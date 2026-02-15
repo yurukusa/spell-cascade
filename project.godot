@@ -8,7 +8,7 @@ config_version=5
 
 config/name="Spell Cascade"
 config/description="Idol Tower Defense with PoE-depth build system. Link skills, craft mods, discover game-changing synergies."
-run/main_scene="res://scenes/game.tscn"
+run/main_scene="res://scenes/title.tscn"
 config/features=PackedStringArray("4.3", "GL Compatibility")
 config/icon="res://icon.svg"
 

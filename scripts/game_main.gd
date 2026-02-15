@@ -1419,7 +1419,7 @@ func _show_result_screen(is_victory: bool) -> void:
 
 	# リトライ
 	var retry := Label.new()
-	retry.text = "Press R to Retry"
+	retry.text = "Press R to Retry  |  Press T for Title"
 	retry.add_theme_font_size_override("font_size", 22)
 	retry.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5, 1.0))
 	retry.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
@@ -1467,6 +1467,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.keycode == KEY_R and game_over:
 			get_tree().paused = false
 			get_tree().reload_current_scene()
+		elif event.keycode == KEY_T and game_over:
+			get_tree().paused = false
+			get_tree().change_scene_to_file("res://scenes/title.tscn")
 		elif event.keycode == KEY_ESCAPE and not game_over:
 			get_tree().paused = not get_tree().paused
 			if get_tree().paused:
