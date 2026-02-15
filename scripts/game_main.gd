@@ -643,20 +643,64 @@ func _update_combo_display() -> void:
 
 # --- タワーイベント ---
 
+var hp_bar_last_value := -1.0  # heal flash検出用
+
 func _on_tower_damaged(current: float, max_val: float) -> void:
+	# Heal flash（HP増加を検出）
+	if hp_bar_last_value >= 0 and current > hp_bar_last_value:
+		_flash_hp_bar_heal()
+	hp_bar_last_value = current
+
 	hp_bar.value = current
 	_update_hp_label(current, max_val)
 
-	# HP低下でバーの色を変化（cyan → yellow → red）
+	# HP低下で連続的な色変化（smooth lerp）
 	var pct := current / max_val
 	var fill_style := hp_bar.get_theme_stylebox("fill") as StyleBoxFlat
-	if fill_style:
-		if pct > 0.5:
-			fill_style.bg_color = Color(0.28, 0.6, 0.8, 1.0)  # cyan
-		elif pct > 0.25:
-			fill_style.bg_color = Color(0.85, 0.75, 0.2, 1.0)  # yellow warning
+	if fill_style == null:
+		return
+
+	var hp_color := Color.WHITE
+	if pct > 0.5:
+		# 100%~50%: cyan
+		hp_color = Color(0.28, 0.6, 0.8, 1.0)
+	elif pct > 0.25:
+		# 50%~25%: cyan → yellow（smooth lerp）
+		var t: float = (pct - 0.25) / 0.25  # 1.0 at 50%, 0.0 at 25%
+		hp_color = Color(0.28, 0.6, 0.8, 1.0).lerp(Color(0.85, 0.75, 0.2, 1.0), 1.0 - t)
+	else:
+		# 25%~0%: yellow → red（smooth lerp）
+		var t: float = pct / 0.25  # 1.0 at 25%, 0.0 at 0%
+		hp_color = Color(0.85, 0.75, 0.2, 1.0).lerp(Color(0.9, 0.2, 0.15, 1.0), 1.0 - t)
+	fill_style.bg_color = hp_color
+
+	# HP label色もバーに連動
+	hp_label.add_theme_color_override("font_color", hp_color.lightened(0.3))
+
+	# Low HP pulse（25%以下でバーの境界線が脈動）
+	var bar_bg := hp_bar.get_theme_stylebox("background") as StyleBoxFlat
+	if bar_bg:
+		if pct <= 0.25 and pct > 0:
+			# 危険: 赤い境界線
+			bar_bg.border_color = Color(0.9, 0.2, 0.15, 0.9)
+			bar_bg.set_border_width_all(2)
+		elif tower.crush_active:
+			# Crush中: 赤い境界線（HP状態と連動）
+			bar_bg.border_color = Color(1.0, 0.3, 0.2, 0.7)
+			bar_bg.set_border_width_all(2)
 		else:
-			fill_style.bg_color = Color(0.9, 0.2, 0.15, 1.0)  # red danger
+			bar_bg.border_color = Color(0.2, 0.18, 0.3, 0.8)
+			bar_bg.set_border_width_all(1)
+
+func _flash_hp_bar_heal() -> void:
+	## HP回復時のバー緑フラッシュ
+	var fill_style := hp_bar.get_theme_stylebox("fill") as StyleBoxFlat
+	if fill_style == null:
+		return
+	var original := fill_style.bg_color
+	fill_style.bg_color = Color(0.3, 0.9, 0.4, 1.0)
+	var tween := hp_bar.create_tween()
+	tween.tween_property(fill_style, "bg_color", original, 0.2)
 
 func _on_xp_gained(total_xp: int, current_level: int) -> void:
 	var next_xp: int = tower.get_xp_for_next_level()
