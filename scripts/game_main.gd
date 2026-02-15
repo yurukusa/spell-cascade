@@ -54,6 +54,13 @@ const BOSS_TIME_TRIGGER := 360.0  # 6分で距離未達でもボス出現（時�
 const BOSS_WARNING_TIME := 350.0  # ボス10秒前予告
 var boss_warning_shown := false
 
+# Shrine（中盤イベント: 120-225sのquiet zone対策）
+const SHRINE_TIME := 150.0  # 2:30で出現
+const SHRINE_AUTO_SELECT_TIME := 10.0  # 10秒で自動選択
+var shrine_shown := false
+var shrine_ui: Control = null
+var shrine_timer := 0.0
+
 # 判断イベント管理
 var upgrade_events_given := 0
 var next_upgrade_time := 0.0
@@ -156,6 +163,16 @@ func _process(delta: float) -> void:
 		else:
 			next_upgrade_time = INF
 		_show_upgrade_choice()
+
+	# Shrine（150sで中盤イベント: quiet zone対策）
+	if not shrine_shown and run_time >= SHRINE_TIME:
+		shrine_shown = true
+		_show_shrine()
+	# Shrine自動選択タイマー
+	if shrine_ui and shrine_timer > 0:
+		shrine_timer -= delta
+		if shrine_timer <= 0:
+			_shrine_auto_select()
 
 	# ボス予告（350sで "BOSS IN 10s"）
 	if not boss_spawned and not boss_warning_shown and run_time >= BOSS_WARNING_TIME:
@@ -506,6 +523,123 @@ func _show_boss_warning() -> void:
 	tween.tween_property(label, "modulate:a", 0.3, 0.4).set_trans(Tween.TRANS_SINE)
 	tween.tween_property(label, "modulate:a", 1.0, 0.4).set_trans(Tween.TRANS_SINE)
 	tween.tween_property(label, "modulate:a", 0.0, 0.5).set_delay(0.5)
+	tween.tween_callback(label.queue_free)
+
+## --- Shrine（中盤イベント） ---
+
+func _show_shrine() -> void:
+	## ゲームを止めずに3択UIを表示。10秒で自動選択
+	shrine_timer = SHRINE_AUTO_SELECT_TIME
+	SFX.play_ui_select()
+
+	shrine_ui = Control.new()
+	shrine_ui.name = "ShrineUI"
+	shrine_ui.z_index = 190
+
+	# 半透明背景（小さめ、画面下部）
+	var bg := ColorRect.new()
+	bg.color = Color(0.1, 0.05, 0.2, 0.85)
+	bg.position = Vector2(240, 500)
+	bg.size = Vector2(800, 160)
+	shrine_ui.add_child(bg)
+
+	# タイトル
+	var title := Label.new()
+	title.text = "SHRINE DISCOVERED"
+	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3, 1.0))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.position = Vector2(240, 505)
+	title.custom_minimum_size = Vector2(800, 0)
+	shrine_ui.add_child(title)
+
+	# 3択ボタン
+	var choices := [
+		{"name": "OVERCHARGE", "desc": "Projectile +2\nCooldown +30% slower", "color": Color(1.0, 0.4, 0.2)},
+		{"name": "GREED", "desc": "Pickup range +200\nDamage -15%", "color": Color(0.3, 1.0, 0.3)},
+		{"name": "DISCIPLINE", "desc": "Damage +25%\nMove speed -20%", "color": Color(0.4, 0.6, 1.0)},
+	]
+
+	for i in choices.size():
+		var btn := Button.new()
+		btn.text = choices[i]["name"] + "\n" + choices[i]["desc"]
+		btn.position = Vector2(260 + i * 260, 530)
+		btn.custom_minimum_size = Vector2(240, 110)
+		btn.add_theme_font_size_override("font_size", 13)
+		# ボタンスタイル
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(0.15, 0.1, 0.25, 0.9)
+		style.border_color = choices[i]["color"]
+		style.set_border_width_all(2)
+		style.set_corner_radius_all(6)
+		btn.add_theme_stylebox_override("normal", style)
+		var hover := style.duplicate() as StyleBoxFlat
+		hover.bg_color = Color(0.25, 0.15, 0.35, 0.95)
+		btn.add_theme_stylebox_override("hover", hover)
+		btn.add_theme_color_override("font_color", choices[i]["color"])
+		btn.pressed.connect(_on_shrine_chosen.bind(i))
+		shrine_ui.add_child(btn)
+
+	ui_layer.add_child(shrine_ui)
+
+	# フェードイン
+	shrine_ui.modulate.a = 0.0
+	var tween := shrine_ui.create_tween()
+	tween.tween_property(shrine_ui, "modulate:a", 1.0, 0.3)
+
+func _on_shrine_chosen(choice: int) -> void:
+	if shrine_ui == null:
+		return
+	SFX.play_ui_select()
+
+	match choice:
+		0:  # OVERCHARGE: projectile+2, cooldown+30%悪化
+			if tower:
+				tower.projectile_bonus += 2
+				tower.cooldown_mult *= 1.3
+		1:  # GREED: pickup attract+200, damage-15%
+			if tower:
+				tower.attract_range_bonus += 200.0
+				tower.damage_mult *= 0.85
+		2:  # DISCIPLINE: damage+25%, move speed-20%
+			if tower:
+				tower.damage_mult *= 1.25
+				tower.move_speed_mult *= 0.8
+
+	# 選択結果のトースト
+	var names := ["OVERCHARGE", "GREED", "DISCIPLINE"]
+	var colors := [Color(1.0, 0.4, 0.2), Color(0.3, 1.0, 0.3), Color(0.4, 0.6, 1.0)]
+	_show_shrine_toast(names[choice], colors[choice])
+	_dismiss_shrine()
+
+func _shrine_auto_select() -> void:
+	## タイムアウト: ランダムに1つ選択
+	var choice := randi() % 3
+	_on_shrine_chosen(choice)
+
+func _dismiss_shrine() -> void:
+	if shrine_ui:
+		var tween := shrine_ui.create_tween()
+		tween.tween_property(shrine_ui, "modulate:a", 0.0, 0.3)
+		tween.tween_callback(shrine_ui.queue_free)
+		shrine_ui = null
+		shrine_timer = 0.0
+
+func _show_shrine_toast(choice_name: String, color: Color) -> void:
+	var label := Label.new()
+	label.text = "SHRINE: " + choice_name + " ACTIVATED"
+	label.add_theme_font_size_override("font_size", 20)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	label.add_theme_constant_override("shadow_offset_x", 2)
+	label.add_theme_constant_override("shadow_offset_y", 2)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.position = Vector2(640 - 200, 350)
+	label.custom_minimum_size = Vector2(400, 0)
+	label.z_index = 200
+	ui_layer.add_child(label)
+	var tween := label.create_tween()
+	tween.tween_property(label, "modulate:a", 0.0, 1.5).set_delay(1.0)
 	tween.tween_callback(label.queue_free)
 
 func _spawn_boss() -> void:
