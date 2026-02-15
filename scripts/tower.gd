@@ -399,3 +399,28 @@ func get_xp_for_next_level() -> int:
 	if level - 1 < level_thresholds.size():
 		return level_thresholds[level - 1]
 	return 9999  # 上限到達
+
+# --- Screen Shake ---
+# Camera2D.offset を揺らして即座に減衰するシンプルなシェイク
+
+var shake_intensity := 0.0
+var shake_decay := 8.0  # 減衰速度
+
+func shake(intensity: float = 3.0) -> void:
+	# 累積ではなく、より強い方を採用（連続ヒットで揺れすぎない）
+	shake_intensity = maxf(shake_intensity, intensity)
+
+func _process(delta: float) -> void:
+	if shake_intensity > 0.01:
+		var cam := get_node_or_null("Camera")
+		if cam and cam is Camera2D:
+			cam.offset = Vector2(
+				randf_range(-shake_intensity, shake_intensity),
+				randf_range(-shake_intensity, shake_intensity)
+			)
+		shake_intensity = lerpf(shake_intensity, 0.0, shake_decay * delta)
+	else:
+		shake_intensity = 0.0
+		var cam := get_node_or_null("Camera")
+		if cam and cam is Camera2D:
+			cam.offset = Vector2.ZERO

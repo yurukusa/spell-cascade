@@ -441,6 +441,8 @@ func _on_boss_died(_enemy: Node2D) -> void:
 	enemies_alive -= 1
 	kill_count += 1
 	tower.enemy_killed.emit()
+	# ボス撃破: 大きなシェイク
+	tower.shake(8.0)
 
 	# ボス撃破のお祝い表示
 	var label := Label.new()
@@ -521,6 +523,8 @@ func _on_enemy_died(_enemy: Node2D) -> void:
 	enemies_alive -= 1
 	kill_count += 1
 	tower.enemy_killed.emit()
+	# 小さなシェイク（爽快感）
+	tower.shake(2.0)
 
 # --- タワーイベント ---
 
@@ -547,6 +551,8 @@ func _on_crush_changed(active: bool, count: int) -> void:
 	if active:
 		crush_label.text = "SURROUNDED x%d" % count
 		crush_label.visible = true
+		# 包囲開始: 警告シェイク
+		tower.shake(4.0)
 	else:
 		crush_label.visible = false
 
