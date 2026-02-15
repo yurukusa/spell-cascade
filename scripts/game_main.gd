@@ -513,6 +513,9 @@ func _on_boss_died(_enemy: Node2D) -> void:
 	combo_count += 3
 	combo_timer = COMBO_WINDOW
 	_update_combo_display()
+	# ボスキル: 長めのヒットストップ + タワーグロー
+	_do_hitstop(0.12)
+	_flash_tower_kill_glow()
 
 	# ボス撃破のお祝い表示
 	var label := Label.new()
@@ -599,6 +602,10 @@ func _on_enemy_died(_enemy: Node2D) -> void:
 	combo_count += 1
 	combo_timer = COMBO_WINDOW
 	_update_combo_display()
+	# ヒットストップ（キル時の一瞬の停止 = 重い手応え）
+	_do_hitstop(0.03)
+	# タワーキルグロー（シアンの瞬間パルス）
+	_flash_tower_kill_glow()
 
 func _update_combo_display() -> void:
 	if combo_label_node == null:
@@ -1088,6 +1095,23 @@ func _show_result_screen(is_victory: bool) -> void:
 		blink.tween_property(retry, "modulate:a", 0.4, 0.6).set_trans(Tween.TRANS_SINE)
 		blink.tween_property(retry, "modulate:a", 1.0, 0.6).set_trans(Tween.TRANS_SINE)
 	)
+
+func _do_hitstop(duration: float) -> void:
+	## 一瞬のタイムスケール低下で「重い手応え」を演出
+	Engine.time_scale = 0.05
+	# 復帰にはSceneTreeTimerを使う（time_scaleの影響を受けない）
+	get_tree().create_timer(duration, true, false, true).timeout.connect(func():
+		Engine.time_scale = 1.0
+	)
+
+func _flash_tower_kill_glow() -> void:
+	## キル時にタワーがシアンに一瞬光る（報酬フィードバック）
+	var glow := tower.get_node_or_null("StylizedVisual")
+	if glow == null:
+		return
+	glow.modulate = Color(1.5, 2.0, 2.5, 1.0)
+	var tween := glow.create_tween()
+	tween.tween_property(glow, "modulate", Color.WHITE, 0.15)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed:

@@ -583,54 +583,115 @@ func _spawn_drops() -> void:
 			scene_root.add_child(chip_orb)
 
 func _spawn_death_vfx() -> void:
-	# キル時の爆散エフェクト: 赤い破片が放射状に飛ぶ（PoE的「画面が光る」快感）
+	## キル時の爆散エフェクト。敵タイプでスケール。
+	## normal: 6片+小flash / swarmer: 4片+小flash / tank: 10片+大flash / boss: 16片+multi-ring
 	var scene_root := get_tree().current_scene
 	if scene_root == null:
 		return
 
+	# タイプ別パラメータ
 	var fragment_count := 6
+	var frag_size_min := 3.0
+	var frag_size_max := 7.0
+	var frag_dist_min := 30.0
+	var frag_dist_max := 80.0
+	var flash_radius := 20.0
+	var flash_scale := 2.0
+	var frag_color := Color(1.0, 0.3, 0.2, 0.9)
+
+	match enemy_type:
+		"swarmer":
+			fragment_count = 4
+			frag_size_min = 2.0
+			frag_size_max = 5.0
+			frag_dist_max = 60.0
+			frag_color = Color(0.3, 0.9, 0.3, 0.9)
+		"tank":
+			fragment_count = 10
+			frag_size_min = 4.0
+			frag_size_max = 10.0
+			frag_dist_min = 40.0
+			frag_dist_max = 120.0
+			flash_radius = 30.0
+			flash_scale = 2.5
+			frag_color = Color(0.6, 0.15, 0.1, 0.9)
+		"boss":
+			fragment_count = 16
+			frag_size_min = 5.0
+			frag_size_max = 14.0
+			frag_dist_min = 50.0
+			frag_dist_max = 160.0
+			flash_radius = 40.0
+			flash_scale = 3.5
+			frag_color = Color(0.7, 0.3, 1.0, 0.9)
+
+	# 破片
 	for i in range(fragment_count):
 		var frag := Polygon2D.new()
 		var angle := randf() * TAU
-		var size := randf_range(3.0, 7.0)
+		var size := randf_range(frag_size_min, frag_size_max)
 		frag.polygon = PackedVector2Array([
 			Vector2(-size, -size * 0.5),
 			Vector2(size, 0),
 			Vector2(-size, size * 0.5),
 		])
-		var frag_color := Color(1.0, 0.3, 0.2, 0.9)
-		if enemy_type == "swarmer":
-			frag_color = Color(0.3, 0.9, 0.3, 0.9)
-		elif enemy_type == "tank":
-			frag_color = Color(0.6, 0.15, 0.1, 0.9)
-		frag.color = frag_color
+		# 色をわずかにランダム化（単調さ防止）
+		var color_var := randf_range(-0.1, 0.1)
+		frag.color = Color(
+			clampf(frag_color.r + color_var, 0.0, 1.0),
+			clampf(frag_color.g + color_var * 0.5, 0.0, 1.0),
+			clampf(frag_color.b + color_var, 0.0, 1.0),
+			frag_color.a
+		)
 		frag.global_position = global_position
 		frag.rotation = angle
 		scene_root.add_child(frag)
 
-		# 飛散アニメーション
-		var dist := randf_range(30.0, 80.0)
+		var dist := randf_range(frag_dist_min, frag_dist_max)
 		var target_pos := global_position + Vector2(cos(angle), sin(angle)) * dist
+		var frag_dur := 0.3 if enemy_type != "boss" else 0.5
 		var tween := frag.create_tween()
 		tween.set_parallel(true)
-		tween.tween_property(frag, "global_position", target_pos, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		tween.tween_property(frag, "modulate:a", 0.0, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		tween.tween_property(frag, "scale", Vector2(0.3, 0.3), 0.3)
+		tween.tween_property(frag, "global_position", target_pos, frag_dur).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tween.tween_property(frag, "modulate:a", 0.0, frag_dur).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tween.tween_property(frag, "scale", Vector2(0.3, 0.3), frag_dur)
 		tween.chain().tween_callback(frag.queue_free)
 
-	# 白フラッシュ円（瞬間的な満足感）
+	# メインフラッシュ円
+	_spawn_flash_ring(scene_root, flash_radius, flash_scale, 0.15)
+
+	# ボス: 追加リング（2段階の遅延爆発）
+	if enemy_type == "boss":
+		# ディレイ付き第2リング
+		var timer := get_tree().create_timer(0.1)
+		timer.timeout.connect(func():
+			if is_instance_valid(scene_root):
+				_spawn_flash_ring_at(scene_root, global_position, flash_radius * 0.7, 3.0, 0.2, Color(1.0, 0.6, 1.0, 0.5))
+		)
+		# ディレイ付き第3リング
+		var timer2 := get_tree().create_timer(0.2)
+		timer2.timeout.connect(func():
+			if is_instance_valid(scene_root):
+				_spawn_flash_ring_at(scene_root, global_position, flash_radius * 0.5, 4.0, 0.25, Color(1.0, 0.9, 0.5, 0.4))
+		)
+
+func _spawn_flash_ring(scene_root: Node, radius: float, target_scale: float, duration: float) -> void:
+	_spawn_flash_ring_at(scene_root, global_position, radius, target_scale, duration, Color(1.0, 0.8, 0.6, 0.6))
+
+func _spawn_flash_ring_at(scene_root: Node, pos: Vector2, radius: float, target_scale: float, duration: float, color: Color) -> void:
 	var flash := Polygon2D.new()
 	var flash_pts: PackedVector2Array = []
-	for j in range(8):
-		var a := j * TAU / 8
-		flash_pts.append(Vector2(cos(a), sin(a)) * 20.0)
+	for j in range(12):
+		var a: float = float(j) * TAU / 12.0
+		flash_pts.append(Vector2(cos(a), sin(a)) * radius)
 	flash.polygon = flash_pts
-	flash.color = Color(1.0, 0.8, 0.6, 0.6)
-	flash.global_position = global_position
+	flash.color = color
+	flash.global_position = pos
+	flash.z_index = 120
 	scene_root.add_child(flash)
 
 	var flash_tween := flash.create_tween()
 	flash_tween.set_parallel(true)
-	flash_tween.tween_property(flash, "scale", Vector2(2.0, 2.0), 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	flash_tween.tween_property(flash, "modulate:a", 0.0, 0.15)
+	flash_tween.tween_property(flash, "scale", Vector2(target_scale, target_scale), duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	flash_tween.tween_property(flash, "modulate:a", 0.0, duration)
 	flash_tween.chain().tween_callback(flash.queue_free)
