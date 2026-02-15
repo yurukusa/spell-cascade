@@ -33,11 +33,18 @@ func _apply_saved_chips() -> void:
 	if save_mgr == null:
 		return
 	var saved: Dictionary = save_mgr.get_unlocked_chips()
+	var applied: Array[String] = []
 	for category in saved.keys():
 		var chip_id: String = saved[category]
 		# チップが実際に存在するか確認してから適用
 		if chips.has(chip_id) or chip_id in ["manual", "manual_aim", "auto_cast"]:
 			equipped_chips[category] = chip_id
+			if chip_id != "manual" and chip_id != "manual_aim" and chip_id != "auto_cast":
+				applied.append("%s=%s" % [category, chip_id])
+	if applied.size() > 0:
+		print("Chip Vault loaded: ", ", ".join(applied))
+	else:
+		print("Chip Vault: no saved unlocks (fresh start)")
 
 func _load_data() -> void:
 	skills = _load_json("res://data/skills.json", "skills", "id")
