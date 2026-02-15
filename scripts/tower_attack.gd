@@ -98,18 +98,28 @@ func _create_projectile(direction: Vector2) -> void:
 	# コリジョン
 	var col := CollisionShape2D.new()
 	var shape := CircleShape2D.new()
-	shape.radius = 5.0
+	shape.radius = 8.0
 	col.shape = shape
 	bullet.add_child(col)
 
-	# ビジュアル（プレースホルダ）
+	# ビジュアル（視認性重視: 12px六角形 + グロー）
+	var color := _get_bullet_color()
+	var glow := Polygon2D.new()
+	var glow_points: PackedVector2Array = []
+	for i in range(8):
+		var angle := i * TAU / 8
+		glow_points.append(Vector2(cos(angle), sin(angle)) * 16.0)
+	glow.polygon = glow_points
+	glow.color = Color(color.r, color.g, color.b, 0.25)
+	bullet.add_child(glow)
+
 	var visual := Polygon2D.new()
 	var points: PackedVector2Array = []
 	for i in range(6):
 		var angle := i * TAU / 6
-		points.append(Vector2(cos(angle), sin(angle)) * 5.0)
+		points.append(Vector2(cos(angle), sin(angle)) * 10.0)
 	visual.polygon = points
-	visual.color = _get_bullet_color()
+	visual.color = color
 	bullet.add_child(visual)
 
 	# 弾スクリプト
@@ -255,7 +265,7 @@ func _find_chain_target(exclude_body) -> Node2D:
 
 	return nearest
 
-func _do_fork(hit_body):
+func _do_fork(_hit_body):
 	# Fork弾を生成（fork_countは0にして無限分裂を防止）
 	var base_angle := direction.angle()
 	for i in range(2):

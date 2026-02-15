@@ -18,8 +18,8 @@ func _process(delta: float) -> void:
 		phase = 1
 		timer = 0.0
 
-	elif phase == 1 and timer >= 4.0:
-		# 4秒後にスクショ
+	elif phase == 1 and timer >= 12.0:
+		# 12秒後にスクショ（敵がレンジ内に到達する時間）
 		phase = 2
 		_take_screenshot()
 
@@ -49,7 +49,7 @@ func _find_and_press_button(node: Node) -> void:
 func _take_screenshot() -> void:
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
-	var path := "/home/namakusa/screenshots/spell-cascade-v4-gameplay.png"
+	var path := "/home/namakusa/screenshots/spell-cascade-v6-player-avatar.png"
 	var err := img.save_png(path)
 	if err == OK:
 		print("SCREENSHOT_SAVED: %s" % path)
