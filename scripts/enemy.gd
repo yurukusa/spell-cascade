@@ -461,10 +461,35 @@ func _spawn_damage_number(amount: float) -> void:
 	if scene_root == null:
 		return
 
+	# ダメージ量に応じてサイズ・色・演出を変化
+	var dmg_int := int(amount)
+	var font_size := 14
+	var color := Color(0.9, 0.85, 0.7, 1.0)  # 小ダメージ: 薄い白
+	var float_height := 35.0
+	var duration := 0.5
+
+	if amount >= 50.0:
+		# 大ダメージ: 赤くて大きい
+		font_size = 26
+		color = Color(1.0, 0.2, 0.1, 1.0)
+		float_height = 55.0
+		duration = 0.8
+	elif amount >= 25.0:
+		# 中ダメージ: オレンジ
+		font_size = 20
+		color = Color(1.0, 0.7, 0.2, 1.0)
+		float_height = 45.0
+		duration = 0.65
+	elif amount >= 10.0:
+		# 普通ダメージ: 黄色
+		font_size = 16
+		color = Color(1.0, 0.9, 0.4, 1.0)
+		float_height = 40.0
+
 	var label := Label.new()
-	label.text = str(int(amount))
-	label.add_theme_font_size_override("font_size", 16)
-	label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5, 1.0))
+	label.text = str(dmg_int)
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
 	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	label.add_theme_constant_override("shadow_offset_x", 1)
 	label.add_theme_constant_override("shadow_offset_y", 1)
@@ -474,8 +499,14 @@ func _spawn_damage_number(amount: float) -> void:
 
 	var float_tween := label.create_tween()
 	float_tween.set_parallel(true)
-	float_tween.tween_property(label, "global_position:y", label.global_position.y - 40.0, 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	float_tween.tween_property(label, "modulate:a", 0.0, 0.6).set_delay(0.2)
+	float_tween.tween_property(label, "global_position:y", label.global_position.y - float_height, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	float_tween.tween_property(label, "modulate:a", 0.0, duration).set_delay(duration * 0.3)
+
+	# 大ダメージはスケールバウンスで「重い一撃」を演出
+	if amount >= 50.0:
+		float_tween.tween_property(label, "scale", Vector2(1.3, 1.3), 0.08).set_trans(Tween.TRANS_BACK)
+		float_tween.chain().tween_property(label, "scale", Vector2(1.0, 1.0), 0.1)
+
 	float_tween.chain().tween_callback(label.queue_free)
 
 	if hp <= 0:
