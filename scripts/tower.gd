@@ -27,7 +27,7 @@ var start_y := 0.0  # 開始Y位置
 var xp := 0
 var level := 1
 # レベルアップに必要な累計XP（Lv2=10, Lv3=25, ...）
-var level_thresholds: Array[int] = [10, 25, 50, 80, 120, 170, 230, 300, 380, 470, 570, 680, 800]
+var level_thresholds: Array[int] = [5, 12, 22, 35, 52, 72, 95, 122, 155, 195, 240, 290, 350]
 signal xp_gained(total_xp: int, level: int)
 signal level_up(new_level: int)
 
