@@ -40,6 +40,11 @@ var best_combo := 0  # リザルト画面用
 var crush_ring: Line2D = null
 var crush_warning_label: Label = null  # pre-crush "DANGER" 表示
 
+# Boss HP bar
+var boss_hp_bar: ProgressBar = null
+var boss_hp_label: Label = null
+var boss_phase_label: Label = null
+
 # 画面外敵インジケーター
 var indicator_pool: Array[Polygon2D] = []
 const MAX_INDICATORS := 8
@@ -478,8 +483,13 @@ func _spawn_boss() -> void:
 	boss.init(tower, speed_val, hp_val, dmg_val, "boss")
 	boss.add_to_group("enemies")
 	boss.died.connect(_on_boss_died)
+	boss.boss_hp_changed.connect(_on_boss_hp_changed)
+	boss.boss_phase_changed.connect(_on_boss_phase_changed)
 	enemies_alive += 1
 	add_child(boss)
+
+	# Boss HP bar（画面上部中央）
+	_create_boss_hp_bar(boss)
 
 	# "BOSS INCOMING!" 警告テキスト
 	var label := Label.new()
@@ -534,6 +544,122 @@ func _on_boss_died(_enemy: Node2D) -> void:
 	var tween := label.create_tween()
 	tween.tween_property(label, "modulate:a", 0.0, 2.0).set_delay(1.5)
 	tween.chain().tween_callback(label.queue_free)
+
+	# Boss HP bar除去
+	_remove_boss_hp_bar()
+
+func _create_boss_hp_bar(boss: Node2D) -> void:
+	## ボス専用HPバー（画面上部中央）
+	boss_hp_bar = ProgressBar.new()
+	boss_hp_bar.name = "BossHPBar"
+	boss_hp_bar.position = Vector2(340, 80)
+	boss_hp_bar.custom_minimum_size = Vector2(600, 14)
+	boss_hp_bar.size = Vector2(600, 14)
+	boss_hp_bar.max_value = boss.max_hp
+	boss_hp_bar.value = boss.hp
+	boss_hp_bar.show_percentage = false
+
+	var bar_bg := StyleBoxFlat.new()
+	bar_bg.bg_color = Color(0.06, 0.03, 0.12, 0.85)
+	bar_bg.border_color = Color(0.5, 0.2, 0.7, 0.8)
+	bar_bg.set_border_width_all(1)
+	bar_bg.set_corner_radius_all(3)
+	boss_hp_bar.add_theme_stylebox_override("background", bar_bg)
+
+	var bar_fill := StyleBoxFlat.new()
+	bar_fill.bg_color = Color(0.6, 0.2, 0.9, 1.0)
+	bar_fill.set_corner_radius_all(2)
+	boss_hp_bar.add_theme_stylebox_override("fill", bar_fill)
+	boss_hp_bar.z_index = 180
+	ui_layer.add_child(boss_hp_bar)
+
+	# Boss name label
+	boss_hp_label = Label.new()
+	boss_hp_label.name = "BossHPLabel"
+	boss_hp_label.text = "BOSS"
+	boss_hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	boss_hp_label.position = Vector2(440, 60)
+	boss_hp_label.custom_minimum_size = Vector2(400, 0)
+	boss_hp_label.add_theme_font_size_override("font_size", 14)
+	boss_hp_label.add_theme_color_override("font_color", Color(0.7, 0.4, 1.0, 0.9))
+	boss_hp_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	boss_hp_label.add_theme_constant_override("shadow_offset_x", 1)
+	boss_hp_label.add_theme_constant_override("shadow_offset_y", 1)
+	boss_hp_label.z_index = 180
+	ui_layer.add_child(boss_hp_label)
+
+	# Phase indicator
+	boss_phase_label = Label.new()
+	boss_phase_label.name = "BossPhaseLabel"
+	boss_phase_label.text = "Phase 1"
+	boss_phase_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	boss_phase_label.position = Vector2(740, 96)
+	boss_phase_label.custom_minimum_size = Vector2(200, 0)
+	boss_phase_label.add_theme_font_size_override("font_size", 12)
+	boss_phase_label.add_theme_color_override("font_color", Color(0.5, 0.3, 0.8, 0.7))
+	boss_phase_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	boss_phase_label.add_theme_constant_override("shadow_offset_x", 1)
+	boss_phase_label.add_theme_constant_override("shadow_offset_y", 1)
+	boss_phase_label.z_index = 180
+	ui_layer.add_child(boss_phase_label)
+
+func _remove_boss_hp_bar() -> void:
+	if boss_hp_bar:
+		boss_hp_bar.queue_free()
+		boss_hp_bar = null
+	if boss_hp_label:
+		boss_hp_label.queue_free()
+		boss_hp_label = null
+	if boss_phase_label:
+		boss_phase_label.queue_free()
+		boss_phase_label = null
+
+func _on_boss_hp_changed(current: float, max_val: float) -> void:
+	if boss_hp_bar:
+		boss_hp_bar.value = current
+		# HP割合でバー色変化（紫→赤）
+		var pct := current / max_val
+		var fill := boss_hp_bar.get_theme_stylebox("fill") as StyleBoxFlat
+		if fill:
+			if pct > 0.66:
+				fill.bg_color = Color(0.6, 0.2, 0.9, 1.0)
+			elif pct > 0.33:
+				fill.bg_color = Color(0.9, 0.5, 0.2, 1.0)
+			else:
+				fill.bg_color = Color(0.9, 0.15, 0.1, 1.0)
+
+func _on_boss_phase_changed(phase: int, _hp_pct: float) -> void:
+	if boss_phase_label:
+		boss_phase_label.text = "Phase %d" % phase
+		# フェーズ移行時のラベルフラッシュ
+		boss_phase_label.add_theme_color_override("font_color", Color(1.0, 0.8, 0.3, 1.0))
+		var tween := boss_phase_label.create_tween()
+		tween.tween_property(boss_phase_label, "theme_override_colors/font_color", Color(0.5, 0.3, 0.8, 0.7), 0.5)
+
+	# フェーズ移行: 中シェイク
+	tower.shake(5.0)
+
+	# "PHASE X" テキスト
+	var label := Label.new()
+	label.text = "PHASE %d" % phase
+	label.add_theme_font_size_override("font_size", 30)
+	label.add_theme_color_override("font_color", Color(0.8, 0.4, 1.0, 1.0))
+	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	label.add_theme_constant_override("shadow_offset_x", 2)
+	label.add_theme_constant_override("shadow_offset_y", 2)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.position = Vector2(490, 150)
+	label.custom_minimum_size = Vector2(300, 0)
+	label.z_index = 200
+	label.modulate.a = 0.0
+	ui_layer.add_child(label)
+
+	var text_tween := label.create_tween()
+	text_tween.tween_property(label, "modulate:a", 1.0, 0.1)
+	text_tween.tween_property(label, "scale", Vector2(1.2, 1.2), 0.1).set_trans(Tween.TRANS_BACK)
+	text_tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1)
+	text_tween.tween_property(label, "modulate:a", 0.0, 0.8).set_delay(0.5)
+	text_tween.tween_callback(label.queue_free)
 
 func _spawn_enemy() -> void:
 	if enemy_scene == null:

@@ -20,8 +20,12 @@ var boss_timer := 0.0
 var boss_attack_cd := 3.0  # 攻撃間隔
 var boss_attack_timer := 0.0
 var boss_telegraph_node: Node2D = null
+var boss_phase := 1  # 1=100-66%, 2=66-33%, 3=33-0%
+var boss_phase_invuln := 0.0  # フェーズ移行中の無敵時間
 
 signal died(enemy: Node2D)
+signal boss_phase_changed(phase: int, hp_pct: float)  # game_mainがHPバー更新用
+signal boss_hp_changed(current: float, max_val: float)  # ボスHPバー更新用
 
 func _ready() -> void:
 	hp = max_hp
@@ -270,8 +274,69 @@ func _physics_process(delta: float) -> void:
 			if player.has_method("take_damage"):
 				player.take_damage(damage)
 
+func _check_boss_phase() -> void:
+	## HP割合でフェーズ移行を判定
+	var pct := hp / max_hp
+	var new_phase := 1
+	if pct <= 0.33:
+		new_phase = 3
+	elif pct <= 0.66:
+		new_phase = 2
+
+	if new_phase > boss_phase:
+		boss_phase = new_phase
+		boss_phase_changed.emit(boss_phase, pct)
+		_boss_phase_transition()
+
+func _boss_phase_transition() -> void:
+	## フェーズ移行演出: 短い無敵 + 視覚バースト + パラメータ強化
+	boss_phase_invuln = 0.8
+	boss_state = "cooldown"
+	boss_timer = 0.0
+
+	# フェーズ移行でパラメータ強化
+	match boss_phase:
+		2:
+			boss_attack_cd = maxf(boss_attack_cd * 0.7, 1.5)
+			speed *= 1.2
+		3:
+			boss_attack_cd = maxf(boss_attack_cd * 0.6, 1.0)
+			speed *= 1.3
+
+	# 視覚: 紫のパルスリング
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+	var ring := Polygon2D.new()
+	var pts: PackedVector2Array = []
+	for i in range(16):
+		var a: float = float(i) * TAU / 16.0
+		pts.append(Vector2(cos(a), sin(a)) * 20.0)
+	ring.polygon = pts
+	ring.color = Color(0.7, 0.2, 1.0, 0.7)
+	ring.global_position = global_position
+	ring.z_index = 130
+	scene_root.add_child(ring)
+
+	var tween := ring.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(ring, "scale", Vector2(6.0, 6.0), 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(ring, "modulate:a", 0.0, 0.4)
+	tween.chain().tween_callback(ring.queue_free)
+
+	# 本体フラッシュ
+	modulate = Color(2.0, 1.0, 3.0, 1.0)
+	var body_tween := create_tween()
+	body_tween.tween_property(self, "modulate", Color.WHITE, 0.4)
+
 func _boss_process(delta: float) -> void:
-	## ボス専用AI: chase → 攻撃 → cooldown のループ
+	## ボス専用AI: chase → 攻撃 → cooldown のループ（フェーズ対応）
+
+	# 無敵タイマー減衰
+	if boss_phase_invuln > 0:
+		boss_phase_invuln -= delta
+		return
+
 	boss_attack_timer += delta
 
 	match boss_state:
@@ -290,10 +355,15 @@ func _boss_process(delta: float) -> void:
 					if player.has_method("take_damage"):
 						player.take_damage(damage)
 
-			# 攻撃パターン発動（交互に切り替え）
+			# 攻撃パターン発動（フェーズで確率変化）
 			if boss_attack_timer >= boss_attack_cd:
 				boss_attack_timer = 0.0
-				if randi() % 2 == 0:
+				var roll := randf()
+				if boss_phase >= 3 and roll < 0.3:
+					# Phase 3: 30%でburst+charge連続
+					_boss_start_telegraph_burst()
+					# burst後にcharge予約（_boss_fire_burstから呼ばれる）
+				elif roll < 0.5:
 					_boss_start_telegraph_burst()
 				else:
 					_boss_start_telegraph_charge()
@@ -371,9 +441,10 @@ func _boss_fire_burst() -> void:
 	if scene_root == null:
 		return
 
-	# 8方向に弾を発射
-	for i in range(8):
-		var angle := i * TAU / 8.0
+	# フェーズで弾数が増加: P1=8, P2=12, P3=16
+	var bullet_count := 8 + (boss_phase - 1) * 4
+	for i in range(bullet_count):
+		var angle := float(i) * TAU / float(bullet_count)
 		var dir := Vector2(cos(angle), sin(angle))
 
 		var bullet := Area2D.new()
@@ -450,8 +521,17 @@ func _on_body_entered(body):
 """
 
 func take_damage(amount: float) -> void:
+	# フェーズ移行中の無敵
+	if boss_phase_invuln > 0:
+		return
+
 	hp -= amount
 	_spawn_damage_number(amount)
+
+	# ボスHPバー更新
+	if is_boss:
+		boss_hp_changed.emit(hp, max_hp)
+		_check_boss_phase()
 
 	# ヒットフラッシュ
 	modulate = Color(2, 2, 2, 1)
