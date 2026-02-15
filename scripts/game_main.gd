@@ -17,6 +17,7 @@ extends Node2D
 
 var build_system: Node  # BuildSystem autoload
 var upgrade_ui: Node  # UpgradeUI
+var xp_bar: ProgressBar = null  # XP進捗バー
 
 # ゲーム状態
 var run_time := 0.0
@@ -203,6 +204,27 @@ func _style_hud() -> void:
 	distance_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
 	distance_label.add_theme_constant_override("shadow_offset_x", 1)
 	distance_label.add_theme_constant_override("shadow_offset_y", 1)
+
+	# XP progress bar (WaveLabelの下、薄いバー)
+	xp_bar = ProgressBar.new()
+	xp_bar.name = "XPBar"
+	xp_bar.position = Vector2(530, 44)
+	xp_bar.custom_minimum_size = Vector2(220, 6)
+	xp_bar.size = Vector2(220, 6)
+	xp_bar.max_value = tower.get_xp_for_next_level()
+	xp_bar.value = 0
+	xp_bar.show_percentage = false
+
+	var xp_bar_bg := StyleBoxFlat.new()
+	xp_bar_bg.bg_color = Color(0.08, 0.06, 0.15, 0.6)
+	xp_bar_bg.set_corner_radius_all(2)
+	xp_bar.add_theme_stylebox_override("background", xp_bar_bg)
+
+	var xp_bar_fill := StyleBoxFlat.new()
+	xp_bar_fill.bg_color = Color(0.35, 0.85, 0.45, 0.8)  # 緑: XPカラー
+	xp_bar_fill.set_corner_radius_all(2)
+	xp_bar.add_theme_stylebox_override("fill", xp_bar_fill)
+	ui_layer.add_child(xp_bar)
 
 	# Build info label
 	build_label.add_theme_font_size_override("font_size", 13)
@@ -617,6 +639,10 @@ func _on_tower_damaged(current: float, max_val: float) -> void:
 func _on_xp_gained(total_xp: int, current_level: int) -> void:
 	var next_xp: int = tower.get_xp_for_next_level()
 	wave_label.text = "Lv.%d  XP: %d/%d" % [current_level, total_xp, next_xp]
+	# XPバー更新
+	if xp_bar:
+		xp_bar.max_value = next_xp
+		xp_bar.value = total_xp
 
 func _on_crush_changed(active: bool, count: int) -> void:
 	if active:
@@ -645,6 +671,18 @@ func _on_level_up(new_level: int) -> void:
 	for i in range(mini(3, pool.size())):
 		choices.append(pool[i])
 	upgrade_ui.show_levelup_choice(new_level, choices)
+
+	# XPバーリセット（次のレベルの目標に合わせる）
+	if xp_bar:
+		xp_bar.max_value = tower.get_xp_for_next_level()
+		xp_bar.value = tower.xp
+		# レベルアップフラッシュ: バーが一瞬光る
+		var xp_fill := xp_bar.get_theme_stylebox("fill") as StyleBoxFlat
+		if xp_fill:
+			var original_color := Color(0.35, 0.85, 0.45, 0.8)
+			xp_fill.bg_color = Color(1.0, 1.0, 0.6, 1.0)
+			var bar_tween := xp_bar.create_tween()
+			bar_tween.tween_property(xp_fill, "bg_color", original_color, 0.3)
 
 	# レベルアップフラッシュVFX
 	_spawn_levelup_vfx()
