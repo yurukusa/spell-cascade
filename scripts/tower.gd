@@ -1,7 +1,7 @@
 extends CharacterBody2D
 
-## Tower - プレイヤーアバター兼装備台。
-## Behavior Chipsで制御されるAI移動。操作機序そのものが装備。
+## Tower - プレイヤーアバター。
+## Mirror War: 手動WASD操作がデフォルト。AutoMoveチップで自動化を"勝ち取る"。
 ## 「プログラムが装備品」= 知識は力。
 
 signal module_changed(slot_index: int)
@@ -19,13 +19,18 @@ var build_system: Node
 
 # Move AI state
 var orbit_angle := 0.0  # Orbit chip用
+var facing_dir := Vector2.UP  # 最後に向いていた方向（弾の方向用）
+var distance_traveled := 0.0  # 進行距離（メートル）
+var start_y := 0.0  # 開始Y位置
 
 func _ready() -> void:
 	hp = max_hp
+	start_y = position.y
 	for i in range(max_slots):
 		modules.append(null)
 	build_system = get_node("/root/BuildSystem")
 	_install_stylized_visual()
+	_setup_camera()
 
 func _install_stylized_visual() -> void:
 	# The current sprite pack reads as "placeholder". Replace with a simple stylized silhouette
@@ -106,14 +111,31 @@ func _make_ngon(sides: int, radius: float) -> PackedVector2Array:
 		pts.append(Vector2(cos(a), sin(a)) * radius)
 	return pts
 
+func _setup_camera() -> void:
+	# Camera2D: プレイヤー追従で縦スクロール実現
+	if get_node_or_null("Camera") != null:
+		return
+	var cam := Camera2D.new()
+	cam.name = "Camera"
+	cam.position_smoothing_enabled = true
+	cam.position_smoothing_speed = 8.0
+	# X軸は画面中央にロック、Y軸のみ追従（縦スクロール）
+	cam.limit_left = 0
+	cam.limit_right = 1280
+	add_child(cam)
+	cam.make_current()
+
 func _physics_process(delta: float) -> void:
 	var move_chip: Dictionary = build_system.get_equipped_chip("move")
-	var move_id: String = move_chip.get("id", "kite")
+	var move_id: String = move_chip.get("id", "manual")
 	var move_dir := Vector2.ZERO
 
 	var enemies := get_tree().get_nodes_in_group("enemies")
 
 	match move_id:
+		"manual", "":
+			# デフォルト: WASD手動操作
+			move_dir = _get_manual_input()
 		"kite":
 			move_dir = _ai_kite(enemies, move_chip.get("params", {}))
 		"orbit":
@@ -121,15 +143,31 @@ func _physics_process(delta: float) -> void:
 		"greedy":
 			move_dir = _ai_greedy(enemies, move_chip.get("params", {}))
 		_:
-			move_dir = _ai_kite(enemies, {})
+			move_dir = _get_manual_input()
+
+	if move_dir != Vector2.ZERO:
+		facing_dir = move_dir.normalized()
 
 	velocity = move_dir * move_speed
 	move_and_slide()
 
-	# 画面外に出ないようクランプ
-	var vp := get_viewport_rect().size
-	position.x = clampf(position.x, 24.0, vp.x - 24.0)
-	position.y = clampf(position.y, 24.0, vp.y - 24.0)
+	# X軸のみ画面内クランプ（Y軸は無制限 = 縦スクロール）
+	position.x = clampf(position.x, 24.0, 1256.0)
+
+	# 進行距離更新（上方向=負のY）
+	distance_traveled = maxf(start_y - position.y, distance_traveled)
+
+func _get_manual_input() -> Vector2:
+	var dir := Vector2.ZERO
+	if Input.is_action_pressed("move_up"):
+		dir.y -= 1.0
+	if Input.is_action_pressed("move_down"):
+		dir.y += 1.0
+	if Input.is_action_pressed("move_left"):
+		dir.x -= 1.0
+	if Input.is_action_pressed("move_right"):
+		dir.x += 1.0
+	return dir.normalized()
 
 # --- Move AI パターン ---
 

@@ -1,7 +1,7 @@
 extends Node2D
 
-## GameMain - 放置専用アクションRPG。
-## Behavior Chips（操作AI）を選んでスタート。プレイヤーは自動で動く。
+## GameMain - Mirror War: 縦スクロールハクスラ。
+## 手動で強くなる→装備更新→オート化を"勝ち取る"。
 ## 「プログラムが装備品」= 知識は力。
 
 @onready var tower: Node2D = $Tower
@@ -12,6 +12,7 @@ extends Node2D
 @onready var timer_label: Label = $UI/TimerLabel
 @onready var build_label: Label = $UI/BuildLabel
 @onready var restart_label: Label = $UI/RestartLabel
+@onready var distance_label: Label = $UI/DistanceLabel
 
 var build_system: Node  # BuildSystem autoload
 var upgrade_ui: Node  # UpgradeUI
@@ -21,20 +22,18 @@ var run_time := 0.0
 var max_run_time := 600.0  # 10分
 var game_over := false
 var enemies_alive := 0
-
-# ロードアウト選択フェーズ
-var loadout_phase := 0  # 0=preset選択, 1=playing
+var game_started := false
 
 # 判断イベント管理
 var upgrade_events_given := 0
 var next_upgrade_time := 0.0
-# 2分フック: 10秒で最初のゲームチェンジ体験
+# 縦スクロール: 距離ベースのアップグレード（メートル単位）
 var upgrade_schedule: Array[float] = [10.0, 25.0, 45.0, 70.0, 100.0, 140.0, 190.0, 250.0, 320.0, 400.0]
 
-# 敵スポーン（初期密度ブースト: 最初から弾幕感を出す）
+# 敵スポーン
 var enemy_scene: PackedScene
 var spawn_timer := 0.0
-var spawn_interval := 1.2  # 2.0→1.2: 最初から敵が多い
+var spawn_interval := 1.5  # 縦スクロール: 少しゆったり（手動操作のため）
 
 func _ready() -> void:
 	build_system = get_node("/root/BuildSystem")
@@ -61,34 +60,40 @@ func _ready() -> void:
 	_update_hp_label(tower.max_hp, tower.max_hp)
 	restart_label.visible = false
 
-	# ロードアウト選択開始（プリセット1画面）
-	_show_loadout_choice()
+	# Mirror War: 即スタート。初期スキルはFireball
+	var module: Variant = build_system.TowerModule.new("fireball")
+	tower.set_module(0, module)
+	_setup_tower_attacks()
+	_update_build_display()
+	game_started = true
 
-	# 最初の判断イベントタイミング
+	# 最初の判断イベントタイミング（距離ベース）
 	if not upgrade_schedule.is_empty():
 		next_upgrade_time = upgrade_schedule[0]
 
 func _process(delta: float) -> void:
-	if game_over or loadout_phase < 1:
+	if game_over or not game_started:
 		return
 
 	run_time += delta
 	_update_timer_display()
+	_update_distance_display()
 
 	# 10分経過 → 勝利
 	if run_time >= max_run_time:
 		_win_game()
 		return
 
-	# 敵スポーン
+	# 敵スポーン（縦スクロール: 上方スポーン中心）
 	spawn_timer += delta
-	var current_interval := maxf(spawn_interval - run_time * 0.003, 0.3)
+	var current_interval := maxf(spawn_interval - run_time * 0.002, 0.4)
 	if spawn_timer >= current_interval:
 		spawn_timer = 0.0
 		_spawn_enemy()
 
-	# 判断イベント
-	if run_time >= next_upgrade_time and upgrade_events_given < upgrade_schedule.size():
+	# 判断イベント（距離ベース: メートル単位）
+	var distance_m: float = float(tower.distance_traveled) / 10.0  # 10px = 1m
+	if distance_m >= next_upgrade_time and upgrade_events_given < upgrade_schedule.size():
 		upgrade_events_given += 1
 		if upgrade_events_given < upgrade_schedule.size():
 			next_upgrade_time = upgrade_schedule[upgrade_events_given]
@@ -145,6 +150,13 @@ func _style_hud() -> void:
 	timer_label.add_theme_constant_override("shadow_offset_x", 1)
 	timer_label.add_theme_constant_override("shadow_offset_y", 1)
 
+	# Distance label (below title)
+	distance_label.add_theme_font_size_override("font_size", 16)
+	distance_label.add_theme_color_override("font_color", dim_text)
+	distance_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
+	distance_label.add_theme_constant_override("shadow_offset_x", 1)
+	distance_label.add_theme_constant_override("shadow_offset_y", 1)
+
 	# Build info label
 	build_label.add_theme_font_size_override("font_size", 13)
 	build_label.add_theme_color_override("font_color", dim_text)
@@ -162,15 +174,20 @@ func _style_hud() -> void:
 func _update_hp_label(current: float, max_val: float) -> void:
 	hp_label.text = "%d / %d" % [int(current), int(max_val)]
 
+func _update_distance_display() -> void:
+	var distance_m: float = float(tower.distance_traveled) / 10.0
+	distance_label.text = "%dm" % int(distance_m)
+
 func _update_build_display() -> void:
 	var lines: PackedStringArray = []
 
-	# Behavior Chips表示
+	# Behavior Chips表示（"manual"はデータにないので直接表示）
 	var move_chip: Dictionary = build_system.get_equipped_chip("move")
 	var attack_chip: Dictionary = build_system.get_equipped_chip("attack")
 	var skill_chip: Dictionary = build_system.get_equipped_chip("skill")
+	var move_name: String = move_chip.get("name", "Manual") if not move_chip.is_empty() else "Manual"
 	lines.append("AI: %s / %s / %s" % [
-		move_chip.get("name", "?"),
+		move_name,
 		attack_chip.get("name", "?"),
 		skill_chip.get("name", "?"),
 	])
@@ -213,27 +230,10 @@ func _update_build_display() -> void:
 
 	build_label.text = "\n".join(lines)
 
-# --- ロードアウト選択（1画面プリセット）---
-
-func _show_loadout_choice() -> void:
-	var presets_list: Array[Dictionary] = build_system.get_all_presets()
-	upgrade_ui.show_preset_choice(presets_list)
-
 func _on_upgrade_chosen(upgrade_data: Dictionary) -> void:
 	var upgrade_type: String = upgrade_data.get("type", "")
 
 	match upgrade_type:
-		"preset":
-			var preset_id: String = upgrade_data.get("preset_id", "")
-			var starting_skill: String = build_system.apply_preset(preset_id)
-			# プリセットの初期スキルでSlot 0を即セット
-			if starting_skill != "":
-				var module: Variant = build_system.TowerModule.new(starting_skill)
-				tower.set_module(0, module)
-				_setup_tower_attacks()
-			loadout_phase = 1
-			_start_game()
-
 		"chip":
 			var chip_id: String = upgrade_data.get("chip_id", "")
 			var chip_data: Dictionary = build_system.get_chip(chip_id)
@@ -271,18 +271,10 @@ func _on_upgrade_chosen(upgrade_data: Dictionary) -> void:
 
 	_update_build_display()
 
-func _start_game() -> void:
-	_update_build_display()
-	get_tree().paused = false
-	# 即座に3体スポーンして「始まった！」感を出す
-	for i in range(3):
-		_spawn_enemy()
-
 # --- アップグレード選択（ラン中）---
 
 func _show_upgrade_choice() -> void:
-	# 最初の判断イベント（10秒）は「ゲームが変わる」体験を保証
-	# → 強力サポート（Chain/Fork/Pierce）を確定提示
+	# 最初のアップグレード（10m）は強力サポートを保証
 	if upgrade_events_given == 1:
 		var guaranteed_supports: Array = ["chain", "fork", "pierce"]
 		upgrade_ui.show_support_choice(guaranteed_supports)
@@ -361,24 +353,42 @@ func _spawn_enemy() -> void:
 
 	var enemy := enemy_scene.instantiate() as CharacterBody2D
 
-	# 画面外からスポーン
-	var vp := get_tree().root.get_visible_rect().size
-	var side := randi() % 4
+	# 縦スクロール: 70%上から、15%左右、15%下からスポーン
+	var cam_pos := tower.global_position
 	var spawn_pos := Vector2.ZERO
+	var roll := randf()
 
-	match side:
-		0: spawn_pos = Vector2(randf_range(0, vp.x), -40)
-		1: spawn_pos = Vector2(randf_range(0, vp.x), vp.y + 40)
-		2: spawn_pos = Vector2(-40, randf_range(0, vp.y))
-		3: spawn_pos = Vector2(vp.x + 40, randf_range(0, vp.y))
+	if roll < 0.7:
+		# 上方（進行方向）からスポーン
+		spawn_pos = Vector2(
+			cam_pos.x + randf_range(-640, 640),
+			cam_pos.y - randf_range(400, 550)
+		)
+	elif roll < 0.85:
+		# 左右からスポーン
+		var side_x := -660.0 if randf() < 0.5 else 660.0
+		spawn_pos = Vector2(
+			cam_pos.x + side_x,
+			cam_pos.y + randf_range(-300, 300)
+		)
+	else:
+		# 下方（後方）からスポーン
+		spawn_pos = Vector2(
+			cam_pos.x + randf_range(-640, 640),
+			cam_pos.y + randf_range(400, 550)
+		)
+
+	# X座標をワールド範囲にクランプ
+	spawn_pos.x = clampf(spawn_pos.x, -40, 1320)
 
 	enemy.position = spawn_pos
 
-	# 時間経過でスケーリング（2分で緊張感が出る難易度）
-	var time_scale := 1.0 + run_time / 80.0
-	var hp_val := 30.0 * time_scale
-	var speed_val := 70.0 + run_time * 0.15
-	var dmg_val := 8.0 + run_time * 0.03
+	# 距離＋時間でスケーリング
+	var distance_m: float = float(tower.distance_traveled) / 10.0
+	var progress_scale := 1.0 + distance_m / 50.0 + run_time / 120.0
+	var hp_val := 25.0 * progress_scale
+	var speed_val := 65.0 + distance_m * 0.1 + run_time * 0.08
+	var dmg_val := 6.0 + distance_m * 0.02
 
 	enemy.init(tower, speed_val, hp_val, dmg_val)
 	enemy.died.connect(_on_enemy_died)

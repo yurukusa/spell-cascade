@@ -1,16 +1,15 @@
 extends Node
 
-## テストプレイ観察モード。
+## テストプレイ観察モード（Mirror War対応）。
+## 自動でW押下をシミュレートし、縦スクロールを進行させる。
 ## 複数タイミングでスクショを撮り、ゲーム進行を記録。
-## 自動でアップグレードUIも処理し、フルゲームプレイを記録する。
 
 var timer := 0.0
-var phase := 0  # 0=wait_for_ui, 1=gameplay
-# 2分フックテスト: 5s(初期弾幕), 12s(10s判断後), 25s(第2スキル), 45s(3スロット), 90s(フル装備), 120s(2分判定)
-var screenshot_times: Array[float] = [5.0, 12.0, 25.0, 45.0, 90.0, 120.0]
+var phase := 0  # 0=init, 1=gameplay
+var screenshot_times: Array[float] = [3.0, 10.0, 20.0, 35.0, 60.0, 90.0]
 var screenshot_index := 0
 var gameplay_timer := 0.0
-var auto_dismiss_interval := 0.5  # 0.5秒ごとにUI確認
+var auto_dismiss_interval := 0.5
 var auto_dismiss_timer := 0.0
 
 func _ready() -> void:
@@ -19,17 +18,17 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	timer += delta
 
-	if phase == 0 and timer >= 0.5:
-		# 初回スキル選択UIのボタンを自動クリック
-		_auto_select_first_button()
+	if phase == 0 and timer >= 0.3:
 		phase = 1
-		timer = 0.0
 		gameplay_timer = 0.0
 
 	elif phase == 1:
 		gameplay_timer += delta
 
-		# 定期的にアップグレードUIを自動処理（ゲーム中に出てくるやつ）
+		# 自動で上移動をシミュレート（テスト用）
+		_simulate_move_up()
+
+		# 定期的にアップグレードUIを自動処理
 		auto_dismiss_timer += delta
 		if auto_dismiss_timer >= auto_dismiss_interval:
 			auto_dismiss_timer = 0.0
@@ -41,9 +40,15 @@ func _process(delta: float) -> void:
 				_take_screenshot(screenshot_index)
 				screenshot_index += 1
 				if screenshot_index >= screenshot_times.size():
-					# 全スクショ完了→終了
 					await get_tree().create_timer(0.1).timeout
 					get_tree().quit()
+
+func _simulate_move_up() -> void:
+	# テスト用: タワーを直接上に移動させる（WASDシミュレート）
+	var tower := get_tree().current_scene.get_node_or_null("Tower")
+	if tower and is_instance_valid(tower):
+		tower.position.y -= 200.0 * get_process_delta_time()  # 200px/s上昇
+		tower.distance_traveled = maxf(tower.start_y - tower.position.y, tower.distance_traveled)
 
 func _auto_select_first_button() -> void:
 	var upgrade_ui := get_tree().current_scene.get_node_or_null("UpgradeUI")

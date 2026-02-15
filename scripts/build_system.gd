@@ -16,8 +16,9 @@ var presets: Dictionary = {}      # id -> preset data
 var art_config: Dictionary = {}   # Design Lock設定
 
 # 装備中のBehavior Chips（カテゴリ -> chip_id）
+# Mirror War: デフォルトは手動。AutoはDropで"勝ち取る"
 var equipped_chips: Dictionary = {
-	"move": "kite",
+	"move": "manual",
 	"attack": "aim_nearest",
 	"skill": "auto_cast",
 }
