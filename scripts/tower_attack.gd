@@ -54,12 +54,10 @@ func _fire() -> void:
 		_fire_spread(8)
 		return
 
-	# 通常: 最寄り敵をターゲット
-	var nearest := _find_nearest_enemy(enemies)
-	if nearest == null:
+	# 方向決定: 移動入力があれば移動方向、なければ最寄り敵
+	var direction := _get_aim_direction(enemies)
+	if direction == Vector2.ZERO:
 		return
-
-	var direction := (nearest.global_position - global_position).normalized()
 	var proj_count: int = stats.get("projectile_count", 1)
 	var spread_angle: float = stats.get("spread_angle", 0)
 
@@ -79,6 +77,27 @@ func _fire_spread(directions: int) -> void:
 		var angle := i * TAU / directions
 		var dir := Vector2(cos(angle), sin(angle))
 		_create_projectile(dir)
+
+func _get_aim_direction(enemies: Array) -> Vector2:
+	# プレイヤーが移動中 → 移動方向に撃つ（自分で狙う感覚）
+	var input_dir := Vector2.ZERO
+	if Input.is_action_pressed("move_up"):
+		input_dir.y -= 1
+	if Input.is_action_pressed("move_down"):
+		input_dir.y += 1
+	if Input.is_action_pressed("move_left"):
+		input_dir.x -= 1
+	if Input.is_action_pressed("move_right"):
+		input_dir.x += 1
+
+	if input_dir != Vector2.ZERO:
+		return input_dir.normalized()
+
+	# 停止中 → 最寄り敵をフォールバック（idle時の安全網）
+	var nearest := _find_nearest_enemy(enemies)
+	if nearest:
+		return (nearest.global_position - global_position).normalized()
+	return Vector2.ZERO
 
 func _find_nearest_enemy(enemies: Array) -> Node2D:
 	var nearest: Node2D = null
