@@ -62,6 +62,9 @@ func _ready() -> void:
 	_update_hp_label(tower.max_hp, tower.max_hp)
 	restart_label.visible = false
 
+	# XP表示接続
+	tower.xp_gained.connect(_on_xp_gained)
+
 	# Mirror War: 即スタート。初期スキルはFireball
 	var module: Variant = build_system.TowerModule.new("fireball")
 	tower.set_module(0, module)
@@ -430,6 +433,9 @@ func _on_tower_damaged(current: float, max_val: float) -> void:
 			fill_style.bg_color = Color(0.85, 0.75, 0.2, 1.0)  # yellow warning
 		else:
 			fill_style.bg_color = Color(0.9, 0.2, 0.15, 1.0)  # red danger
+
+func _on_xp_gained(total_xp: int, _level: int) -> void:
+	wave_label.text = "XP: %d" % total_xp
 
 func _on_crush_changed(active: bool, count: int) -> void:
 	if active:

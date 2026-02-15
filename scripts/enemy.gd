@@ -138,8 +138,28 @@ func _spawn_damage_number(amount: float) -> void:
 
 	if hp <= 0:
 		_spawn_death_vfx()
+		_spawn_drops()
 		died.emit(self)
 		queue_free()
+
+func _spawn_drops() -> void:
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+
+	# XPオーブを1-3個ドロップ
+	var orb_count := randi_range(1, 3)
+	var drop_script := load("res://scripts/drop_orb.gd")
+
+	for i in range(orb_count):
+		var orb := Area2D.new()
+		orb.set_script(drop_script)
+		orb.name = "XPOrb"
+		orb.add_to_group("pickups")
+		orb.global_position = global_position + Vector2(randf_range(-15, 15), randf_range(-15, 15))
+		orb.set("target", player)
+		orb.set("xp_value", xp_value)
+		scene_root.add_child(orb)
 
 func _spawn_death_vfx() -> void:
 	# キル時の爆散エフェクト: 赤い破片が放射状に飛ぶ（PoE的「画面が光る」快感）

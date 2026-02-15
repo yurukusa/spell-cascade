@@ -1,0 +1,113 @@
+extends Area2D
+
+## DropOrb - 敵撃破時に出現するXPオーブ。
+## プレイヤーに向かって加速し、接触で回収。
+## 将来: AutoAimチップ、装備ドロップもこの仕組みで。
+
+var target: Node2D  # プレイヤー（タワー）
+var speed := 50.0  # 初速（即座に動き出す感触）
+var max_speed := 500.0
+var acceleration := 800.0
+var attract_range := 200.0  # この距離以内で吸い寄せ開始
+var lifetime := 6.0  # 短めにして早めにauto-attract
+var xp_value := 1
+var orb_type := "xp"  # "xp", "chip", "item"
+
+func _ready() -> void:
+	# コリジョン設定
+	collision_layer = 8
+	collision_mask = 1
+
+	var col := CollisionShape2D.new()
+	var shape := CircleShape2D.new()
+	shape.radius = 12.0
+	col.shape = shape
+	add_child(col)
+
+	body_entered.connect(_on_body_entered)
+
+	# ビジュアル: 小さな輝くオーブ
+	_create_visual()
+
+func _create_visual() -> void:
+	var color := Color(0.3, 0.9, 0.4, 0.9)  # 緑XPオーブ
+	if orb_type == "chip":
+		color = Color(0.9, 0.7, 0.2, 0.9)  # 金色チップドロップ
+
+	# 外側グロー
+	var glow := Polygon2D.new()
+	var glow_pts: PackedVector2Array = []
+	for i in range(6):
+		var a := i * TAU / 6
+		glow_pts.append(Vector2(cos(a), sin(a)) * 10.0)
+	glow.polygon = glow_pts
+	glow.color = Color(color.r, color.g, color.b, 0.25)
+	add_child(glow)
+
+	# コア
+	var core := Polygon2D.new()
+	var core_pts: PackedVector2Array = []
+	for i in range(6):
+		var a := i * TAU / 6
+		core_pts.append(Vector2(cos(a), sin(a)) * 5.0)
+	core.polygon = core_pts
+	core.color = color
+	add_child(core)
+
+	# パルスアニメーション
+	var tween := create_tween()
+	tween.set_loops()
+	tween.tween_property(core, "scale", Vector2(1.2, 1.2), 0.4).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(core, "scale", Vector2(1.0, 1.0), 0.4).set_trans(Tween.TRANS_SINE)
+
+func _process(delta: float) -> void:
+	lifetime -= delta
+	if lifetime <= 0:
+		queue_free()
+		return
+
+	if not is_instance_valid(target):
+		return
+
+	var dist := global_position.distance_to(target.global_position)
+
+	# 吸い寄せ範囲内か、2秒後は常に吸い寄せ
+	if dist < attract_range or lifetime < 4.0:
+		speed = minf(speed + acceleration * delta, max_speed)
+		var dir := (target.global_position - global_position).normalized()
+		position += dir * speed * delta
+	else:
+		# 範囲外: ゆっくり浮遊
+		position.y += sin(lifetime * 3.0) * 0.3
+
+func _on_body_entered(body: Node2D) -> void:
+	if body == target:
+		_on_collected()
+
+func _on_collected() -> void:
+	# XP付与
+	if is_instance_valid(target) and "xp" in target:
+		target.xp += xp_value
+		if target.has_signal("xp_gained"):
+			target.xp_gained.emit(target.xp, target.level)
+
+	# 回収エフェクト: 白い閃光
+	var flash := Polygon2D.new()
+	var pts: PackedVector2Array = []
+	for i in range(8):
+		var a := i * TAU / 8
+		pts.append(Vector2(cos(a), sin(a)) * 8.0)
+	flash.polygon = pts
+	flash.color = Color(1.0, 1.0, 0.8, 0.7)
+	flash.global_position = global_position
+
+	var scene_root := get_tree().current_scene
+	if scene_root:
+		scene_root.add_child(flash)
+		var tween := flash.create_tween()
+		tween.set_parallel(true)
+		tween.tween_property(flash, "scale", Vector2(2.0, 2.0), 0.15)
+		tween.tween_property(flash, "modulate:a", 0.0, 0.15)
+		tween.chain().tween_callback(flash.queue_free)
+
+	queue_free()

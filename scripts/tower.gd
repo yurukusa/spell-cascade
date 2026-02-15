@@ -23,6 +23,11 @@ var facing_dir := Vector2.UP  # 最後に向いていた方向（弾の方向用
 var distance_traveled := 0.0  # 進行距離（メートル）
 var start_y := 0.0  # 開始Y位置
 
+# XP / レベル
+var xp := 0
+var level := 1
+signal xp_gained(total_xp: int, level: int)
+
 # Crush state（包囲DPS）
 var crush_active := false
 var crush_count := 0  # 包囲敵数
