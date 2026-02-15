@@ -12,6 +12,7 @@ var prefixes: Array = []          # prefix mod pool
 var suffixes: Array = []          # suffix mod pool
 var synergies: Array = []         # synergy definitions
 var chips: Dictionary = {}        # id -> chip data
+var presets: Dictionary = {}      # id -> preset data
 
 # 装備中のBehavior Chips（カテゴリ -> chip_id）
 var equipped_chips: Dictionary = {
@@ -41,6 +42,9 @@ func _load_data() -> void:
 		for chip in chip_data.get("chips", []):
 			if chip.has("id"):
 				chips[chip["id"]] = chip
+		for preset in chip_data.get("presets", []):
+			if preset.has("id"):
+				presets[preset["id"]] = preset
 
 func _load_json(path: String, array_key: String, id_key: String) -> Dictionary:
 	var result: Dictionary = {}
@@ -296,4 +300,20 @@ func get_chips_by_category(category: String) -> Array[Dictionary]:
 	for chip in chips.values():
 		if chip.get("category", "") == category:
 			result.append(chip)
+	return result
+
+## プリセットを適用: 3チップ + 初期スキルを一括設定
+func apply_preset(preset_id: String) -> String:
+	var preset: Dictionary = presets.get(preset_id, {})
+	if preset.is_empty():
+		return ""
+	equipped_chips["move"] = preset.get("move", "kite")
+	equipped_chips["attack"] = preset.get("attack", "aim_nearest")
+	equipped_chips["skill"] = preset.get("skill", "auto_cast")
+	return preset.get("starting_skill", "fireball")
+
+func get_all_presets() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for p in presets.values():
+		result.append(p)
 	return result

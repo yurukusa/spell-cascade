@@ -347,6 +347,39 @@ func _show_slot_choice(prompt: String, tower: Node2D, slots: Array[int], callbac
 		)
 		buttons_container.add_child(btn)
 
+# --- プリセット選択（ゲーム開始時の1画面）---
+
+func show_preset_choice(presets_list: Array[Dictionary]) -> void:
+	_clear_buttons()
+	title_label.text = "Choose Your Playstyle"
+
+	for preset in presets_list:
+		var btn := Button.new()
+		btn.text = "%s\n%s" % [
+			preset.get("name", "?"),
+			preset.get("description", ""),
+		]
+		btn.custom_minimum_size = Vector2(400, 70)
+		btn.add_theme_font_size_override("font_size", 14)
+
+		var style := _make_preset_style(preset.get("id", ""))
+		btn.add_theme_stylebox_override("normal", style)
+		var hover := style.duplicate()
+		hover.bg_color = hover.bg_color.lightened(0.15)
+		btn.add_theme_stylebox_override("hover", hover)
+
+		var preset_id: String = preset.get("id", "")
+		btn.pressed.connect(_on_preset_chosen.bind(preset_id))
+		buttons_container.add_child(btn)
+
+	visible = true
+	get_tree().paused = true
+
+func _on_preset_chosen(preset_id: String) -> void:
+	get_tree().paused = false
+	hide_ui()
+	upgrade_chosen.emit({"type": "preset", "preset_id": preset_id})
+
 # --- Behavior Chip選択 ---
 
 func show_chip_choice(category_label: String, chip_options: Array[Dictionary]) -> void:
@@ -428,6 +461,26 @@ func _make_mod_style(mod_type: String) -> StyleBoxFlat:
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(4)
 	style.set_content_margin_all(8)
+	return style
+
+func _make_preset_style(preset_id: String) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	match preset_id:
+		"balanced":
+			style.bg_color = Color(0.1, 0.12, 0.2, 0.9)
+			style.border_color = Color(0.4, 0.5, 0.7, 0.8)
+		"glass_cannon":
+			style.bg_color = Color(0.25, 0.08, 0.08, 0.9)
+			style.border_color = Color(0.8, 0.3, 0.2, 0.8)
+		"chain_master":
+			style.bg_color = Color(0.08, 0.18, 0.22, 0.9)
+			style.border_color = Color(0.3, 0.7, 0.8, 0.8)
+		_:
+			style.bg_color = Color(0.15, 0.12, 0.2, 0.9)
+			style.border_color = Color(0.4, 0.4, 0.5, 0.8)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(6)
+	style.set_content_margin_all(10)
 	return style
 
 func _make_chip_style(rarity: String) -> StyleBoxFlat:

@@ -6,7 +6,8 @@ extends Node
 
 var timer := 0.0
 var phase := 0  # 0=wait_for_ui, 1=gameplay
-var screenshot_times: Array[float] = [5.0, 12.0, 20.0, 30.0, 45.0]
+# 2分フックテスト: 5s(初期弾幕), 12s(10s判断後), 25s(第2スキル), 45s(3スロット), 90s(フル装備), 120s(2分判定)
+var screenshot_times: Array[float] = [5.0, 12.0, 25.0, 45.0, 90.0, 120.0]
 var screenshot_index := 0
 var gameplay_timer := 0.0
 var auto_dismiss_interval := 0.5  # 0.5秒ごとにUI確認

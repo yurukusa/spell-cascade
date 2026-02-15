@@ -2,6 +2,30 @@
   "_comment": "Behavior Chips: 操作機序そのものが装備。3カテゴリ×3+選択肢。",
   "categories": ["move", "attack", "skill"],
 
+  "presets": [
+    {
+      "id": "balanced",
+      "name": "Balanced",
+      "description": "Kite + Nearest + Auto Cast. Safe and steady. Good for learning.",
+      "move": "kite", "attack": "aim_nearest", "skill": "auto_cast",
+      "starting_skill": "fireball"
+    },
+    {
+      "id": "glass_cannon",
+      "name": "Glass Cannon",
+      "description": "Orbit + Cluster + Panic. High risk, explosive damage when hurt.",
+      "move": "orbit", "attack": "aim_cluster", "skill": "panic",
+      "starting_skill": "spark"
+    },
+    {
+      "id": "chain_master",
+      "name": "Chain Master",
+      "description": "Kite + Highest HP + On Kill. Kill chains feel AMAZING.",
+      "move": "kite", "attack": "aim_highest_hp", "skill": "on_kill",
+      "starting_skill": "ice_shard"
+    }
+  ],
+
   "chips": [
     {
       "id": "kite",

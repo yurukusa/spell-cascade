@@ -22,17 +22,18 @@ var game_over := false
 var enemies_alive := 0
 
 # ロードアウト選択フェーズ
-var loadout_phase := 0  # 0=move, 1=attack, 2=skill, 3=first_skill, 4=playing
+var loadout_phase := 0  # 0=preset選択, 1=playing
 
 # 判断イベント管理
 var upgrade_events_given := 0
 var next_upgrade_time := 0.0
-var upgrade_schedule: Array[float] = [20.0, 45.0, 75.0, 110.0, 150.0, 200.0, 260.0, 330.0, 410.0, 500.0]
+# 2分フック: 10秒で最初のゲームチェンジ体験
+var upgrade_schedule: Array[float] = [10.0, 25.0, 45.0, 70.0, 100.0, 140.0, 190.0, 250.0, 320.0, 400.0]
 
-# 敵スポーン
+# 敵スポーン（初期密度ブースト: 最初から弾幕感を出す）
 var enemy_scene: PackedScene
 var spawn_timer := 0.0
-var spawn_interval := 2.0
+var spawn_interval := 1.2  # 2.0→1.2: 最初から敵が多い
 
 func _ready() -> void:
 	build_system = get_node("/root/BuildSystem")
@@ -57,7 +58,7 @@ func _ready() -> void:
 	hp_bar.value = tower.max_hp
 	restart_label.visible = false
 
-	# ロードアウト選択開始（Move → Attack → Skill → first skill → play）
+	# ロードアウト選択開始（プリセット1画面）
 	_show_loadout_choice()
 
 	# 最初の判断イベントタイミング
@@ -65,7 +66,7 @@ func _ready() -> void:
 		next_upgrade_time = upgrade_schedule[0]
 
 func _process(delta: float) -> void:
-	if game_over or loadout_phase < 4:
+	if game_over or loadout_phase < 1:
 		return
 
 	run_time += delta
@@ -151,37 +152,32 @@ func _update_build_display() -> void:
 
 	build_label.text = "\n".join(lines)
 
-# --- ロードアウト選択（ゲーム開始前の3カテゴリ + 初期スキル）---
+# --- ロードアウト選択（1画面プリセット）---
 
 func _show_loadout_choice() -> void:
-	var category_names: Array[String] = ["move", "attack", "skill"]
-	var category_labels: Array[String] = ["Move AI", "Attack AI", "Skill AI"]
-
-	if loadout_phase < 3:
-		# Behavior Chip選択
-		var category: String = category_names[loadout_phase]
-		var label: String = category_labels[loadout_phase]
-		var chip_options: Array[Dictionary] = build_system.get_chips_by_category(category)
-		upgrade_ui.show_chip_choice(label, chip_options)
-	elif loadout_phase == 3:
-		# 初期スキル選択
-		var skill_ids: Array = build_system.get_random_skill_ids(3)
-		upgrade_ui.show_skill_choice(0, skill_ids)
+	var presets_list: Array[Dictionary] = build_system.get_all_presets()
+	upgrade_ui.show_preset_choice(presets_list)
 
 func _on_upgrade_chosen(upgrade_data: Dictionary) -> void:
 	var upgrade_type: String = upgrade_data.get("type", "")
 
 	match upgrade_type:
+		"preset":
+			var preset_id: String = upgrade_data.get("preset_id", "")
+			var starting_skill: String = build_system.apply_preset(preset_id)
+			# プリセットの初期スキルでSlot 0を即セット
+			if starting_skill != "":
+				var module: Variant = build_system.TowerModule.new(starting_skill)
+				tower.set_module(0, module)
+				_setup_tower_attacks()
+			loadout_phase = 1
+			_start_game()
+
 		"chip":
 			var chip_id: String = upgrade_data.get("chip_id", "")
 			var chip_data: Dictionary = build_system.get_chip(chip_id)
 			var category: String = chip_data.get("category", "")
 			build_system.equip_chip(category, chip_id)
-			loadout_phase += 1
-			if loadout_phase < 4:
-				_show_loadout_choice()
-			else:
-				_start_game()
 
 		"skill":
 			var slot: int = upgrade_data.get("slot", 0)
@@ -189,9 +185,6 @@ func _on_upgrade_chosen(upgrade_data: Dictionary) -> void:
 			var module: Variant = build_system.TowerModule.new(skill_id)
 			tower.set_module(slot, module)
 			_setup_tower_attacks()
-			if loadout_phase == 3:
-				loadout_phase = 4
-				_start_game()
 
 		"support":
 			var support_id: String = upgrade_data.get("support_id", "")
@@ -220,11 +213,21 @@ func _on_upgrade_chosen(upgrade_data: Dictionary) -> void:
 func _start_game() -> void:
 	_update_build_display()
 	get_tree().paused = false
+	# 即座に3体スポーンして「始まった！」感を出す
+	for i in range(3):
+		_spawn_enemy()
 
 # --- アップグレード選択（ラン中）---
 
 func _show_upgrade_choice() -> void:
-	# 空スロットがあればスキル追加、なければサポート/Mod/チップ入替
+	# 最初の判断イベント（10秒）は「ゲームが変わる」体験を保証
+	# → 強力サポート（Chain/Fork/Pierce）を確定提示
+	if upgrade_events_given == 1:
+		var guaranteed_supports: Array = ["chain", "fork", "pierce"]
+		upgrade_ui.show_support_choice(guaranteed_supports)
+		return
+
+	# 空スロットがあればスキル追加
 	var empty_slot := -1
 	for i in range(tower.max_slots):
 		if tower.get_module(i) == null:
