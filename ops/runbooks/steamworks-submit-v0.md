@@ -39,14 +39,12 @@ Location: **Store Page > Graphical Assets**
 
 | Asset | Spec | Source File |
 |-------|------|-------------|
-| Header Capsule | 460x215 PNG | TODO: create from `marketing/screenshot_title.png` |
-| Small Capsule | 231x87 PNG | TODO: resize |
-| Main Capsule | 616x353 PNG | TODO: create |
-| Hero Graphic | 3840x1240 PNG | TODO: create (can be simple gradient + title) |
-| Screenshots (min 5) | 1280x720 PNG | `marketing/screenshot_title.png`, `screenshot_combat.png`, `screenshot_boss.png` + 2 more needed |
+| Header Capsule | 460x215 PNG | `marketing/header_capsule.png` |
+| Small Capsule | 231x87 PNG | `marketing/small_capsule.png` |
+| Main Capsule | 616x353 PNG | `marketing/main_capsule.png` |
+| Hero Graphic | 3840x1240 PNG | `marketing/hero_graphic.png` |
+| Screenshots (min 5) | 1280x720 PNG | `marketing/screenshot_title.png`, `screenshot_combat.png`, `screenshot_boss.png`, `screenshot_gameplay_early.png`, `screenshot_settings.png` |
 | Trailer (optional) | MP4 | Not available yet |
-
-**Note**: Minimum 5 screenshots required. We have 3. Need 2 more (e.g., Shrine event, level-up UI).
 
 ## 4. Store Page — Tags & Categories
 
