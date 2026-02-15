@@ -22,6 +22,8 @@ var boss_attack_timer := 0.0
 var boss_telegraph_node: Node2D = null
 var boss_phase := 1  # 1=100-66%, 2=66-33%, 3=33-0%
 var boss_phase_invuln := 0.0  # フェーズ移行中の無敵時間
+var _boss_last_hit_msec := 0  # 連続ヒット抑制用タイムスタンプ
+const BOSS_HIT_COOLDOWN_MS := 150  # 150ms以内の連続ヒットは減衰
 
 signal died(enemy: Node2D)
 signal boss_phase_changed(phase: int, hp_pct: float)  # game_mainがHPバー更新用
@@ -531,6 +533,13 @@ func take_damage(amount: float) -> void:
 	# フェーズ移行中の無敵
 	if boss_phase_invuln > 0:
 		return
+
+	# ボス連続ヒット減衰: chain/fork等の高速連打を抑制し、単発は100%通す
+	if is_boss:
+		var now := Time.get_ticks_msec()
+		if now - _boss_last_hit_msec < BOSS_HIT_COOLDOWN_MS:
+			amount *= 0.3  # 150ms以内の連続ヒットは30%に減衰
+		_boss_last_hit_msec = now
 
 	hp -= amount
 	_spawn_damage_number(amount)
