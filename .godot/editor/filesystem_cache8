@@ -1,0 +1,14 @@
+ea4bc82a6ad023ab7ee23ee620429895
+::res://::1771156203
+icon.svg::CompressedTexture2D::7469640978163526545::1771156195::1771156203::1::::<><>::
+::res://resources/::1771156203
+light_gradient.png::CompressedTexture2D::7292931319864712976::1771155881::1771156203::1::::<><>::
+::res://scenes/::1771156189
+enemy.tscn::PackedScene::151590118762::1771155862::0::1::::<><>::res://scripts/enemy.gd
+main.tscn::PackedScene::142876485625246::1771156189::0::1::::<><>::res://scripts/main.gd<>res://scripts/player.gd<>res://scripts/wave_manager.gd<>res://scripts/auto_attack.gd<>uid://c5enemy1::::res://scenes/enemy.tscn
+::res://scripts/::1771156140
+auto_attack.gd::GDScript::-1::1771155845::0::1::::<>Node2D<>::
+enemy.gd::GDScript::-1::1771155813::0::1::::<>CharacterBody2D<>::
+main.gd::GDScript::-1::1771156129::0::1::::<>Node2D<>::
+player.gd::GDScript::-1::1771155803::0::1::::<>CharacterBody2D<>::
+wave_manager.gd::GDScript::-1::1771156140::0::1::::<>Node<>::
