@@ -11,7 +11,15 @@ var hp: float
 var player: Node2D
 var attack_timer := 0.0
 var attack_cooldown := 1.0  # メレー攻撃間隔
-var enemy_type := "normal"  # "normal", "swarmer", "tank"
+var enemy_type := "normal"  # "normal", "swarmer", "tank", "boss"
+
+# Boss用
+var is_boss := false
+var boss_state := "chase"  # "chase", "telegraph_burst", "burst", "telegraph_charge", "charge", "cooldown"
+var boss_timer := 0.0
+var boss_attack_cd := 3.0  # 攻撃間隔
+var boss_attack_timer := 0.0
+var boss_telegraph_node: Node2D = null
 
 signal died(enemy: Node2D)
 
@@ -36,6 +44,8 @@ func _install_stylized_visual() -> void:
 			_build_swarmer_visual(root)
 		"tank":
 			_build_tank_visual(root)
+		"boss":
+			_build_boss_visual(root)
 		_:
 			_build_normal_visual(root)
 
@@ -124,6 +134,58 @@ func _build_tank_visual(root: Node2D) -> void:
 	root.add_child(aura)
 	aura.z_index = -1
 
+func _build_boss_visual(root: Node2D) -> void:
+	## ボス: 紫/金の大型十二角形。威圧的、コアが脈動。
+	# 外枠（黒）
+	var outline := Polygon2D.new()
+	outline.color = Color(0.02, 0.02, 0.03, 1.0)
+	outline.polygon = _make_ngon(12, 70.0)
+	root.add_child(outline)
+
+	# 本体（深紫）
+	var body := Polygon2D.new()
+	body.color = Color(0.35, 0.1, 0.55, 1.0)
+	body.polygon = _make_ngon(12, 64.0)
+	root.add_child(body)
+
+	# 内側リング（暗紫）
+	var inner := Polygon2D.new()
+	inner.color = Color(0.25, 0.06, 0.4, 1.0)
+	inner.polygon = _make_ngon(12, 48.0)
+	root.add_child(inner)
+
+	# コア（金色、脈動）
+	var core := Polygon2D.new()
+	core.name = "BossCore"
+	core.color = Color(1.0, 0.85, 0.3, 1.0)
+	core.polygon = _make_ngon(6, 20.0)
+	root.add_child(core)
+
+	# コア脈動アニメーション
+	var tween := create_tween()
+	tween.set_loops()
+	tween.tween_property(core, "scale", Vector2(1.3, 1.3), 0.5).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(core, "scale", Vector2(1.0, 1.0), 0.5).set_trans(Tween.TRANS_SINE)
+
+	# 3つの目（三角配置、威圧感）
+	for i in range(3):
+		var eye := Polygon2D.new()
+		eye.color = Color(1.0, 0.9, 0.4, 1.0)
+		var a := float(i) * TAU / 3.0 - PI / 2.0
+		var ex := cos(a) * 35.0
+		var ey := sin(a) * 35.0
+		eye.polygon = PackedVector2Array([
+			Vector2(ex - 4, ey - 3), Vector2(ex + 8, ey), Vector2(ex - 4, ey + 3),
+		])
+		root.add_child(eye)
+
+	# ボスオーラ（紫、強め）
+	var aura := Polygon2D.new()
+	aura.color = Color(0.5, 0.2, 0.8, 0.15)
+	aura.polygon = _make_ngon(12, 85.0)
+	root.add_child(aura)
+	aura.z_index = -1
+
 func _make_diamond(radius: float) -> PackedVector2Array:
 	return PackedVector2Array([
 		Vector2(0, -radius),
@@ -157,6 +219,14 @@ func init(target: Node2D, spd: float = 80.0, health: float = 30.0, dmg: float = 
 			damage = dmg * 2.0
 			xp_value = 3
 			attack_cooldown = 1.5
+		"boss":
+			speed = spd * 0.6
+			max_hp = health * 20.0
+			damage = dmg * 1.5
+			xp_value = 10
+			attack_cooldown = 2.0
+			is_boss = true
+			boss_attack_cd = 3.0
 		_:  # normal
 			speed = spd
 			max_hp = health
@@ -180,6 +250,10 @@ func _physics_process(delta: float) -> void:
 	if not is_instance_valid(player):
 		return
 
+	if is_boss:
+		_boss_process(delta)
+		return
+
 	var dist := global_position.distance_to(player.global_position)
 
 	# メレー範囲外なら接近
@@ -195,6 +269,183 @@ func _physics_process(delta: float) -> void:
 			attack_timer -= attack_cooldown
 			if player.has_method("take_damage"):
 				player.take_damage(damage)
+
+func _boss_process(delta: float) -> void:
+	## ボス専用AI: chase → 攻撃 → cooldown のループ
+	boss_attack_timer += delta
+
+	match boss_state:
+		"chase":
+			# プレイヤーに接近
+			var direction := (player.global_position - global_position).normalized()
+			velocity = direction * speed
+			move_and_slide()
+
+			# メレーダメージ
+			var dist := global_position.distance_to(player.global_position)
+			if dist <= 50.0:
+				attack_timer += delta
+				if attack_timer >= attack_cooldown:
+					attack_timer -= attack_cooldown
+					if player.has_method("take_damage"):
+						player.take_damage(damage)
+
+			# 攻撃パターン発動（交互に切り替え）
+			if boss_attack_timer >= boss_attack_cd:
+				boss_attack_timer = 0.0
+				if randi() % 2 == 0:
+					_boss_start_telegraph_burst()
+				else:
+					_boss_start_telegraph_charge()
+
+		"telegraph_burst":
+			velocity = Vector2.ZERO
+			boss_timer += delta
+			if boss_timer >= 0.5:
+				_boss_fire_burst()
+
+		"burst":
+			velocity = Vector2.ZERO
+			boss_timer += delta
+			if boss_timer >= 0.3:
+				boss_state = "cooldown"
+				boss_timer = 0.0
+
+		"telegraph_charge":
+			velocity = Vector2.ZERO
+			boss_timer += delta
+			if boss_timer >= 0.5:
+				_boss_start_charge()
+
+		"charge":
+			boss_timer += delta
+			move_and_slide()
+			# 突進中の接触ダメージ
+			var dist := global_position.distance_to(player.global_position)
+			if dist <= 60.0 and player.has_method("take_damage"):
+				player.take_damage(damage * 2.0)
+				boss_state = "cooldown"
+				boss_timer = 0.0
+			elif boss_timer >= 1.0:
+				boss_state = "cooldown"
+				boss_timer = 0.0
+
+		"cooldown":
+			velocity = Vector2.ZERO
+			boss_timer += delta
+			if boss_timer >= 1.0:
+				boss_state = "chase"
+				boss_timer = 0.0
+
+func _boss_start_telegraph_burst() -> void:
+	## 放射弾テレグラフ: 赤い拡大リングで警告
+	boss_state = "telegraph_burst"
+	boss_timer = 0.0
+
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+	var telegraph := Polygon2D.new()
+	telegraph.color = Color(1.0, 0.2, 0.1, 0.25)
+	telegraph.polygon = _make_ngon(16, 10.0)
+	telegraph.global_position = global_position
+	telegraph.z_index = -1
+	scene_root.add_child(telegraph)
+	boss_telegraph_node = telegraph
+
+	# テレグラフ拡大アニメーション
+	var tween := telegraph.create_tween()
+	tween.tween_property(telegraph, "scale", Vector2(20.0, 20.0), 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+func _boss_fire_burst() -> void:
+	## 8方向に弾を発射
+	boss_state = "burst"
+	boss_timer = 0.0
+
+	# テレグラフを消す
+	if is_instance_valid(boss_telegraph_node):
+		boss_telegraph_node.queue_free()
+		boss_telegraph_node = null
+
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+
+	# 8方向に弾を発射
+	for i in range(8):
+		var angle := i * TAU / 8.0
+		var dir := Vector2(cos(angle), sin(angle))
+
+		var bullet := Area2D.new()
+		bullet.name = "BossBullet"
+		bullet.global_position = global_position
+		bullet.collision_layer = 4  # enemy bullets
+		bullet.collision_mask = 1   # player layer
+
+		var col := CollisionShape2D.new()
+		var shape := CircleShape2D.new()
+		shape.radius = 10.0
+		col.shape = shape
+		bullet.add_child(col)
+
+		# 紫の弾ビジュアル
+		var visual := Polygon2D.new()
+		visual.color = Color(0.7, 0.2, 0.9, 0.9)
+		visual.polygon = _make_ngon(6, 12.0)
+		bullet.add_child(visual)
+
+		var glow := Polygon2D.new()
+		glow.color = Color(0.7, 0.2, 0.9, 0.3)
+		glow.polygon = _make_ngon(6, 20.0)
+		bullet.add_child(glow)
+
+		scene_root.add_child(bullet)
+
+		# 弾スクリプト（シンプルな直進 + プレイヤーダメージ）
+		var script := GDScript.new()
+		script.source_code = _boss_bullet_script()
+		script.reload()
+		bullet.set_script(script)
+		bullet.set("direction", dir)
+		bullet.set("speed", 200.0)
+		bullet.set("damage", damage)
+
+func _boss_start_telegraph_charge() -> void:
+	## 突進テレグラフ: 赤く光ってから突進
+	boss_state = "telegraph_charge"
+	boss_timer = 0.0
+	modulate = Color(2.0, 0.4, 0.3, 1.0)
+
+func _boss_start_charge() -> void:
+	## 突進実行
+	boss_state = "charge"
+	boss_timer = 0.0
+	modulate = Color(1.0, 1.0, 1.0, 1.0)
+
+	var direction := (player.global_position - global_position).normalized()
+	velocity = direction * speed * 4.0  # 4倍速で突進
+
+func _boss_bullet_script() -> String:
+	return """extends Area2D
+var direction := Vector2.ZERO
+var speed := 200.0
+var damage := 10.0
+var lifetime := 4.0
+
+func _ready():
+	body_entered.connect(_on_body_entered)
+
+func _process(delta):
+	position += direction * speed * delta
+	lifetime -= delta
+	if lifetime <= 0:
+		queue_free()
+
+func _on_body_entered(body):
+	if body.has_method(\"take_damage\"):
+		body.take_damage(damage)
+	queue_free()
+"""
 
 func take_damage(amount: float) -> void:
 	hp -= amount
@@ -251,6 +502,22 @@ func _spawn_drops() -> void:
 		orb.set("target", player)
 		orb.set("xp_value", xp_value)
 		scene_root.add_child(orb)
+
+	# ボス撃破: AutoMoveチップ保証ドロップ
+	if is_boss:
+		var build_sys2 := get_node_or_null("/root/BuildSystem")
+		if build_sys2:
+			var move_chip_id: String = build_sys2.equipped_chips.get("move", "manual")
+			if move_chip_id == "manual":
+				var chip_orb := Area2D.new()
+				chip_orb.set_script(drop_script)
+				chip_orb.name = "BossChipDrop"
+				chip_orb.add_to_group("pickups")
+				chip_orb.global_position = global_position
+				chip_orb.set("target", player)
+				chip_orb.set("orb_type", "chip_move")
+				chip_orb.set("xp_value", 0)
+				scene_root.add_child(chip_orb)
 
 	# チップドロップ判定（AutoAim: 未所持なら5%、最低15体倒した後）
 	var build_sys := get_node_or_null("/root/BuildSystem")

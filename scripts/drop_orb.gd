@@ -33,6 +33,8 @@ func _create_visual() -> void:
 	var color := Color(0.3, 0.9, 0.4, 0.9)  # 緑XPオーブ
 	if orb_type == "chip":
 		color = Color(0.9, 0.7, 0.2, 0.9)  # 金色チップドロップ
+	elif orb_type == "chip_move":
+		color = Color(0.6, 0.3, 1.0, 0.9)  # 紫のAutoMoveチップ
 
 	# 外側グロー
 	var glow := Polygon2D.new()
@@ -92,6 +94,8 @@ func _on_body_entered(body: Node2D) -> void:
 func _on_collected() -> void:
 	if orb_type == "chip":
 		_equip_auto_aim()
+	elif orb_type == "chip_move":
+		_equip_auto_move()
 	elif is_instance_valid(target) and target.has_method("add_xp"):
 		target.add_xp(xp_value)
 
@@ -160,4 +164,49 @@ func _equip_auto_aim() -> void:
 	flash_tween.set_parallel(true)
 	flash_tween.tween_property(big_flash, "scale", Vector2(3.0, 3.0), 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	flash_tween.tween_property(big_flash, "modulate:a", 0.0, 0.3)
+	flash_tween.chain().tween_callback(big_flash.queue_free)
+
+func _equip_auto_move() -> void:
+	var build_sys := get_node_or_null("/root/BuildSystem")
+	if build_sys:
+		build_sys.equip_chip("move", "kite")
+
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+
+	# "AUTO MOVE ACQUIRED!" 表示（紫テーマ）
+	var label := Label.new()
+	label.text = "AUTO MOVE ACQUIRED!"
+	label.add_theme_font_size_override("font_size", 32)
+	label.add_theme_color_override("font_color", Color(0.7, 0.4, 1.0, 1.0))
+	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	label.add_theme_constant_override("shadow_offset_x", 2)
+	label.add_theme_constant_override("shadow_offset_y", 2)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.global_position = global_position + Vector2(-140, -60)
+	label.z_index = 200
+	scene_root.add_child(label)
+
+	var announce_tween := label.create_tween()
+	announce_tween.set_parallel(true)
+	announce_tween.tween_property(label, "global_position:y", label.global_position.y - 80.0, 2.0).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	announce_tween.tween_property(label, "modulate:a", 0.0, 2.0).set_delay(1.0)
+	announce_tween.chain().tween_callback(label.queue_free)
+
+	# 紫の大きな閃光
+	var big_flash := Polygon2D.new()
+	var big_pts: PackedVector2Array = []
+	for i in range(12):
+		var a := i * TAU / 12
+		big_pts.append(Vector2(cos(a), sin(a)) * 40.0)
+	big_flash.polygon = big_pts
+	big_flash.color = Color(0.6, 0.3, 1.0, 0.8)
+	big_flash.global_position = global_position
+	scene_root.add_child(big_flash)
+
+	var flash_tween := big_flash.create_tween()
+	flash_tween.set_parallel(true)
+	flash_tween.tween_property(big_flash, "scale", Vector2(4.0, 4.0), 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	flash_tween.tween_property(big_flash, "modulate:a", 0.0, 0.4)
 	flash_tween.chain().tween_callback(big_flash.queue_free)

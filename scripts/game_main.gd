@@ -24,6 +24,8 @@ var max_run_time := 600.0  # 10分
 var game_over := false
 var enemies_alive := 0
 var game_started := false
+var boss_spawned := false
+const BOSS_DISTANCE := 200.0  # メートル
 
 # 判断イベント管理
 var upgrade_events_given := 0
@@ -112,6 +114,10 @@ func _process(delta: float) -> void:
 		else:
 			next_upgrade_time = INF
 		_show_upgrade_choice()
+
+	# ボスの出現判定
+	if not boss_spawned and distance_m >= BOSS_DISTANCE:
+		_spawn_boss()
 
 func _update_timer_display() -> void:
 	var remaining := maxf(max_run_time - run_time, 0.0)
@@ -371,6 +377,71 @@ func _setup_tower_attacks() -> void:
 		attack_node.setup(i, stats)
 
 # --- 敵スポーン ---
+
+func _spawn_boss() -> void:
+	if enemy_scene == null:
+		return
+	boss_spawned = true
+
+	var boss := enemy_scene.instantiate() as CharacterBody2D
+	# ボスは上方から出現
+	var cam_pos := tower.global_position
+	boss.position = Vector2(cam_pos.x, cam_pos.y - 500)
+
+	var distance_m: float = float(tower.distance_traveled) / 10.0
+	var progress_scale := 1.0 + distance_m / 50.0 + run_time / 120.0
+	var hp_val := 25.0 * progress_scale
+	var speed_val := 65.0 + distance_m * 0.1 + run_time * 0.08
+	var dmg_val := 6.0 + distance_m * 0.02
+
+	boss.init(tower, speed_val, hp_val, dmg_val, "boss")
+	boss.died.connect(_on_boss_died)
+	enemies_alive += 1
+	add_child(boss)
+
+	# "BOSS INCOMING!" 警告テキスト
+	var label := Label.new()
+	label.text = "BOSS INCOMING!"
+	label.add_theme_font_size_override("font_size", 36)
+	label.add_theme_color_override("font_color", Color(0.7, 0.3, 1.0, 1.0))
+	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	label.add_theme_constant_override("shadow_offset_x", 2)
+	label.add_theme_constant_override("shadow_offset_y", 2)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	label.position = Vector2(640 - 200, 120)
+	label.custom_minimum_size = Vector2(400, 0)
+	label.z_index = 200
+	ui_layer.add_child(label)
+
+	var tween := label.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(label, "scale", Vector2(1.3, 1.3), 0.3).set_trans(Tween.TRANS_BOUNCE)
+	tween.chain().tween_property(label, "scale", Vector2(1.0, 1.0), 0.2)
+	tween.chain().tween_property(label, "modulate:a", 0.0, 1.5).set_delay(1.0)
+	tween.chain().tween_callback(label.queue_free)
+
+func _on_boss_died(_enemy: Node2D) -> void:
+	enemies_alive -= 1
+	tower.enemy_killed.emit()
+
+	# ボス撃破のお祝い表示
+	var label := Label.new()
+	label.text = "BOSS DEFEATED!"
+	label.add_theme_font_size_override("font_size", 36)
+	label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.4, 1.0))
+	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	label.add_theme_constant_override("shadow_offset_x", 2)
+	label.add_theme_constant_override("shadow_offset_y", 2)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.position = Vector2(640 - 200, 120)
+	label.custom_minimum_size = Vector2(400, 0)
+	label.z_index = 200
+	ui_layer.add_child(label)
+
+	var tween := label.create_tween()
+	tween.tween_property(label, "modulate:a", 0.0, 2.0).set_delay(1.5)
+	tween.chain().tween_callback(label.queue_free)
 
 func _spawn_enemy() -> void:
 	if enemy_scene == null:
