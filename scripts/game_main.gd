@@ -49,13 +49,14 @@ var boss_phase_label: Label = null
 var indicator_pool: Array[Polygon2D] = []
 const MAX_INDICATORS := 8
 const SCREEN_MARGIN := 40.0  # 画面端からの余白
-const BOSS_DISTANCE := 200.0  # メートル
+const BOSS_DISTANCE := 100.0  # メートル（200mでは到達不可能だったため短縮）
 
 # 判断イベント管理
 var upgrade_events_given := 0
 var next_upgrade_time := 0.0
 # 縦スクロール: 距離ベースのアップグレード（メートル単位）
-var upgrade_schedule: Array[float] = [10.0, 25.0, 45.0, 70.0, 100.0, 140.0, 190.0, 250.0, 320.0, 400.0]
+# 旧: [10, 25, 45, 70, 100, 140, 190, 250, 320, 400] — 後半到達不可
+var upgrade_schedule: Array[float] = [10.0, 25.0, 40.0, 55.0, 75.0, 95.0, 120.0, 150.0, 180.0, 220.0]
 
 # 敵スポーン
 var enemy_scene: PackedScene
@@ -396,6 +397,16 @@ func _show_upgrade_choice() -> void:
 		var guaranteed_supports: Array = ["chain", "fork", "pierce"]
 		upgrade_ui.show_support_choice(guaranteed_supports)
 		return
+
+	# 3番目のアップグレード（40m）: まだ手動移動ならMove AIチップを提示
+	if upgrade_events_given == 3:
+		var move_chip: Dictionary = build_system.get_equipped_chip("move")
+		var move_id: String = move_chip.get("id", "manual")
+		if move_id == "manual" or move_id == "":
+			var move_chips: Array[Dictionary] = build_system.get_chips_by_category("move")
+			if not move_chips.is_empty():
+				upgrade_ui.show_chip_choice("Move AI Unlock", move_chips)
+				return
 
 	# 空スロットがあればスキル追加
 	var empty_slot := -1
