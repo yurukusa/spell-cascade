@@ -61,6 +61,11 @@ var shrine_shown := false
 var shrine_ui: Control = null
 var shrine_timer := 0.0
 
+# Onboarding overlay（初回ガイド: 10秒 or 初回アップグレードで消える）
+var onboarding_panel: PanelContainer = null
+var onboarding_timer := 0.0
+const ONBOARDING_DURATION := 10.0
+
 # 判断イベント管理
 var upgrade_events_given := 0
 var next_upgrade_time := 0.0
@@ -116,6 +121,9 @@ func _ready() -> void:
 	var initial_xp_target: int = tower.get_xp_for_next_level()
 	wave_label.text = "Lv.1  XP: 0/%d" % initial_xp_target
 	game_started = true
+
+	# Onboarding overlay（操作説明 + 目的）
+	_show_onboarding()
 
 	# 最初の判断イベントタイミング（距離ベース）
 	if not upgrade_schedule.is_empty():
@@ -190,6 +198,12 @@ func _process(delta: float) -> void:
 	if distance_m >= next_milestone:
 		_show_milestone(int(next_milestone))
 		next_milestone += 50.0
+
+	# Onboarding overlay タイマー
+	if onboarding_panel and onboarding_timer > 0:
+		onboarding_timer -= delta
+		if onboarding_timer <= 0:
+			_dismiss_onboarding()
 
 	# Kill combo タイマー減衰
 	if combo_count > 0:
@@ -373,6 +387,10 @@ func _update_build_display() -> void:
 	build_label.text = "\n".join(lines)
 
 func _on_upgrade_chosen(upgrade_data: Dictionary) -> void:
+	# 初回アップグレード選択でオンボーディングを消す
+	if onboarding_panel:
+		_dismiss_onboarding()
+
 	var upgrade_type: String = upgrade_data.get("type", "")
 
 	match upgrade_type:
@@ -416,6 +434,84 @@ func _on_upgrade_chosen(upgrade_data: Dictionary) -> void:
 				_setup_tower_attacks()
 
 	_update_build_display()
+
+# --- Onboarding overlay ---
+
+func _show_onboarding() -> void:
+	## ゲーム開始直後に表示: 目的・操作・ヒント。10秒 or 初回アップグレードで消える
+	onboarding_panel = PanelContainer.new()
+	onboarding_panel.name = "OnboardingOverlay"
+
+	# 半透明ダーク背景
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.02, 0.01, 0.06, 0.85)
+	style.border_color = Color(0.35, 0.75, 1.0, 0.4)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(8)
+	style.set_content_margin_all(24)
+	onboarding_panel.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	onboarding_panel.add_child(vbox)
+
+	# 目的
+	var goal_lbl := Label.new()
+	goal_lbl.text = "SURVIVE UNTIL THE BOSS"
+	goal_lbl.add_theme_font_size_override("font_size", 28)
+	goal_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3, 1.0))
+	goal_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(goal_lbl)
+
+	# 操作
+	var controls_lbl := Label.new()
+	controls_lbl.text = "WASD — Move     Mouse — Aim\nKill enemies for XP     Choose upgrades to grow"
+	controls_lbl.add_theme_font_size_override("font_size", 18)
+	controls_lbl.add_theme_color_override("font_color", Color(0.9, 0.88, 0.95, 1.0))
+	controls_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(controls_lbl)
+
+	# ヒント: CRUSH → BREAKOUT
+	var hint_lbl := Label.new()
+	hint_lbl.text = "When surrounded: CRUSH triggers — survive it for BREAKOUT!"
+	hint_lbl.add_theme_font_size_override("font_size", 14)
+	hint_lbl.add_theme_color_override("font_color", Color(0.6, 0.9, 1.0, 0.8))
+	hint_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(hint_lbl)
+
+	# UI Layer上にセンタリング配置
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	center.anchor_left = 0.0
+	center.anchor_right = 1.0
+	center.anchor_top = 0.15
+	center.anchor_bottom = 0.15
+	center.offset_left = 0
+	center.offset_right = 0
+	center.offset_top = 0
+	center.offset_bottom = 200
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	onboarding_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.add_child(onboarding_panel)
+	ui_layer.add_child(center)
+
+	# フェードイン
+	onboarding_panel.modulate.a = 0.0
+	var tween := onboarding_panel.create_tween()
+	tween.tween_property(onboarding_panel, "modulate:a", 1.0, 0.5)
+
+	onboarding_timer = ONBOARDING_DURATION
+
+func _dismiss_onboarding() -> void:
+	if onboarding_panel == null:
+		return
+	var panel := onboarding_panel
+	onboarding_panel = null
+	onboarding_timer = 0.0
+	var tween := panel.create_tween()
+	tween.tween_property(panel, "modulate:a", 0.0, 0.5)
+	# CenterContainerごと消す
+	tween.tween_callback(panel.get_parent().queue_free)
 
 # --- アップグレード選択（ラン中）---
 
