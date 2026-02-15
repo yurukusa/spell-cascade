@@ -249,50 +249,8 @@ func _create_projectile(direction: Vector2) -> void:
 	col.shape = shape
 	bullet.add_child(col)
 
-	# ビジュアル（Design Lock: 10px core + 18px glow, 3:1 contrast vs BG）
-	var color := _get_bullet_color()
-
-	# 外側グロー（形状認識 + 存在感）
-	var glow := Polygon2D.new()
-	var glow_points: PackedVector2Array = []
-	for i in range(8):
-		var angle := i * TAU / 8
-		glow_points.append(Vector2(cos(angle), sin(angle)) * 18.0)
-	glow.polygon = glow_points
-	glow.color = Color(color.r, color.g, color.b, 0.3)
-	bullet.add_child(glow)
-
-	# 本体（六角形コア）
-	var visual := Polygon2D.new()
-	var points: PackedVector2Array = []
-	for i in range(6):
-		var angle := i * TAU / 6
-		points.append(Vector2(cos(angle), sin(angle)) * 10.0)
-	visual.polygon = points
-	visual.color = color
-	bullet.add_child(visual)
-
-	# ホットスポット（中心の明るい点 — 弾道の視認性向上）
-	var hotspot := Polygon2D.new()
-	var hs_points: PackedVector2Array = []
-	for i in range(4):
-		var angle := i * TAU / 4
-		hs_points.append(Vector2(cos(angle), sin(angle)) * 3.0)
-	hotspot.polygon = hs_points
-	hotspot.color = Color(minf(color.r + 0.4, 1.0), minf(color.g + 0.4, 1.0), minf(color.b + 0.4, 1.0), 0.9)
-	bullet.add_child(hotspot)
-
-	# トレイル（弾の軌跡）
-	var trail := Line2D.new()
-	trail.name = "Trail"
-	trail.width = 6.0
-	trail.default_color = Color(color.r, color.g, color.b, 0.5)
-	trail.gradient = Gradient.new()
-	trail.gradient.set_color(0, Color(color.r, color.g, color.b, 0.5))
-	trail.gradient.set_color(1, Color(color.r, color.g, color.b, 0.0))
-	trail.z_index = -1
-	trail.top_level = true  # ワールド座標で描画（弾のローカル座標ではなく）
-	bullet.add_child(trail)
+	# スキル別ビジュアル（タグで分岐）
+	_build_skill_visual(bullet, direction)
 
 	# 弾スクリプト
 	var script := GDScript.new()
@@ -338,6 +296,221 @@ func _get_bullet_color() -> Color:
 	elif "holy" in tags:
 		return Color(1.0, 0.95, 0.7, 0.9)
 	return Color(0.8, 0.8, 0.9, 0.9)
+
+func _build_skill_visual(bullet: Area2D, direction: Vector2) -> void:
+	## タグに基づいてスキル固有の弾ビジュアルを構築
+	var tags: Array = stats.get("tags", [])
+	var color := _get_bullet_color()
+
+	if "fire" in tags:
+		_visual_fireball(bullet, color, direction)
+	elif "cold" in tags:
+		_visual_ice_shard(bullet, color, direction)
+	elif "lightning" in tags:
+		_visual_spark(bullet, color)
+	elif "chaos" in tags:
+		_visual_poison(bullet, color)
+	elif "holy" in tags:
+		_visual_holy(bullet, color, direction)
+	else:
+		_visual_default(bullet, color)
+
+	# トレイル（全スキル共通、色だけ変化）
+	var trail := Line2D.new()
+	trail.name = "Trail"
+	trail.width = 5.0 if "holy" not in tags else 10.0
+	trail.default_color = Color(color.r, color.g, color.b, 0.5)
+	trail.gradient = Gradient.new()
+	trail.gradient.set_color(0, Color(color.r, color.g, color.b, 0.5))
+	trail.gradient.set_color(1, Color(color.r, color.g, color.b, 0.0))
+	trail.z_index = -1
+	trail.top_level = true
+	bullet.add_child(trail)
+
+func _visual_fireball(bullet: Area2D, color: Color, direction: Vector2) -> void:
+	## 火球: 前方に尖った涙滴形 + 揺らめくグロー
+	var rot := direction.angle()
+
+	# 外側グロー（暖色の大きなぼかし）
+	var glow := Polygon2D.new()
+	glow.polygon = _make_ngon(10, 22.0)
+	glow.color = Color(1.0, 0.6, 0.1, 0.2)
+	glow.rotation = rot
+	bullet.add_child(glow)
+
+	# 涙滴（前方に尖った弾頭）
+	var body := Polygon2D.new()
+	body.polygon = PackedVector2Array([
+		Vector2(14, 0),    # 先端
+		Vector2(-4, -8),   # 左後方
+		Vector2(-10, 0),   # 後端
+		Vector2(-4, 8),    # 右後方
+	])
+	body.color = color
+	body.rotation = rot
+	bullet.add_child(body)
+
+	# 内部の明るいコア
+	var core := Polygon2D.new()
+	core.polygon = _make_ngon(5, 5.0)
+	core.color = Color(1.0, 0.9, 0.5, 0.9)
+	bullet.add_child(core)
+
+func _visual_ice_shard(bullet: Area2D, color: Color, direction: Vector2) -> void:
+	## 氷の破片: 鋭角な菱形、結晶感
+	var rot := direction.angle()
+
+	# 霜のオーラ
+	var glow := Polygon2D.new()
+	glow.polygon = _make_ngon(6, 20.0)
+	glow.color = Color(0.5, 0.8, 1.0, 0.15)
+	bullet.add_child(glow)
+
+	# 鋭い菱形（前後に長く、横に薄い）
+	var body := Polygon2D.new()
+	body.polygon = PackedVector2Array([
+		Vector2(16, 0),    # 前端（鋭い）
+		Vector2(0, -5),    # 上辺
+		Vector2(-12, 0),   # 後端
+		Vector2(0, 5),     # 下辺
+	])
+	body.color = color
+	body.rotation = rot
+	bullet.add_child(body)
+
+	# 結晶ハイライト線
+	var highlight := Polygon2D.new()
+	highlight.polygon = PackedVector2Array([
+		Vector2(12, 0),
+		Vector2(0, -2),
+		Vector2(-8, 0),
+		Vector2(0, 2),
+	])
+	highlight.color = Color(0.7, 0.95, 1.0, 0.7)
+	highlight.rotation = rot
+	bullet.add_child(highlight)
+
+func _visual_spark(bullet: Area2D, color: Color) -> void:
+	## スパーク: 小さな電気球 + ジグザグのフリッカー
+	# 電気オーラ（不規則な形）
+	var glow := Polygon2D.new()
+	var glow_pts: PackedVector2Array = []
+	for i in range(8):
+		var a := i * TAU / 8
+		var r := randf_range(12.0, 20.0)  # 不規則な半径
+		glow_pts.append(Vector2(cos(a), sin(a)) * r)
+	glow.polygon = glow_pts
+	glow.color = Color(1.0, 1.0, 0.4, 0.2)
+	bullet.add_child(glow)
+
+	# 電気コア（小さめ）
+	var core := Polygon2D.new()
+	core.polygon = _make_ngon(5, 7.0)
+	core.color = color
+	bullet.add_child(core)
+
+	# 中心のホットスポット
+	var hot := Polygon2D.new()
+	hot.polygon = _make_ngon(4, 3.0)
+	hot.color = Color(1.0, 1.0, 0.9, 1.0)
+	bullet.add_child(hot)
+
+func _visual_poison(bullet: Area2D, color: Color) -> void:
+	## 毒弾: 不定形のぶよぶよした球体
+	# 毒霧オーラ
+	var glow := Polygon2D.new()
+	glow.polygon = _make_ngon(12, 20.0)
+	glow.color = Color(0.3, 0.8, 0.1, 0.15)
+	bullet.add_child(glow)
+
+	# ぶよぶよボディ（不規則な多角形）
+	var body := Polygon2D.new()
+	var pts: PackedVector2Array = []
+	for i in range(8):
+		var a := i * TAU / 8
+		var r := 8.0 + randf_range(-2.0, 2.0)
+		pts.append(Vector2(cos(a), sin(a)) * r)
+	body.polygon = pts
+	body.color = color
+	bullet.add_child(body)
+
+	# 泡のアクセント
+	var bubble := Polygon2D.new()
+	bubble.polygon = _make_ngon(6, 3.5)
+	bubble.color = Color(0.6, 1.0, 0.4, 0.6)
+	bubble.position = Vector2(randf_range(-3, 3), randf_range(-3, 3))
+	bullet.add_child(bubble)
+
+func _visual_holy(bullet: Area2D, color: Color, direction: Vector2) -> void:
+	## 聖光ビーム: 細長い光の帯 + 金色パーティクル
+	var rot := direction.angle()
+
+	# 広がるオーラ
+	var glow := Polygon2D.new()
+	glow.polygon = PackedVector2Array([
+		Vector2(20, -8),
+		Vector2(24, 0),
+		Vector2(20, 8),
+		Vector2(-20, 4),
+		Vector2(-24, 0),
+		Vector2(-20, -4),
+	])
+	glow.color = Color(1.0, 0.95, 0.7, 0.2)
+	glow.rotation = rot
+	bullet.add_child(glow)
+
+	# 細長いビーム本体
+	var body := Polygon2D.new()
+	body.polygon = PackedVector2Array([
+		Vector2(18, -3),
+		Vector2(22, 0),
+		Vector2(18, 3),
+		Vector2(-18, 2),
+		Vector2(-20, 0),
+		Vector2(-18, -2),
+	])
+	body.color = color
+	body.rotation = rot
+	bullet.add_child(body)
+
+	# 中心のクロス（十字架モチーフ）
+	var cross_h := Polygon2D.new()
+	cross_h.polygon = PackedVector2Array([
+		Vector2(-4, -1), Vector2(4, -1), Vector2(4, 1), Vector2(-4, 1),
+	])
+	cross_h.color = Color(1.0, 1.0, 0.9, 0.8)
+	bullet.add_child(cross_h)
+
+	var cross_v := Polygon2D.new()
+	cross_v.polygon = PackedVector2Array([
+		Vector2(-1, -4), Vector2(1, -4), Vector2(1, 4), Vector2(-1, 4),
+	])
+	cross_v.color = Color(1.0, 1.0, 0.9, 0.8)
+	bullet.add_child(cross_v)
+
+func _visual_default(bullet: Area2D, color: Color) -> void:
+	## フォールバック: 基本六角形
+	var glow := Polygon2D.new()
+	glow.polygon = _make_ngon(8, 18.0)
+	glow.color = Color(color.r, color.g, color.b, 0.3)
+	bullet.add_child(glow)
+
+	var visual := Polygon2D.new()
+	visual.polygon = _make_ngon(6, 10.0)
+	visual.color = color
+	bullet.add_child(visual)
+
+	var hotspot := Polygon2D.new()
+	hotspot.polygon = _make_ngon(4, 3.0)
+	hotspot.color = Color(minf(color.r + 0.4, 1.0), minf(color.g + 0.4, 1.0), minf(color.b + 0.4, 1.0), 0.9)
+	bullet.add_child(hotspot)
+
+func _make_ngon(sides: int, radius: float) -> PackedVector2Array:
+	var pts: PackedVector2Array = []
+	for i in range(maxi(sides, 3)):
+		var a := float(i) * TAU / float(sides)
+		pts.append(Vector2(cos(a), sin(a)) * radius)
+	return pts
 
 func _get_pierce_count() -> int:
 	if stats.get("pierce", false):
