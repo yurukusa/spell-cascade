@@ -54,7 +54,7 @@ func _physics_process(delta: float) -> void:
 # --- Move AI パターン ---
 
 func _ai_kite(enemies: Array, params: Dictionary) -> Vector2:
-	## 最寄り敵から距離を取る。安全距離より近ければ逃げる。
+	## 最寄り敵から距離を取る。角に追い込まれないよう中央バイアス付き。
 	if enemies.is_empty():
 		return Vector2.ZERO
 	var safe_dist: float = params.get("safe_distance", 200)
@@ -63,13 +63,31 @@ func _ai_kite(enemies: Array, params: Dictionary) -> Vector2:
 		return Vector2.ZERO
 	var to_enemy := nearest.global_position - global_position
 	var dist := to_enemy.length()
+
+	var move_dir := Vector2.ZERO
 	if dist < safe_dist:
-		# 逃げる（敵と反対方向）
-		return -to_enemy.normalized()
+		move_dir = -to_enemy.normalized()
 	elif dist < safe_dist * 1.5:
-		# 安全距離付近: 横に動いて円弧的に距離を保つ
-		return to_enemy.normalized().rotated(PI * 0.5)
-	return Vector2.ZERO  # 十分遠ければ止まる
+		move_dir = to_enemy.normalized().rotated(PI * 0.5)
+
+	# 画面端バイアス: 端に近いほど中央方向に引っ張る（角逃げ防止）
+	var vp := get_viewport_rect().size
+	var center := vp * 0.5
+	var edge_margin := 120.0
+	var edge_pull := Vector2.ZERO
+	if position.x < edge_margin:
+		edge_pull.x = 1.0
+	elif position.x > vp.x - edge_margin:
+		edge_pull.x = -1.0
+	if position.y < edge_margin:
+		edge_pull.y = 1.0
+	elif position.y > vp.y - edge_margin:
+		edge_pull.y = -1.0
+
+	if edge_pull != Vector2.ZERO:
+		move_dir = (move_dir + edge_pull.normalized() * 0.6).normalized()
+
+	return move_dir
 
 func _ai_orbit(enemies: Array, params: Dictionary, delta: float) -> Vector2:
 	## 敵群の重心を周回する。
