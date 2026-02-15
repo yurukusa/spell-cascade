@@ -107,12 +107,84 @@ func _physics_process(delta: float) -> void:
 
 func take_damage(amount: float) -> void:
 	hp -= amount
+	_spawn_damage_number(amount)
 
 	# ヒットフラッシュ
 	modulate = Color(2, 2, 2, 1)
 	var tween := create_tween()
 	tween.tween_property(self, "modulate", Color.WHITE, 0.1)
 
+func _spawn_damage_number(amount: float) -> void:
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+
+	var label := Label.new()
+	label.text = str(int(amount))
+	label.add_theme_font_size_override("font_size", 16)
+	label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5, 1.0))
+	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	label.add_theme_constant_override("shadow_offset_x", 1)
+	label.add_theme_constant_override("shadow_offset_y", 1)
+	label.global_position = global_position + Vector2(randf_range(-15, 15), -20)
+	label.z_index = 100
+	scene_root.add_child(label)
+
+	var float_tween := label.create_tween()
+	float_tween.set_parallel(true)
+	float_tween.tween_property(label, "global_position:y", label.global_position.y - 40.0, 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	float_tween.tween_property(label, "modulate:a", 0.0, 0.6).set_delay(0.2)
+	float_tween.chain().tween_callback(label.queue_free)
+
 	if hp <= 0:
+		_spawn_death_vfx()
 		died.emit(self)
 		queue_free()
+
+func _spawn_death_vfx() -> void:
+	# キル時の爆散エフェクト: 赤い破片が放射状に飛ぶ（PoE的「画面が光る」快感）
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+
+	var fragment_count := 6
+	for i in range(fragment_count):
+		var frag := Polygon2D.new()
+		var angle := randf() * TAU
+		var size := randf_range(3.0, 7.0)
+		frag.polygon = PackedVector2Array([
+			Vector2(-size, -size * 0.5),
+			Vector2(size, 0),
+			Vector2(-size, size * 0.5),
+		])
+		frag.color = Color(1.0, 0.3, 0.2, 0.9)
+		frag.global_position = global_position
+		frag.rotation = angle
+		scene_root.add_child(frag)
+
+		# 飛散アニメーション
+		var dist := randf_range(30.0, 80.0)
+		var target_pos := global_position + Vector2(cos(angle), sin(angle)) * dist
+		var tween := frag.create_tween()
+		tween.set_parallel(true)
+		tween.tween_property(frag, "global_position", target_pos, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tween.tween_property(frag, "modulate:a", 0.0, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tween.tween_property(frag, "scale", Vector2(0.3, 0.3), 0.3)
+		tween.chain().tween_callback(frag.queue_free)
+
+	# 白フラッシュ円（瞬間的な満足感）
+	var flash := Polygon2D.new()
+	var flash_pts: PackedVector2Array = []
+	for j in range(8):
+		var a := j * TAU / 8
+		flash_pts.append(Vector2(cos(a), sin(a)) * 20.0)
+	flash.polygon = flash_pts
+	flash.color = Color(1.0, 0.8, 0.6, 0.6)
+	flash.global_position = global_position
+	scene_root.add_child(flash)
+
+	var flash_tween := flash.create_tween()
+	flash_tween.set_parallel(true)
+	flash_tween.tween_property(flash, "scale", Vector2(2.0, 2.0), 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	flash_tween.tween_property(flash, "modulate:a", 0.0, 0.15)
+	flash_tween.chain().tween_callback(flash.queue_free)
