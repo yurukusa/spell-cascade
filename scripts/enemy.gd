@@ -1,6 +1,6 @@
 extends CharacterBody2D
 
-## Enemy - ピクセルアートキャラクター。プレイヤーに向かって移動。
+## Enemy - ピクセルアートキャラクター。ターゲット（タワー）に向かって移動。
 
 @export var speed := 80.0
 @export var max_hp := 30.0
@@ -34,6 +34,14 @@ func _physics_process(_delta: float) -> void:
 	var direction := (player.global_position - global_position).normalized()
 	velocity = direction * speed
 	move_and_slide()
+
+	# タワーに到達したらダメージを与えて消える
+	var dist := global_position.distance_to(player.global_position)
+	if dist < 30.0:
+		if player.has_method("take_damage"):
+			player.take_damage(damage)
+		died.emit(self)
+		queue_free()
 
 func take_damage(amount: float) -> void:
 	hp -= amount

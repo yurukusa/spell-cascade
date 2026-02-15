@@ -1,0 +1,61 @@
+{
+  "_comment": "スキル定義。タワーモジュールの主スキル。各スキルは1つの攻撃パターンを持つ。",
+  "skills": [
+    {
+      "id": "fireball",
+      "name": "Fireball",
+      "tags": ["fire", "projectile", "spell"],
+      "base_damage": 15,
+      "base_cooldown": 1.2,
+      "base_range": 300,
+      "description": "Fires a burning projectile at the nearest enemy.",
+      "visual": "circle_red"
+    },
+    {
+      "id": "ice_shard",
+      "name": "Ice Shard",
+      "tags": ["cold", "projectile", "spell"],
+      "base_damage": 10,
+      "base_cooldown": 0.8,
+      "base_range": 250,
+      "description": "Launches a fast ice shard that slows on hit.",
+      "visual": "circle_blue",
+      "on_hit": {"slow": 0.7, "slow_duration": 1.5}
+    },
+    {
+      "id": "spark",
+      "name": "Spark",
+      "tags": ["lightning", "projectile", "spell"],
+      "base_damage": 8,
+      "base_cooldown": 0.3,
+      "base_range": 200,
+      "description": "Rapid-fire sparks in random directions.",
+      "visual": "circle_yellow",
+      "projectile_count": 3,
+      "spread_angle": 45
+    },
+    {
+      "id": "poison_nova",
+      "name": "Poison Nova",
+      "tags": ["chaos", "area", "spell"],
+      "base_damage": 5,
+      "base_cooldown": 2.0,
+      "base_range": 150,
+      "description": "Emits poison in all directions. Applies DoT.",
+      "visual": "circle_green",
+      "area_radius": 120,
+      "on_hit": {"dot_damage": 3, "dot_duration": 4.0}
+    },
+    {
+      "id": "holy_beam",
+      "name": "Holy Beam",
+      "tags": ["holy", "beam", "spell"],
+      "base_damage": 25,
+      "base_cooldown": 3.0,
+      "base_range": 500,
+      "description": "Piercing beam of light. High damage, slow fire rate.",
+      "visual": "line_white",
+      "pierce": true
+    }
+  ]
+}

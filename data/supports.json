@@ -1,0 +1,99 @@
+{
+  "_comment": "サポート定義。スキルにリンクして挙動を変える（倍率ではなく挙動変化）。最大2つまで。",
+  "supports": [
+    {
+      "id": "chain",
+      "name": "Chain",
+      "description": "Projectile bounces to 2 additional enemies.",
+      "tags": ["projectile"],
+      "requires_tag": "projectile",
+      "behavior": {
+        "type": "chain",
+        "chain_count": 2,
+        "chain_range": 150,
+        "damage_falloff": 0.7
+      }
+    },
+    {
+      "id": "fork",
+      "name": "Fork",
+      "description": "Projectile splits into 2 on hit.",
+      "tags": ["projectile"],
+      "requires_tag": "projectile",
+      "behavior": {
+        "type": "fork",
+        "fork_count": 2,
+        "fork_angle": 30
+      }
+    },
+    {
+      "id": "pierce",
+      "name": "Pierce",
+      "description": "Projectile passes through enemies (up to 3).",
+      "tags": ["projectile"],
+      "requires_tag": "projectile",
+      "behavior": {
+        "type": "pierce",
+        "pierce_count": 3
+      }
+    },
+    {
+      "id": "orbit",
+      "name": "Orbit",
+      "description": "Projectile orbits the tower before flying out.",
+      "tags": ["projectile", "area"],
+      "requires_tag": "projectile",
+      "behavior": {
+        "type": "orbit",
+        "orbit_radius": 60,
+        "orbit_duration": 1.0
+      }
+    },
+    {
+      "id": "return",
+      "name": "Return",
+      "description": "Projectile returns to tower after reaching max range.",
+      "tags": ["projectile"],
+      "requires_tag": "projectile",
+      "behavior": {
+        "type": "return",
+        "return_speed_mult": 1.5
+      }
+    },
+    {
+      "id": "trigger",
+      "name": "Trigger",
+      "description": "On kill, triggers the linked skill again (once).",
+      "tags": ["trigger"],
+      "requires_tag": "spell",
+      "behavior": {
+        "type": "trigger_on_kill",
+        "trigger_count": 1,
+        "cooldown_override": 0
+      }
+    },
+    {
+      "id": "concentrate",
+      "name": "Concentrate",
+      "description": "Area shrinks 50% but damage +80%.",
+      "tags": ["area"],
+      "requires_tag": "area",
+      "behavior": {
+        "type": "concentrate",
+        "area_mult": 0.5,
+        "damage_mult": 1.8
+      }
+    },
+    {
+      "id": "spread",
+      "name": "Spread",
+      "description": "Fires in all directions instead of targeting.",
+      "tags": ["area"],
+      "requires_tag": "spell",
+      "behavior": {
+        "type": "spread",
+        "directions": 8
+      }
+    }
+  ]
+}

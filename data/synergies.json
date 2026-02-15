@@ -1,0 +1,50 @@
+{
+  "_comment": "ゲームチェンジシナジー。特定条件で「別ゲー」になる組み合わせ。Week1は3つだけ。",
+  "synergies": [
+    {
+      "id": "chain_reaction",
+      "name": "Chain Reaction",
+      "description": "Chain + Fork: Each chain also forks. Projectiles multiply exponentially.",
+      "condition": {
+        "type": "supports_combo",
+        "required_supports": ["chain", "fork"]
+      },
+      "effect": {
+        "chain_triggers_fork": true,
+        "_game_change": "Single projectile becomes a screen-filling cascade. 1 shot can clear a wave."
+      },
+      "discovery_hint": "What if a bouncing projectile split every time it bounced?"
+    },
+    {
+      "id": "death_spiral",
+      "name": "Death Spiral",
+      "description": "Orbit + Trigger-on-kill: Kills spawn orbiting projectiles. Self-sustaining vortex.",
+      "condition": {
+        "type": "supports_combo",
+        "required_supports": ["orbit", "trigger"]
+      },
+      "effect": {
+        "kill_spawns_orbit": true,
+        "orbit_inherits_damage": true,
+        "_game_change": "Tower creates a growing death spiral. More kills = more orbiting projectiles = more kills."
+      },
+      "discovery_hint": "Orbiting death that feeds itself..."
+    },
+    {
+      "id": "elemental_convergence",
+      "name": "Elemental Convergence",
+      "description": "Tower has skills with 3+ different elemental tags: All damage +100%, resistance shred.",
+      "condition": {
+        "type": "tag_count",
+        "required_tags": ["fire", "cold", "lightning", "chaos", "holy"],
+        "min_unique": 3
+      },
+      "effect": {
+        "global_damage_mult": 2.0,
+        "resistance_shred": 0.5,
+        "_game_change": "Enemies melt. The investment of diverse elements pays off massively."
+      },
+      "discovery_hint": "If you master all elements..."
+    }
+  ]
+}
