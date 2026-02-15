@@ -26,6 +26,7 @@ var enemies_alive := 0
 var game_started := false
 var boss_spawned := false
 var kill_count := 0
+var next_milestone := 50.0  # 50mごとにマイルストーン
 const BOSS_DISTANCE := 200.0  # メートル
 
 # 判断イベント管理
@@ -119,6 +120,11 @@ func _process(delta: float) -> void:
 	# ボスの出現判定
 	if not boss_spawned and distance_m >= BOSS_DISTANCE:
 		_spawn_boss()
+
+	# 距離マイルストーン（50mごと）
+	if distance_m >= next_milestone:
+		_show_milestone(int(next_milestone))
+		next_milestone += 50.0
 
 func _update_timer_display() -> void:
 	var remaining := maxf(max_run_time - run_time, 0.0)
@@ -592,6 +598,41 @@ func _spawn_levelup_vfx() -> void:
 	tween.tween_property(ring, "modulate:a", 0.0, 0.4)
 	tween.chain().tween_callback(ring.queue_free)
 
+func _show_milestone(meters: int) -> void:
+	## 距離マイルストーン: 達成感を出す中央テキスト + 画面フラッシュ
+	var label := Label.new()
+	label.text = "%dm REACHED!" % meters
+	label.add_theme_font_size_override("font_size", 32)
+	label.add_theme_color_override("font_color", Color(0.4, 0.9, 1.0, 1.0))
+	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	label.add_theme_constant_override("shadow_offset_x", 2)
+	label.add_theme_constant_override("shadow_offset_y", 2)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.position = Vector2(640 - 150, 200)
+	label.custom_minimum_size = Vector2(300, 0)
+	label.z_index = 200
+	label.modulate.a = 0.0
+	ui_layer.add_child(label)
+
+	var tween := label.create_tween()
+	tween.tween_property(label, "modulate:a", 1.0, 0.15)
+	tween.tween_property(label, "scale", Vector2(1.15, 1.15), 0.1).set_trans(Tween.TRANS_BACK)
+	tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1)
+	tween.tween_interval(1.0)
+	tween.tween_property(label, "modulate:a", 0.0, 0.5)
+	tween.tween_callback(label.queue_free)
+
+	# 画面フラッシュ（白く一瞬光る）
+	var flash := ColorRect.new()
+	flash.color = Color(0.4, 0.8, 1.0, 0.15)
+	flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui_layer.add_child(flash)
+
+	var flash_tween := flash.create_tween()
+	flash_tween.tween_property(flash, "color:a", 0.0, 0.4)
+	flash_tween.tween_callback(flash.queue_free)
+
 func _on_tower_destroyed() -> void:
 	game_over = true
 	_show_result_screen(false)
@@ -667,7 +708,6 @@ func _show_result_screen(is_victory: bool) -> void:
 
 	var stat_labels: Array[Label] = []
 	var stat_color := Color(0.85, 0.82, 0.92, 1.0)
-	var value_color := Color(0.4, 0.8, 1.0, 1.0)
 
 	for stat in stats_data:
 		var lbl := Label.new()

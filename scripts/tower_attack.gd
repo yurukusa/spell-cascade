@@ -384,7 +384,7 @@ func _process(delta):
 	position += direction * speed * delta
 	lifetime -= delta
 	if lifetime <= 0:
-		queue_free()
+		call_deferred(\"queue_free\")
 
 func _on_body_entered(body):
 	if not body.has_method(\"take_damage\"):
@@ -418,7 +418,7 @@ func _on_body_entered(body):
 		pierce_remaining -= 1
 		return  # 弾は消えない
 
-	queue_free()
+	call_deferred(\"queue_free\")
 
 func _find_chain_target(exclude_body) -> Node2D:
 	var enemies := get_tree().get_nodes_in_group(\"enemies\")
@@ -474,7 +474,7 @@ func _ready():
 	body_entered.connect(func(body):
 		if body.has_method(\\\"take_damage\\\"):
 			body.take_damage(damage)
-		queue_free()
+		call_deferred(\\\"queue_free\\\")
 	)
 	collision_layer = 2
 	collision_mask = 4
@@ -483,7 +483,7 @@ func _process(delta):
 	position += direction * speed * delta
 	lifetime -= delta
 	if lifetime <= 0:
-		queue_free()
+		call_deferred(\\\"queue_free\\\")
 \"\"\"
 		s.reload()
 		fork_bullet.set_script(s)
