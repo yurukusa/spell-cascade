@@ -35,12 +35,15 @@ func _create_visual() -> void:
 		color = Color(0.9, 0.7, 0.2, 0.9)  # 金色チップドロップ
 	elif orb_type == "chip_move":
 		color = Color(0.6, 0.3, 1.0, 0.9)  # 紫のAutoMoveチップ
+	elif orb_type == "hp":
+		color = Color(1.0, 0.25, 0.3, 0.9)  # 赤のHP回復オーブ
 
-	# 外側グロー
+	# 外側グロー（HPオーブは4角ダイヤ、その他は6角）
+	var sides := 4 if orb_type == "hp" else 6
 	var glow := Polygon2D.new()
 	var glow_pts: PackedVector2Array = []
-	for i in range(6):
-		var a := i * TAU / 6
+	for i in range(sides):
+		var a := i * TAU / sides
 		glow_pts.append(Vector2(cos(a), sin(a)) * 10.0)
 	glow.polygon = glow_pts
 	glow.color = Color(color.r, color.g, color.b, 0.25)
@@ -49,8 +52,8 @@ func _create_visual() -> void:
 	# コア
 	var core := Polygon2D.new()
 	var core_pts: PackedVector2Array = []
-	for i in range(6):
-		var a := i * TAU / 6
+	for i in range(sides):
+		var a := i * TAU / sides
 		core_pts.append(Vector2(cos(a), sin(a)) * 5.0)
 	core.polygon = core_pts
 	core.color = color
@@ -96,6 +99,11 @@ func _on_collected() -> void:
 		_equip_auto_aim()
 	elif orb_type == "chip_move":
 		_equip_auto_move()
+	elif orb_type == "hp":
+		# HP回復: 最大HPの15%を回復
+		if is_instance_valid(target) and target.has_method("heal"):
+			var heal_amount: float = target.max_hp * 0.15
+			target.heal(heal_amount)
 	elif is_instance_valid(target) and target.has_method("add_xp"):
 		target.add_xp(xp_value)
 
@@ -118,7 +126,8 @@ func _on_collected() -> void:
 		tween.tween_property(flash, "modulate:a", 0.0, 0.15)
 		tween.chain().tween_callback(flash.queue_free)
 
-	queue_free()
+	# physics callback中のqueue_freeはarea_set_shape_disabledエラーを起こすため遅延
+	call_deferred("queue_free")
 
 func _equip_auto_aim() -> void:
 	var build_sys := get_node_or_null("/root/BuildSystem")

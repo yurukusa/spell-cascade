@@ -444,7 +444,7 @@ func _process(delta):
 func _on_body_entered(body):
 	if body.has_method(\"take_damage\"):
 		body.take_damage(damage)
-	queue_free()
+	call_deferred(\"queue_free\")
 """
 
 func take_damage(amount: float) -> void:
@@ -502,6 +502,21 @@ func _spawn_drops() -> void:
 		orb.set("target", player)
 		orb.set("xp_value", xp_value)
 		scene_root.add_child(orb)
+
+	# HPオーブドロップ判定（通常10%、タンク20%）
+	var hp_drop_chance := 0.10
+	if enemy_type == "tank":
+		hp_drop_chance = 0.20
+	if randf() < hp_drop_chance:
+		var hp_orb := Area2D.new()
+		hp_orb.set_script(drop_script)
+		hp_orb.name = "HPOrb"
+		hp_orb.add_to_group("pickups")
+		hp_orb.global_position = global_position + Vector2(randf_range(-10, 10), randf_range(-10, 10))
+		hp_orb.set("target", player)
+		hp_orb.set("orb_type", "hp")
+		hp_orb.set("xp_value", 0)
+		scene_root.add_child(hp_orb)
 
 	# ボス撃破: AutoMoveチップ保証ドロップ
 	if is_boss:
