@@ -48,7 +48,11 @@ func _build_ui() -> void:
 
 	title_label = Label.new()
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label.add_theme_font_size_override("font_size", 20)
+	title_label.add_theme_font_size_override("font_size", 24)
+	title_label.add_theme_color_override("font_color", Color(0.9, 0.85, 1.0, 1.0))
+	title_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
+	title_label.add_theme_constant_override("shadow_offset_x", 1)
+	title_label.add_theme_constant_override("shadow_offset_y", 1)
 	vbox.add_child(title_label)
 
 	buttons_container = VBoxContainer.new()
@@ -80,7 +84,7 @@ func show_skill_choice(slot: int, skill_ids: Array) -> void:
 			tags_str
 		]
 		btn.custom_minimum_size = Vector2(400, 70)
-		btn.add_theme_font_size_override("font_size", 13)
+		btn.add_theme_font_size_override("font_size", 14)
 
 		var style := _make_button_style(skill_data.get("tags", []))
 		btn.add_theme_stylebox_override("normal", style)
@@ -127,7 +131,7 @@ func show_skill_swap(slot: int, skill_ids: Array) -> void:
 			tags_str
 		]
 		btn.custom_minimum_size = Vector2(400, 70)
-		btn.add_theme_font_size_override("font_size", 13)
+		btn.add_theme_font_size_override("font_size", 14)
 
 		var style := _make_button_style(skill_data.get("tags", []))
 		btn.add_theme_stylebox_override("normal", style)
@@ -142,7 +146,7 @@ func show_skill_swap(slot: int, skill_ids: Array) -> void:
 	var skip_btn := Button.new()
 	skip_btn.text = "Keep %s (Skip)" % current_name
 	skip_btn.custom_minimum_size = Vector2(400, 40)
-	skip_btn.add_theme_font_size_override("font_size", 13)
+	skip_btn.add_theme_font_size_override("font_size", 14)
 	skip_btn.pressed.connect(func():
 		get_tree().paused = false
 		hide_ui()
@@ -170,7 +174,7 @@ func show_support_choice(support_ids: Array) -> void:
 			sup_data.get("requires_tag", "any")
 		]
 		btn.custom_minimum_size = Vector2(400, 60)
-		btn.add_theme_font_size_override("font_size", 13)
+		btn.add_theme_font_size_override("font_size", 14)
 
 		var style := _make_support_style()
 		btn.add_theme_stylebox_override("normal", style)
@@ -236,7 +240,7 @@ func show_mod_choice(prefix: Dictionary, suffix: Dictionary) -> void:
 		var btn := Button.new()
 		btn.text = "PREFIX: %s\n%s" % [prefix.get("name", "?"), prefix.get("description", "")]
 		btn.custom_minimum_size = Vector2(400, 60)
-		btn.add_theme_font_size_override("font_size", 13)
+		btn.add_theme_font_size_override("font_size", 14)
 		var style := _make_mod_style("prefix")
 		btn.add_theme_stylebox_override("normal", style)
 		var hover := style.duplicate()
@@ -249,7 +253,7 @@ func show_mod_choice(prefix: Dictionary, suffix: Dictionary) -> void:
 		var btn := Button.new()
 		btn.text = "SUFFIX: %s\n%s" % [suffix.get("name", "?"), suffix.get("description", "")]
 		btn.custom_minimum_size = Vector2(400, 60)
-		btn.add_theme_font_size_override("font_size", 13)
+		btn.add_theme_font_size_override("font_size", 14)
 		var style := _make_mod_style("suffix")
 		btn.add_theme_stylebox_override("normal", style)
 		var hover := style.duplicate()
@@ -262,7 +266,7 @@ func show_mod_choice(prefix: Dictionary, suffix: Dictionary) -> void:
 	var skip_btn := Button.new()
 	skip_btn.text = "Skip (Keep current mods)"
 	skip_btn.custom_minimum_size = Vector2(400, 40)
-	skip_btn.add_theme_font_size_override("font_size", 13)
+	skip_btn.add_theme_font_size_override("font_size", 14)
 	skip_btn.pressed.connect(func():
 		get_tree().paused = false
 		hide_ui()
@@ -395,7 +399,7 @@ func show_chip_choice(category_label: String, chip_options: Array[Dictionary]) -
 			chip.get("description", ""),
 		]
 		btn.custom_minimum_size = Vector2(400, 60)
-		btn.add_theme_font_size_override("font_size", 13)
+		btn.add_theme_font_size_override("font_size", 14)
 
 		var style := _make_chip_style(rarity)
 		btn.add_theme_stylebox_override("normal", style)
@@ -435,10 +439,10 @@ func _make_button_style(tags: Array) -> StyleBoxFlat:
 
 	var style := StyleBoxFlat.new()
 	style.bg_color = color
-	style.border_color = color.lightened(0.3)
+	style.border_color = color.lightened(0.35)
 	style.set_border_width_all(1)
-	style.set_corner_radius_all(4)
-	style.set_content_margin_all(8)
+	style.set_corner_radius_all(5)
+	style.set_content_margin_all(10)
 	return style
 
 func _make_support_style() -> StyleBoxFlat:

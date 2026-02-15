@@ -7,6 +7,7 @@ extends Node2D
 @onready var tower: Node2D = $Tower
 @onready var ui_layer: CanvasLayer = $UI
 @onready var hp_bar: ProgressBar = $UI/HPBar
+@onready var hp_label: Label = $UI/HPBar/HPLabel
 @onready var wave_label: Label = $UI/WaveLabel
 @onready var timer_label: Label = $UI/TimerLabel
 @onready var build_label: Label = $UI/BuildLabel
@@ -53,9 +54,11 @@ func _ready() -> void:
 	tower.tower_damaged.connect(_on_tower_damaged)
 	tower.tower_destroyed.connect(_on_tower_destroyed)
 
-	# UI初期化
+	# UI初期化（Design Lock準拠スタイル適用）
+	_style_hud()
 	hp_bar.max_value = tower.max_hp
 	hp_bar.value = tower.max_hp
+	_update_hp_label(tower.max_hp, tower.max_hp)
 	restart_label.visible = false
 
 	# ロードアウト選択開始（プリセット1画面）
@@ -100,6 +103,64 @@ func _update_timer_display() -> void:
 	var minutes: int = total_sec / 60
 	var seconds: int = total_sec % 60
 	timer_label.text = "%d:%02d" % [minutes, seconds]
+
+func _style_hud() -> void:
+	## Design Lock v1: semantic colors, min 16px text, 4.5:1 contrast
+	var bg_color := Color(0.05, 0.02, 0.1, 1.0)  # match clear color
+	var player_cyan := Color(0.35, 0.75, 1.0, 1.0)
+	var text_color := Color(0.9, 0.88, 0.95, 1.0)  # high contrast vs dark BG
+	var dim_text := Color(0.6, 0.55, 0.7, 1.0)
+
+	# HP Bar: cyan fill on dark background
+	var bar_bg := StyleBoxFlat.new()
+	bar_bg.bg_color = Color(0.06, 0.04, 0.12, 0.9)
+	bar_bg.border_color = Color(0.2, 0.18, 0.3, 0.8)
+	bar_bg.set_border_width_all(1)
+	bar_bg.set_corner_radius_all(3)
+	hp_bar.add_theme_stylebox_override("background", bar_bg)
+
+	var bar_fill := StyleBoxFlat.new()
+	bar_fill.bg_color = player_cyan.darkened(0.2)
+	bar_fill.set_corner_radius_all(2)
+	hp_bar.add_theme_stylebox_override("fill", bar_fill)
+
+	# HP label on top of bar
+	hp_label.add_theme_font_size_override("font_size", 14)
+	hp_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.95))
+	hp_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	hp_label.add_theme_constant_override("shadow_offset_x", 1)
+	hp_label.add_theme_constant_override("shadow_offset_y", 1)
+
+	# Wave/title label
+	wave_label.add_theme_font_size_override("font_size", 18)
+	wave_label.add_theme_color_override("font_color", player_cyan.lightened(0.15))
+	wave_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	wave_label.add_theme_constant_override("shadow_offset_x", 1)
+	wave_label.add_theme_constant_override("shadow_offset_y", 1)
+
+	# Timer label: prominent, right-aligned
+	timer_label.add_theme_font_size_override("font_size", 22)
+	timer_label.add_theme_color_override("font_color", text_color)
+	timer_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	timer_label.add_theme_constant_override("shadow_offset_x", 1)
+	timer_label.add_theme_constant_override("shadow_offset_y", 1)
+
+	# Build info label
+	build_label.add_theme_font_size_override("font_size", 13)
+	build_label.add_theme_color_override("font_color", dim_text)
+	build_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
+	build_label.add_theme_constant_override("shadow_offset_x", 1)
+	build_label.add_theme_constant_override("shadow_offset_y", 1)
+
+	# Restart label: large and clear
+	restart_label.add_theme_font_size_override("font_size", 28)
+	restart_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5, 1.0))
+	restart_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	restart_label.add_theme_constant_override("shadow_offset_x", 2)
+	restart_label.add_theme_constant_override("shadow_offset_y", 2)
+
+func _update_hp_label(current: float, max_val: float) -> void:
+	hp_label.text = "%d / %d" % [int(current), int(max_val)]
 
 func _update_build_display() -> void:
 	var lines: PackedStringArray = []
@@ -331,18 +392,32 @@ func _on_enemy_died(_enemy: Node2D) -> void:
 
 # --- タワーイベント ---
 
-func _on_tower_damaged(current: float, _max: float) -> void:
+func _on_tower_damaged(current: float, max_val: float) -> void:
 	hp_bar.value = current
+	_update_hp_label(current, max_val)
+
+	# HP低下でバーの色を変化（cyan → yellow → red）
+	var pct := current / max_val
+	var fill_style := hp_bar.get_theme_stylebox("fill") as StyleBoxFlat
+	if fill_style:
+		if pct > 0.5:
+			fill_style.bg_color = Color(0.28, 0.6, 0.8, 1.0)  # cyan
+		elif pct > 0.25:
+			fill_style.bg_color = Color(0.85, 0.75, 0.2, 1.0)  # yellow warning
+		else:
+			fill_style.bg_color = Color(0.9, 0.2, 0.15, 1.0)  # red danger
 
 func _on_tower_destroyed() -> void:
 	game_over = true
 	wave_label.text = "DESTROYED"
+	wave_label.add_theme_color_override("font_color", Color(1.0, 0.25, 0.2, 1.0))
 	restart_label.visible = true
 	restart_label.text = "Press R to Restart"
 
 func _win_game() -> void:
 	game_over = true
 	wave_label.text = "SURVIVED 10 MINUTES!"
+	wave_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3, 1.0))
 	restart_label.visible = true
 	restart_label.text = "Press R to Restart"
 
