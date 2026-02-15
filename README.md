@@ -8,13 +8,13 @@ A top-down survival shooter where your build choices matter. Equip attack chips,
 
 ### Windows
 
-1. Download `SpellCascade-win.zip` from [Releases](https://github.com/yurukusa/spell-cascade/releases) or [itch.io](https://yurukusa.itch.io/)
+1. Download `SpellCascade-win.zip` from [Releases](https://github.com/yurukusa/spell-cascade/releases) or [itch.io](https://yurukusa.itch.io/spell-cascade)
 2. Extract the zip
 3. Run `SpellCascade.exe`
 
 ### Web
 
-Play directly in your browser on [itch.io](https://yurukusa.itch.io/).
+Play directly in your browser on [itch.io](https://yurukusa.itch.io/spell-cascade).
 
 ## Controls
 
@@ -52,7 +52,7 @@ godot --headless --export-release "Web" exports/web/SpellCascade.html
 
 ## Version
 
-Current: **v0.1.0** (see [VERSION](VERSION))
+Current: **v0.2.2** (see [VERSION](VERSION))
 
 ## Known Issues
 
