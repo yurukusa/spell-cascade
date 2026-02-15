@@ -101,6 +101,8 @@ func _fire() -> void:
 	if enemies.is_empty():
 		return
 
+	SFX.play_shot()
+
 	# spread挙動: 全方向に撃つ
 	for behavior in stats.get("behaviors", []):
 		if behavior.get("type", "") == "spread":

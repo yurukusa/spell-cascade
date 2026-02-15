@@ -99,6 +99,7 @@ func show_skill_choice(slot: int, skill_ids: Array) -> void:
 	get_tree().paused = true
 
 func _on_skill_chosen(slot: int, skill_id: String) -> void:
+	SFX.play_ui_select()
 	get_tree().paused = false
 	hide_ui()
 	upgrade_chosen.emit({"type": "skill", "slot": slot, "skill_id": skill_id})
@@ -189,6 +190,7 @@ func show_support_choice(support_ids: Array) -> void:
 	get_tree().paused = true
 
 func _on_support_chosen(support_id: String) -> void:
+	SFX.play_ui_select()
 	# Step 2: どのスロットにリンクするか選ばせる（PoEの"悩み=力"）
 	var tower = get_tree().current_scene.get_node_or_null("Tower")
 	if tower == null:
@@ -277,6 +279,7 @@ func show_mod_choice(prefix: Dictionary, suffix: Dictionary) -> void:
 	get_tree().paused = true
 
 func _on_mod_chosen(mod_data: Dictionary, mod_type: String) -> void:
+	SFX.play_ui_select()
 	var tower = get_tree().current_scene.get_node_or_null("Tower")
 	if tower == null:
 		get_tree().paused = false
@@ -398,6 +401,7 @@ func show_preset_choice(presets_list: Array[Dictionary]) -> void:
 	get_tree().paused = true
 
 func _on_preset_chosen(preset_id: String) -> void:
+	SFX.play_ui_select()
 	get_tree().paused = false
 	hide_ui()
 	upgrade_chosen.emit({"type": "preset", "preset_id": preset_id})
@@ -433,6 +437,7 @@ func show_chip_choice(category_label: String, chip_options: Array[Dictionary]) -
 	get_tree().paused = true
 
 func _on_chip_chosen(chip_id: String) -> void:
+	SFX.play_ui_select()
 	get_tree().paused = false
 	hide_ui()
 	upgrade_chosen.emit({"type": "chip", "chip_id": chip_id})

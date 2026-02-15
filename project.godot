@@ -15,6 +15,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 BuildSystem="*res://scripts/build_system.gd"
+SFX="*res://scripts/sfx.gd"
 ;Screenshot="*res://scripts/screenshot.gd"
 
 [display]

@@ -766,6 +766,7 @@ func _on_enemy_died(_enemy: Node2D) -> void:
 	enemies_alive -= 1
 	kill_count += 1
 	tower.enemy_killed.emit()
+	SFX.play_kill()
 	# 小さなシェイク（爽快感）
 	tower.shake(2.0)
 	# コンボカウント

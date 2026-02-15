@@ -527,6 +527,7 @@ func take_damage(amount: float) -> void:
 
 	hp -= amount
 	_spawn_damage_number(amount)
+	SFX.play_hit()
 
 	# ボスHPバー更新
 	if is_boss:

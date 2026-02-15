@@ -429,6 +429,10 @@ func take_damage(amount: float) -> void:
 	var tween := create_tween()
 	tween.tween_property(self, "modulate", Color.WHITE, 0.15)
 
+	# Low HP warning（30%以下で警告音）
+	if hp > 0 and hp / max_hp <= 0.3:
+		SFX.play_low_hp_warning()
+
 	if hp <= 0:
 		hp = 0
 		tower_destroyed.emit()
