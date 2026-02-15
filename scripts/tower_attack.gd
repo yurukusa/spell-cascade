@@ -282,6 +282,18 @@ func _create_projectile(direction: Vector2) -> void:
 	hotspot.color = Color(minf(color.r + 0.4, 1.0), minf(color.g + 0.4, 1.0), minf(color.b + 0.4, 1.0), 0.9)
 	bullet.add_child(hotspot)
 
+	# トレイル（弾の軌跡）
+	var trail := Line2D.new()
+	trail.name = "Trail"
+	trail.width = 6.0
+	trail.default_color = Color(color.r, color.g, color.b, 0.5)
+	trail.gradient = Gradient.new()
+	trail.gradient.set_color(0, Color(color.r, color.g, color.b, 0.5))
+	trail.gradient.set_color(1, Color(color.r, color.g, color.b, 0.0))
+	trail.z_index = -1
+	trail.top_level = true  # ワールド座標で描画（弾のローカル座標ではなく）
+	bullet.add_child(trail)
+
 	# 弾スクリプト
 	var script := GDScript.new()
 	script.source_code = _build_bullet_script()
@@ -374,6 +386,7 @@ var chain_range := 150.0
 var fork_count := 0
 var fork_angle := 30.0
 var hit_enemies := []
+const TRAIL_LENGTH := 8
 
 func _ready():
 	body_entered.connect(_on_body_entered)
@@ -385,6 +398,14 @@ func _process(delta):
 	lifetime -= delta
 	if lifetime <= 0:
 		call_deferred(\"queue_free\")
+		return
+
+	# トレイル更新
+	var trail := get_node_or_null(\"Trail\")
+	if trail and trail is Line2D:
+		trail.add_point(global_position)
+		while trail.get_point_count() > TRAIL_LENGTH:
+			trail.remove_point(0)
 
 func _on_body_entered(body):
 	if not body.has_method(\"take_damage\"):
