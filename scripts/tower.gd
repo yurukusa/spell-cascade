@@ -23,6 +23,18 @@ var facing_dir := Vector2.UP  # 最後に向いていた方向（弾の方向用
 var distance_traveled := 0.0  # 進行距離（メートル）
 var start_y := 0.0  # 開始Y位置
 
+# Crush state（包囲DPS）
+var crush_active := false
+var crush_count := 0  # 包囲敵数
+var crush_tick_timer := 0.0
+var crush_invuln_timer := 0.0
+const CRUSH_RADIUS := 48.0
+const CRUSH_THRESHOLD := 3
+const CRUSH_BASE_DPS := 6.0
+const CRUSH_K_DPS := 4.0
+const CRUSH_TICK := 0.2
+const CRUSH_INVULN := 0.15
+
 func _ready() -> void:
 	hp = max_hp
 	start_y = position.y
@@ -157,6 +169,9 @@ func _physics_process(delta: float) -> void:
 	# 進行距離更新（上方向=負のY）
 	distance_traveled = maxf(start_y - position.y, distance_traveled)
 
+	# Crush state: 包囲DPS
+	_update_crush(enemies, delta)
+
 func _get_manual_input() -> Vector2:
 	var dir := Vector2.ZERO
 	if Input.is_action_pressed("move_up"):
@@ -168,6 +183,64 @@ func _get_manual_input() -> Vector2:
 	if Input.is_action_pressed("move_right"):
 		dir.x += 1.0
 	return dir.normalized()
+
+# --- Crush state（包囲DPS）---
+
+signal crush_changed(active: bool, count: int)
+
+func _update_crush(enemies: Array, delta: float) -> void:
+	# 半径内の敵をカウント（凍結中は除外）
+	crush_count = 0
+	for e in enemies:
+		if not is_instance_valid(e):
+			continue
+		if global_position.distance_to(e.global_position) <= CRUSH_RADIUS:
+			# 将来: 凍結中の敵は除外（freeze_remaining > 0）
+			crush_count += 1
+
+	var was_active := crush_active
+	crush_active = crush_count >= CRUSH_THRESHOLD
+
+	if crush_active != was_active:
+		crush_changed.emit(crush_active, crush_count)
+		if crush_active:
+			# Crush開始: 小ノックバック（逃げ道を作る）
+			_crush_knockback(enemies)
+
+	if not crush_active:
+		crush_tick_timer = 0.0
+		crush_invuln_timer = 0.0
+		return
+
+	# 無敵中はダメージスキップ
+	if crush_invuln_timer > 0:
+		crush_invuln_timer -= delta
+		return
+
+	# DPSティック
+	crush_tick_timer += delta
+	if crush_tick_timer >= CRUSH_TICK:
+		crush_tick_timer -= CRUSH_TICK
+		var dps := CRUSH_BASE_DPS + CRUSH_K_DPS * float(crush_count - 2)
+		var tick_dmg := dps * CRUSH_TICK
+		take_damage(tick_dmg)
+		crush_invuln_timer = CRUSH_INVULN
+
+		# 視覚: 赤フラッシュ（Crush中のみ）
+		modulate = Color(1.5, 0.4, 0.3, 1)
+		var tween := create_tween()
+		tween.tween_property(self, "modulate", Color.WHITE, 0.1)
+
+func _crush_knockback(enemies: Array) -> void:
+	# 最も密集している方向の逆にわずかにノックバック
+	var push_dir := Vector2.ZERO
+	for e in enemies:
+		if not is_instance_valid(e):
+			continue
+		if global_position.distance_to(e.global_position) <= CRUSH_RADIUS:
+			push_dir -= (e.global_position - global_position).normalized()
+	if push_dir.length() > 0:
+		position += push_dir.normalized() * 3.0
 
 # --- Move AI パターン ---
 

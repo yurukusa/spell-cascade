@@ -66,6 +66,14 @@ offset_right = 500.0
 offset_bottom = 160.0
 text = ""
 
+[node name="CrushLabel" type="Label" parent="UI"]
+offset_left = 440.0
+offset_top = 340.0
+offset_right = 840.0
+offset_bottom = 380.0
+text = ""
+horizontal_alignment = 1
+
 [node name="DistanceLabel" type="Label" parent="UI"]
 offset_left = 560.0
 offset_top = 44.0

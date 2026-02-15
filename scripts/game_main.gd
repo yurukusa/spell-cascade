@@ -13,6 +13,7 @@ extends Node2D
 @onready var build_label: Label = $UI/BuildLabel
 @onready var restart_label: Label = $UI/RestartLabel
 @onready var distance_label: Label = $UI/DistanceLabel
+@onready var crush_label: Label = $UI/CrushLabel
 
 var build_system: Node  # BuildSystem autoload
 var upgrade_ui: Node  # UpgradeUI
@@ -52,6 +53,7 @@ func _ready() -> void:
 	# タワー接続
 	tower.tower_damaged.connect(_on_tower_damaged)
 	tower.tower_destroyed.connect(_on_tower_destroyed)
+	tower.crush_changed.connect(_on_crush_changed)
 
 	# UI初期化（Design Lock準拠スタイル適用）
 	_style_hud()
@@ -78,6 +80,10 @@ func _process(delta: float) -> void:
 	run_time += delta
 	_update_timer_display()
 	_update_distance_display()
+
+	# Crush表示更新（敵数が変わるので毎フレーム更新）
+	if tower.crush_active:
+		crush_label.text = "SURROUNDED x%d" % tower.crush_count
 
 	# 10分経過 → 勝利
 	if run_time >= max_run_time:
@@ -163,6 +169,14 @@ func _style_hud() -> void:
 	build_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
 	build_label.add_theme_constant_override("shadow_offset_x", 1)
 	build_label.add_theme_constant_override("shadow_offset_y", 1)
+
+	# Crush warning label
+	crush_label.add_theme_font_size_override("font_size", 22)
+	crush_label.add_theme_color_override("font_color", Color(1.0, 0.25, 0.2, 1.0))
+	crush_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	crush_label.add_theme_constant_override("shadow_offset_x", 2)
+	crush_label.add_theme_constant_override("shadow_offset_y", 2)
+	crush_label.visible = false
 
 	# Restart label: large and clear
 	restart_label.add_theme_font_size_override("font_size", 28)
@@ -416,6 +430,13 @@ func _on_tower_damaged(current: float, max_val: float) -> void:
 			fill_style.bg_color = Color(0.85, 0.75, 0.2, 1.0)  # yellow warning
 		else:
 			fill_style.bg_color = Color(0.9, 0.2, 0.15, 1.0)  # red danger
+
+func _on_crush_changed(active: bool, count: int) -> void:
+	if active:
+		crush_label.text = "SURROUNDED x%d" % count
+		crush_label.visible = true
+	else:
+		crush_label.visible = false
 
 func _on_tower_destroyed() -> void:
 	game_over = true
