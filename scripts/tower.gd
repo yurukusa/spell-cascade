@@ -25,6 +25,86 @@ func _ready() -> void:
 	for i in range(max_slots):
 		modules.append(null)
 	build_system = get_node("/root/BuildSystem")
+	_install_stylized_visual()
+
+func _install_stylized_visual() -> void:
+	# The current sprite pack reads as "placeholder". Replace with a simple stylized silhouette
+	# using Polygon2D only (no new external art), per ops/deep-research-report (1).md:
+	# - silhouette first
+	# - threats/readability > detail
+	# - minimal VFX, no clutter
+	var legacy := get_node_or_null("Visual")
+	if legacy and legacy is CanvasItem:
+		legacy.visible = false
+
+	if get_node_or_null("StylizedVisual") != null:
+		return
+
+	var root := Node2D.new()
+	root.name = "StylizedVisual"
+	add_child(root)
+
+	# Palette: 1 base + 2 accents max (locked)
+	var base_dark := Color(0.08, 0.09, 0.12, 1.0)
+	var accent := Color(0.35, 0.75, 1.0, 1.0)  # cyan
+	var accent2 := Color(0.95, 0.35, 0.70, 1.0)  # magenta
+
+	# Body outline (bigger, behind)
+	var outline := Polygon2D.new()
+	outline.color = Color(0.02, 0.02, 0.03, 1.0)
+	outline.polygon = _make_ngon(10, 30.0)
+	root.add_child(outline)
+
+	# Body
+	var body := Polygon2D.new()
+	body.color = base_dark
+	body.polygon = _make_ngon(10, 26.0)
+	root.add_child(body)
+
+	# "Cape" / hood cue: one strong silhouette feature
+	var cape := Polygon2D.new()
+	cape.color = accent2.darkened(0.25)
+	cape.polygon = PackedVector2Array([
+		Vector2(-10, -6),
+		Vector2(-34, 6),
+		Vector2(-12, 20),
+	])
+	root.add_child(cape)
+	cape.z_index = -1
+
+	# Core glow (small, readable)
+	var core_glow := Polygon2D.new()
+	core_glow.color = Color(accent.r, accent.g, accent.b, 0.18)
+	core_glow.polygon = _make_ngon(8, 18.0)
+	root.add_child(core_glow)
+
+	var core := Polygon2D.new()
+	core.color = accent
+	core.polygon = _make_ngon(8, 12.0)
+	root.add_child(core)
+
+	# Direction hint (front notch) so "where is facing" is readable even in chaos
+	var notch := Polygon2D.new()
+	notch.color = accent.lightened(0.15)
+	notch.polygon = PackedVector2Array([
+		Vector2(18, -4),
+		Vector2(32, 0),
+		Vector2(18, 4),
+	])
+	root.add_child(notch)
+
+	# Slight idle pulse (very low amplitude to avoid clutter)
+	var tween := create_tween()
+	tween.set_loops()
+	tween.tween_property(core, "scale", Vector2(1.05, 1.05), 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(core, "scale", Vector2(1.0, 1.0), 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+func _make_ngon(sides: int, radius: float) -> PackedVector2Array:
+	var pts: PackedVector2Array = []
+	for i in range(maxi(sides, 3)):
+		var a := float(i) * TAU / float(sides)
+		pts.append(Vector2(cos(a), sin(a)) * radius)
+	return pts
 
 func _physics_process(delta: float) -> void:
 	var move_chip: Dictionary = build_system.get_equipped_chip("move")
