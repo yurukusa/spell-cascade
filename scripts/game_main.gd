@@ -235,7 +235,13 @@ func _show_upgrade_choice() -> void:
 			break
 
 	if empty_slot >= 0:
-		var skill_ids: Array = build_system.get_random_skill_ids(3)
+		# 既存スキルと重複しないように除外
+		var equipped: Array[String] = []
+		for i in range(tower.max_slots):
+			var m: Variant = tower.get_module(i)
+			if m != null:
+				equipped.append(m.skill_id)
+		var skill_ids: Array = build_system.get_random_skill_ids(3, equipped)
 		upgrade_ui.show_skill_choice(empty_slot, skill_ids)
 	else:
 		var roll := randf()
@@ -307,11 +313,11 @@ func _spawn_enemy() -> void:
 
 	enemy.position = spawn_pos
 
-	# 時間経過でスケーリング
-	var time_scale := 1.0 + run_time / 120.0
-	var hp_val := 20.0 * time_scale
-	var speed_val := 60.0 + run_time * 0.05
-	var dmg_val := 5.0 + run_time * 0.01
+	# 時間経過でスケーリング（2分で緊張感が出る難易度）
+	var time_scale := 1.0 + run_time / 80.0
+	var hp_val := 30.0 * time_scale
+	var speed_val := 70.0 + run_time * 0.15
+	var dmg_val := 8.0 + run_time * 0.03
 
 	enemy.init(tower, speed_val, hp_val, dmg_val)
 	enemy.died.connect(_on_enemy_died)
