@@ -27,6 +27,11 @@ var game_started := false
 var boss_spawned := false
 var kill_count := 0
 var next_milestone := 50.0  # 50mごとにマイルストーン
+
+# 画面外敵インジケーター
+var indicator_pool: Array[Polygon2D] = []
+const MAX_INDICATORS := 8
+const SCREEN_MARGIN := 40.0  # 画面端からの余白
 const BOSS_DISTANCE := 200.0  # メートル
 
 # 判断イベント管理
@@ -120,6 +125,9 @@ func _process(delta: float) -> void:
 	# ボスの出現判定
 	if not boss_spawned and distance_m >= BOSS_DISTANCE:
 		_spawn_boss()
+
+	# 画面外敵インジケーター更新
+	_update_offscreen_indicators()
 
 	# 距離マイルストーン（50mごと）
 	if distance_m >= next_milestone:
@@ -402,6 +410,7 @@ func _spawn_boss() -> void:
 	var dmg_val := 6.0 + distance_m * 0.02
 
 	boss.init(tower, speed_val, hp_val, dmg_val, "boss")
+	boss.add_to_group("enemies")
 	boss.died.connect(_on_boss_died)
 	enemies_alive += 1
 	add_child(boss)
@@ -503,6 +512,7 @@ func _spawn_enemy() -> void:
 		etype = "tank"
 
 	enemy.init(tower, speed_val, hp_val, dmg_val, etype)
+	enemy.add_to_group("enemies")
 	enemy.died.connect(_on_enemy_died)
 	enemies_alive += 1
 	add_child(enemy)
@@ -597,6 +607,96 @@ func _spawn_levelup_vfx() -> void:
 	tween.tween_property(ring, "scale", Vector2(4.0, 4.0), 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.tween_property(ring, "modulate:a", 0.0, 0.4)
 	tween.chain().tween_callback(ring.queue_free)
+
+func _update_offscreen_indicators() -> void:
+	## 画面外の敵に対して画面端に赤い矢印を表示
+	var cam := tower.get_node_or_null("Camera2D") as Camera2D
+	if cam == null:
+		return
+
+	var cam_pos := cam.get_screen_center_position()
+	var half_w := 640.0
+	var half_h := 360.0
+	var view_left := cam_pos.x - half_w
+	var view_right := cam_pos.x + half_w
+	var view_top := cam_pos.y - half_h
+	var view_bottom := cam_pos.y + half_h
+
+	# 画面外の敵を距離順で収集
+	var offscreen_enemies: Array[Dictionary] = []
+	for child in get_children():
+		if not child is Node2D:
+			continue
+		if not child.is_in_group("enemies"):
+			continue
+		if not is_instance_valid(child):
+			continue
+		var enemy_node: Node2D = child as Node2D
+		var epos: Vector2 = enemy_node.global_position
+		if epos.x >= view_left and epos.x <= view_right and epos.y >= view_top and epos.y <= view_bottom:
+			continue  # 画面内 → スキップ
+		var dist: float = tower.global_position.distance_to(epos)
+		var is_boss_flag: bool = enemy_node.get("is_boss") == true
+		offscreen_enemies.append({"pos": epos, "dist": dist, "boss": is_boss_flag})
+
+	# ボス優先、近い順にソート
+	offscreen_enemies.sort_custom(func(a, b):
+		if a.boss != b.boss:
+			return a.boss  # ボスが先
+		return a.dist < b.dist
+	)
+
+	# インジケータープール拡張
+	while indicator_pool.size() < MAX_INDICATORS:
+		var arrow := Polygon2D.new()
+		arrow.polygon = PackedVector2Array([
+			Vector2(0, -10), Vector2(8, 6), Vector2(-8, 6),
+		])
+		arrow.z_index = 150
+		arrow.visible = false
+		ui_layer.add_child(arrow)
+		indicator_pool.append(arrow)
+
+	# 全非表示にしてから必要な分だけ表示
+	for arrow in indicator_pool:
+		arrow.visible = false
+
+	var count := mini(offscreen_enemies.size(), MAX_INDICATORS)
+	for i in range(count):
+		var data: Dictionary = offscreen_enemies[i]
+		var epos: Vector2 = data.pos
+		var arrow := indicator_pool[i]
+
+		# 敵方向のベクトル
+		var dir := (epos - cam_pos).normalized()
+
+		# 画面端にクランプ（マージン付き）
+		var margin := SCREEN_MARGIN
+		var screen_pos := Vector2.ZERO
+		# dirからスクリーン端の交点を計算
+		var t_x := INF
+		var t_y := INF
+		if abs(dir.x) > 0.001:
+			t_x = ((half_w - margin) / abs(dir.x))
+		if abs(dir.y) > 0.001:
+			t_y = ((half_h - margin) / abs(dir.y))
+		var t := minf(t_x, t_y)
+		screen_pos = dir * t
+
+		# スクリーン座標に変換（UIレイヤーは画面座標）
+		arrow.position = Vector2(640 + screen_pos.x, 360 + screen_pos.y)
+		arrow.rotation = dir.angle() + PI / 2.0  # 矢印が敵方向を指す
+		arrow.visible = true
+
+		# ボスは紫で大きく、通常敵は赤
+		if data.boss:
+			arrow.color = Color(0.7, 0.3, 1.0, 0.85)
+			arrow.scale = Vector2(1.5, 1.5)
+		else:
+			# 距離に応じてアルファを変化（近いほど濃い）
+			var alpha := clampf(1.0 - data.dist / 800.0, 0.3, 0.8)
+			arrow.color = Color(1.0, 0.25, 0.2, alpha)
+			arrow.scale = Vector2(1.0, 1.0)
 
 func _show_milestone(meters: int) -> void:
 	## 距離マイルストーン: 達成感を出す中央テキスト + 画面フラッシュ

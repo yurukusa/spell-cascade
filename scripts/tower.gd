@@ -278,7 +278,7 @@ func _ai_kite(enemies: Array, params: Dictionary) -> Vector2:
 
 	# 画面端バイアス: 端に近いほど中央方向に引っ張る（角逃げ防止）
 	var vp := get_viewport_rect().size
-	var center := vp * 0.5
+	var _center := vp * 0.5
 	var edge_margin := 120.0
 	var edge_pull := Vector2.ZERO
 	if position.x < edge_margin:
