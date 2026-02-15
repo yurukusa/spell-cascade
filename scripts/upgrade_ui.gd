@@ -1,0 +1,107 @@
+extends CanvasLayer
+
+## UpgradeUI - Wave Clear時に3択のオーブ選択を表示。
+## 選択中はゲームを一時停止。
+
+signal orb_selected(orb_type: int)
+
+var panel: PanelContainer
+var title_label: Label
+var buttons_container: VBoxContainer
+var current_choices: Array = []
+
+func _ready() -> void:
+	layer = 10
+	process_mode = Node.PROCESS_MODE_ALWAYS  # pause中もUI操作可能
+	_build_ui()
+	hide_ui()
+
+func _build_ui() -> void:
+	# 半透明の暗幕
+	var overlay := ColorRect.new()
+	overlay.name = "Overlay"
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.color = Color(0, 0, 0, 0.6)
+	add_child(overlay)
+
+	# 中央パネル
+	panel = PanelContainer.new()
+	panel.name = "Panel"
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.offset_left = -200
+	panel.offset_top = -180
+	panel.offset_right = 200
+	panel.offset_bottom = 180
+
+	# パネルスタイル（プレースホルダ、design.md後に差し替え）
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.08, 0.2, 0.95)
+	style.border_color = Color(0.4, 0.3, 0.8, 0.8)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(8)
+	style.set_content_margin_all(20)
+	panel.add_theme_stylebox_override("panel", style)
+	overlay.add_child(panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.name = "VBox"
+	vbox.add_theme_constant_override("separation", 12)
+	panel.add_child(vbox)
+
+	# タイトル
+	title_label = Label.new()
+	title_label.name = "Title"
+	title_label.text = "Choose an Orb"
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.add_theme_font_size_override("font_size", 22)
+	vbox.add_child(title_label)
+
+	# ボタンコンテナ
+	buttons_container = VBoxContainer.new()
+	buttons_container.name = "Buttons"
+	buttons_container.add_theme_constant_override("separation", 8)
+	vbox.add_child(buttons_container)
+
+func show_choices(orb_types: Array) -> void:
+	current_choices = orb_types
+
+	# 既存ボタンを削除
+	for child in buttons_container.get_children():
+		child.queue_free()
+
+	# オーブごとにボタン生成
+	for orb_type in orb_types:
+		var info = OrbData.get_orb(orb_type)
+		if info == null:
+			continue
+
+		var btn := Button.new()
+		btn.text = "%s\n%s" % [info.name, info.description]
+		btn.custom_minimum_size = Vector2(350, 60)
+
+		# ボタンスタイル（プレースホルダ）
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(info.color.r * 0.3, info.color.g * 0.3, info.color.b * 0.3, 0.9)
+		style.border_color = info.color
+		style.set_border_width_all(2)
+		style.set_corner_radius_all(4)
+		style.set_content_margin_all(8)
+		btn.add_theme_stylebox_override("normal", style)
+
+		var hover_style := style.duplicate()
+		hover_style.bg_color = Color(info.color.r * 0.5, info.color.g * 0.5, info.color.b * 0.5, 0.95)
+		btn.add_theme_stylebox_override("hover", hover_style)
+
+		btn.pressed.connect(_on_orb_chosen.bind(orb_type))
+		buttons_container.add_child(btn)
+
+	visible = true
+	get_tree().paused = true
+
+func hide_ui() -> void:
+	visible = false
+
+func _on_orb_chosen(orb_type: int) -> void:
+	get_tree().paused = false
+	hide_ui()
+	orb_selected.emit(orb_type)

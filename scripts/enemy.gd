@@ -1,6 +1,6 @@
 extends CharacterBody2D
 
-## Enemy - 色付き幾何学体。プレイヤーに向かって移動。
+## Enemy - ピクセルアートキャラクター。プレイヤーに向かって移動。
 
 @export var speed := 80.0
 @export var max_hp := 30.0
@@ -21,6 +21,11 @@ func init(target: Node2D, spd: float = 80.0, health: float = 30.0, dmg: float = 
 	max_hp = health
 	hp = max_hp
 	damage = dmg
+
+func set_texture(tex: Texture2D) -> void:
+	var visual := $Visual as Sprite2D
+	if visual:
+		visual.texture = tex
 
 func _physics_process(_delta: float) -> void:
 	if not is_instance_valid(player):

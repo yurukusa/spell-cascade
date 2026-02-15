@@ -1,13 +1,14 @@
-[gd_scene load_steps=6 format=3 uid="uid://cmainscene"]
+[gd_scene load_steps=7 format=3 uid="uid://cmainscene"]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/player.gd" id="2_player"]
 [ext_resource type="Script" path="res://scripts/wave_manager.gd" id="3_wave"]
 [ext_resource type="Script" path="res://scripts/auto_attack.gd" id="4_attack"]
 [ext_resource type="PackedScene" uid="uid://c5enemy1" path="res://scenes/enemy.tscn" id="5_enemy"]
+[ext_resource type="Texture2D" path="res://assets/kenney-tiny-dungeon/tile_0084.png" id="6_playertex"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_player"]
-radius = 14.0
+radius = 20.0
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
@@ -29,9 +30,10 @@ script = ExtResource("2_player")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Player"]
 shape = SubResource("CircleShape2D_player")
 
-[node name="Visual" type="Polygon2D" parent="Player"]
-color = Color(0.3, 0.7, 1.0, 0.95)
-polygon = PackedVector2Array(0, -16, 14, -6, 14, 10, 6, 16, -6, 16, -14, 10, -14, -6)
+[node name="Visual" type="Sprite2D" parent="Player"]
+texture = ExtResource("6_playertex")
+texture_filter = 1
+scale = Vector2(3, 3)
 
 [node name="AutoAttack" type="Node2D" parent="Player"]
 script = ExtResource("4_attack")
@@ -56,4 +58,27 @@ offset_top = 20.0
 offset_right = 720.0
 offset_bottom = 50.0
 text = "Wave 1 / 20"
+horizontal_alignment = 1
+
+[node name="TimerLabel" type="Label" parent="UI"]
+offset_left = 1100.0
+offset_top = 20.0
+offset_right = 1260.0
+offset_bottom = 50.0
+text = "10:00"
+horizontal_alignment = 2
+
+[node name="OrbLabel" type="Label" parent="UI"]
+offset_left = 20.0
+offset_top = 50.0
+offset_right = 500.0
+offset_bottom = 100.0
+text = ""
+
+[node name="RestartLabel" type="Label" parent="UI"]
+offset_left = 440.0
+offset_top = 400.0
+offset_right = 840.0
+offset_bottom = 440.0
+text = "Press R to Restart"
 horizontal_alignment = 1

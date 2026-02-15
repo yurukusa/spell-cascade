@@ -1,0 +1,31 @@
+{
+  "_comment": "見た目パラメータ集約ファイル。design.md反映後に差し替える。凍結中。",
+  "_status": "placeholder",
+  "sprite_scale": 3.0,
+  "player_texture": "res://assets/kenney-tiny-dungeon/tile_0084.png",
+  "enemy_textures": {
+    "tier1": "res://assets/kenney-tiny-dungeon/tile_0108.png",
+    "tier2": "res://assets/kenney-tiny-dungeon/tile_0110.png",
+    "tier3": "res://assets/kenney-tiny-dungeon/tile_0121.png"
+  },
+  "orb_texture": "res://assets/kenney-tiny-dungeon/tile_0056.png",
+  "background_color": [0.05, 0.02, 0.1, 1.0],
+  "palette": {
+    "_note": "design.md確定後に置換",
+    "primary": "#4db2ff",
+    "secondary": "#80ccff",
+    "danger": "#ff4444",
+    "background": "#0d0520"
+  },
+  "ui": {
+    "_note": "レイアウトはdesign.md確定後に固定",
+    "hp_bar_position": "top_left",
+    "wave_label_position": "top_center",
+    "font": "default"
+  },
+  "viewport": {
+    "width": 1280,
+    "height": 720,
+    "_note": "解像度はdesign.md確定後に固定"
+  }
+}

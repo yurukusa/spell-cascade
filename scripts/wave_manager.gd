@@ -15,10 +15,20 @@ var wave_active := false
 var player: Node2D
 var spawn_area: Rect2
 
+# Wave段階に応じた敵テクスチャ
+var enemy_textures: Array[Texture2D] = []
+
 func _ready() -> void:
 	# スポーンエリアはビューポートの外周
 	var vp := get_tree().root.get_visible_rect().size
 	spawn_area = Rect2(Vector2.ZERO, vp)
+
+	# 敵テクスチャをロード（スライム→デーモン→ゴースト）
+	enemy_textures = [
+		load("res://assets/kenney-tiny-dungeon/tile_0108.png"),  # 緑スライム (Wave 1-7)
+		load("res://assets/kenney-tiny-dungeon/tile_0110.png"),  # 赤デーモン (Wave 8-14)
+		load("res://assets/kenney-tiny-dungeon/tile_0121.png"),  # ゴースト (Wave 15-20)
+	]
 
 func start(target_player: Node2D) -> void:
 	player = target_player
@@ -69,6 +79,16 @@ func _spawn_enemy() -> void:
 	var speed_scale := 1.0 + (current_wave - 1) * 0.05
 
 	enemy.init(player, 80.0 * speed_scale, 30.0 * hp_scale, 10.0)
+
+	# Wave段階に応じたテクスチャ割り当て
+	var tex_index := 0
+	if current_wave >= 15:
+		tex_index = 2
+	elif current_wave >= 8:
+		tex_index = 1
+	if not enemy_textures.is_empty():
+		enemy.set_texture(enemy_textures[tex_index])
+
 	enemy.died.connect(_on_enemy_died)
 
 	get_tree().current_scene.add_child(enemy)
