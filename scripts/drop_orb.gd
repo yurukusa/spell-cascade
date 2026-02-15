@@ -68,7 +68,9 @@ func _create_visual() -> void:
 func _process(delta: float) -> void:
 	lifetime -= delta
 	if lifetime <= 0:
-		queue_free()
+		set_deferred("monitoring", false)
+		call_deferred("queue_free")
+		set_process(false)
 		return
 
 	if not is_instance_valid(target):
@@ -126,7 +128,8 @@ func _on_collected() -> void:
 		tween.tween_property(flash, "modulate:a", 0.0, 0.15)
 		tween.chain().tween_callback(flash.queue_free)
 
-	# physics callback中のqueue_freeはarea_set_shape_disabledエラーを起こすため遅延
+	# physics callback中のarea_set_shape_disabledエラー防止: monitoring無効化→遅延free
+	set_deferred("monitoring", false)
 	call_deferred("queue_free")
 
 func _equip_auto_aim() -> void:

@@ -439,11 +439,13 @@ func _process(delta):
 	position += direction * speed * delta
 	lifetime -= delta
 	if lifetime <= 0:
-		queue_free()
+		set_deferred(\"monitoring\", false)
+		call_deferred(\"queue_free\")
 
 func _on_body_entered(body):
 	if body.has_method(\"take_damage\"):
 		body.take_damage(damage)
+	set_deferred(\"monitoring\", false)
 	call_deferred(\"queue_free\")
 """
 

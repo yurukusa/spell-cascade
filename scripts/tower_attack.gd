@@ -397,6 +397,7 @@ func _process(delta):
 	position += direction * speed * delta
 	lifetime -= delta
 	if lifetime <= 0:
+		set_deferred(\"monitoring\", false)
 		call_deferred(\"queue_free\")
 		return
 
@@ -439,6 +440,7 @@ func _on_body_entered(body):
 		pierce_remaining -= 1
 		return  # 弾は消えない
 
+	set_deferred(\"monitoring\", false)
 	call_deferred(\"queue_free\")
 
 func _find_chain_target(exclude_body) -> Node2D:
@@ -495,6 +497,7 @@ func _ready():
 	body_entered.connect(func(body):
 		if body.has_method(\\\"take_damage\\\"):
 			body.take_damage(damage)
+		set_deferred(\\\"monitoring\\\", false)
 		call_deferred(\\\"queue_free\\\")
 	)
 	collision_layer = 2
@@ -504,6 +507,7 @@ func _process(delta):
 	position += direction * speed * delta
 	lifetime -= delta
 	if lifetime <= 0:
+		set_deferred(\\\"monitoring\\\", false)
 		call_deferred(\\\"queue_free\\\")
 \"\"\"
 		s.reload()
