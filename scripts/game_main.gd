@@ -28,6 +28,13 @@ var boss_spawned := false
 var kill_count := 0
 var next_milestone := 50.0  # 50mごとにマイルストーン
 
+# Kill combo（連続キル）
+var combo_count := 0
+var combo_timer := 0.0
+const COMBO_WINDOW := 2.0  # 秒以内に次のキルで継続
+var combo_label_node: Label = null  # HUD上のコンボ表示
+var best_combo := 0  # リザルト画面用
+
 # 画面外敵インジケーター
 var indicator_pool: Array[Polygon2D] = []
 const MAX_INDICATORS := 8
@@ -134,6 +141,13 @@ func _process(delta: float) -> void:
 		_show_milestone(int(next_milestone))
 		next_milestone += 50.0
 
+	# Kill combo タイマー減衰
+	if combo_count > 0:
+		combo_timer -= delta
+		if combo_timer <= 0:
+			combo_count = 0
+			_update_combo_display()
+
 func _update_timer_display() -> void:
 	var remaining := maxf(max_run_time - run_time, 0.0)
 	var total_sec: int = floori(remaining)
@@ -204,6 +218,21 @@ func _style_hud() -> void:
 	crush_label.add_theme_constant_override("shadow_offset_x", 2)
 	crush_label.add_theme_constant_override("shadow_offset_y", 2)
 	crush_label.visible = false
+
+	# Kill combo label (画面右上、タイマーの下)
+	combo_label_node = Label.new()
+	combo_label_node.name = "ComboLabel"
+	combo_label_node.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	combo_label_node.position = Vector2(1080, 40)
+	combo_label_node.custom_minimum_size = Vector2(180, 0)
+	combo_label_node.add_theme_font_size_override("font_size", 20)
+	combo_label_node.add_theme_color_override("font_color", Color(1.0, 0.6, 0.2, 1.0))
+	combo_label_node.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	combo_label_node.add_theme_constant_override("shadow_offset_x", 2)
+	combo_label_node.add_theme_constant_override("shadow_offset_y", 2)
+	combo_label_node.z_index = 100
+	combo_label_node.visible = false
+	ui_layer.add_child(combo_label_node)
 
 	# Restart label: large and clear
 	restart_label.add_theme_font_size_override("font_size", 28)
@@ -443,6 +472,10 @@ func _on_boss_died(_enemy: Node2D) -> void:
 	tower.enemy_killed.emit()
 	# ボス撃破: 大きなシェイク
 	tower.shake(8.0)
+	# コンボ: ボスは+3カウント
+	combo_count += 3
+	combo_timer = COMBO_WINDOW
+	_update_combo_display()
 
 	# ボス撃破のお祝い表示
 	var label := Label.new()
@@ -525,6 +558,44 @@ func _on_enemy_died(_enemy: Node2D) -> void:
 	tower.enemy_killed.emit()
 	# 小さなシェイク（爽快感）
 	tower.shake(2.0)
+	# コンボカウント
+	combo_count += 1
+	combo_timer = COMBO_WINDOW
+	_update_combo_display()
+
+func _update_combo_display() -> void:
+	if combo_label_node == null:
+		return
+	if combo_count < 3:
+		combo_label_node.visible = false
+		return
+
+	combo_label_node.visible = true
+	var tier_text := ""
+	var tier_color := Color(1.0, 0.6, 0.2, 1.0)  # デフォルト: オレンジ
+
+	if combo_count >= 30:
+		tier_text = "GODLIKE!"
+		tier_color = Color(1.0, 0.2, 0.9, 1.0)  # マゼンタ
+	elif combo_count >= 15:
+		tier_text = "MASSACRE!"
+		tier_color = Color(1.0, 0.15, 0.1, 1.0)  # 赤
+	elif combo_count >= 8:
+		tier_text = "RAMPAGE!"
+		tier_color = Color(1.0, 0.5, 0.1, 1.0)  # 濃いオレンジ
+	else:
+		tier_text = "COMBO"
+		tier_color = Color(1.0, 0.75, 0.3, 1.0)  # 黄色
+
+	combo_label_node.text = "%s x%d" % [tier_text, combo_count]
+	combo_label_node.add_theme_color_override("font_color", tier_color)
+	best_combo = maxi(best_combo, combo_count)
+
+	# ティアが上がった瞬間のスケールパンチ（3, 8, 15, 30のタイミング）
+	if combo_count in [3, 8, 15, 30]:
+		var tween := combo_label_node.create_tween()
+		tween.tween_property(combo_label_node, "scale", Vector2(1.3, 1.3), 0.08).set_trans(Tween.TRANS_BACK)
+		tween.tween_property(combo_label_node, "scale", Vector2(1.0, 1.0), 0.12)
 
 # --- タワーイベント ---
 
@@ -809,6 +880,7 @@ func _show_result_screen(is_victory: bool) -> void:
 		["Distance", "%dm" % int(distance_m)],
 		["Level", "%d" % tower.level],
 		["Kills", "%d" % kill_count],
+		["Best Combo", "x%d" % best_combo],
 		["Time", "%d:%02d" % [t_min, t_sec]],
 	]
 
