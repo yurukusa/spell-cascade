@@ -11,6 +11,7 @@ var hp: float
 var player: Node2D
 var attack_timer := 0.0
 var attack_cooldown := 1.0  # メレー攻撃間隔
+var enemy_type := "normal"  # "normal", "swarmer", "tank"
 
 signal died(enemy: Node2D)
 
@@ -19,7 +20,6 @@ func _ready() -> void:
 	_install_stylized_visual()
 
 func _install_stylized_visual() -> void:
-	# Replace placeholder sprite with a readable threat silhouette.
 	var legacy := get_node_or_null("Visual")
 	if legacy and legacy is CanvasItem:
 		legacy.visible = false
@@ -31,7 +31,16 @@ func _install_stylized_visual() -> void:
 	root.name = "StylizedVisual"
 	add_child(root)
 
-	# Threat layer: higher contrast/value than player body
+	match enemy_type:
+		"swarmer":
+			_build_swarmer_visual(root)
+		"tank":
+			_build_tank_visual(root)
+		_:
+			_build_normal_visual(root)
+
+func _build_normal_visual(root: Node2D) -> void:
+	## 通常敵: 赤ダイヤモンド（中サイズ）
 	var outline := Polygon2D.new()
 	outline.color = Color(0.02, 0.02, 0.03, 1.0)
 	outline.polygon = _make_diamond(34.0)
@@ -45,16 +54,73 @@ func _install_stylized_visual() -> void:
 	var eye := Polygon2D.new()
 	eye.color = Color(1.0, 0.95, 0.6, 1.0)
 	eye.polygon = PackedVector2Array([
-		Vector2(6, -3),
-		Vector2(18, 0),
-		Vector2(6, 3),
+		Vector2(6, -3), Vector2(18, 0), Vector2(6, 3),
 	])
 	root.add_child(eye)
 
-	# Subtle "danger aura" ring (short-lived by default; kept always-on but low alpha)
 	var aura := Polygon2D.new()
 	aura.color = Color(1.0, 0.25, 0.25, 0.08)
 	aura.polygon = _make_ngon(10, 44.0)
+	root.add_child(aura)
+	aura.z_index = -1
+
+func _build_swarmer_visual(root: Node2D) -> void:
+	## スウォーマー: 緑三角形（小さく速い）
+	var outline := Polygon2D.new()
+	outline.color = Color(0.02, 0.02, 0.03, 1.0)
+	outline.polygon = _make_ngon(3, 22.0)
+	root.add_child(outline)
+
+	var body := Polygon2D.new()
+	body.color = Color(0.3, 0.85, 0.25, 1.0)
+	body.polygon = _make_ngon(3, 18.0)
+	root.add_child(body)
+
+	# 小さな目
+	var eye := Polygon2D.new()
+	eye.color = Color(1.0, 1.0, 0.8, 1.0)
+	eye.polygon = PackedVector2Array([
+		Vector2(4, -2), Vector2(12, 0), Vector2(4, 2),
+	])
+	root.add_child(eye)
+
+func _build_tank_visual(root: Node2D) -> void:
+	## タンク: 暗赤八角形（大きく遅い）
+	var outline := Polygon2D.new()
+	outline.color = Color(0.02, 0.02, 0.03, 1.0)
+	outline.polygon = _make_ngon(8, 48.0)
+	root.add_child(outline)
+
+	var body := Polygon2D.new()
+	body.color = Color(0.6, 0.12, 0.10, 1.0)
+	body.polygon = _make_ngon(8, 42.0)
+	root.add_child(body)
+
+	# 内側の装甲模様
+	var armor := Polygon2D.new()
+	armor.color = Color(0.45, 0.08, 0.06, 1.0)
+	armor.polygon = _make_ngon(8, 30.0)
+	root.add_child(armor)
+
+	# 大きな二つ目
+	var eye_l := Polygon2D.new()
+	eye_l.color = Color(1.0, 0.7, 0.2, 1.0)
+	eye_l.polygon = PackedVector2Array([
+		Vector2(8, -8), Vector2(22, -5), Vector2(8, -2),
+	])
+	root.add_child(eye_l)
+
+	var eye_r := Polygon2D.new()
+	eye_r.color = Color(1.0, 0.7, 0.2, 1.0)
+	eye_r.polygon = PackedVector2Array([
+		Vector2(8, 2), Vector2(22, 5), Vector2(8, 8),
+	])
+	root.add_child(eye_r)
+
+	# 重厚なオーラ
+	var aura := Polygon2D.new()
+	aura.color = Color(0.8, 0.15, 0.1, 0.12)
+	aura.polygon = _make_ngon(8, 58.0)
 	root.add_child(aura)
 	aura.z_index = -1
 
@@ -73,12 +139,37 @@ func _make_ngon(sides: int, radius: float) -> PackedVector2Array:
 		pts.append(Vector2(cos(a), sin(a)) * radius)
 	return pts
 
-func init(target: Node2D, spd: float = 80.0, health: float = 30.0, dmg: float = 10.0) -> void:
+func init(target: Node2D, spd: float = 80.0, health: float = 30.0, dmg: float = 10.0, type: String = "normal") -> void:
 	player = target
-	speed = spd
-	max_hp = health
+	enemy_type = type
+
+	# タイプ別ステータス乗数
+	match enemy_type:
+		"swarmer":
+			speed = spd * 1.5
+			max_hp = health * 0.4
+			damage = dmg * 0.5
+			xp_value = 1
+			attack_cooldown = 0.8
+		"tank":
+			speed = spd * 0.5
+			max_hp = health * 3.0
+			damage = dmg * 2.0
+			xp_value = 3
+			attack_cooldown = 1.5
+		_:  # normal
+			speed = spd
+			max_hp = health
+			damage = dmg
+			xp_value = 1
+
 	hp = max_hp
-	damage = dmg
+
+	# タイプ変更後にビジュアル再構築
+	var old_visual := get_node_or_null("StylizedVisual")
+	if old_visual:
+		old_visual.queue_free()
+	_install_stylized_visual()
 
 func set_texture(tex: Texture2D) -> void:
 	var visual := $Visual as Sprite2D
@@ -192,7 +283,12 @@ func _spawn_death_vfx() -> void:
 			Vector2(size, 0),
 			Vector2(-size, size * 0.5),
 		])
-		frag.color = Color(1.0, 0.3, 0.2, 0.9)
+		var frag_color := Color(1.0, 0.3, 0.2, 0.9)
+		if enemy_type == "swarmer":
+			frag_color = Color(0.3, 0.9, 0.3, 0.9)
+		elif enemy_type == "tank":
+			frag_color = Color(0.6, 0.15, 0.1, 0.9)
+		frag.color = frag_color
 		frag.global_position = global_position
 		frag.rotation = angle
 		scene_root.add_child(frag)

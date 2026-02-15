@@ -415,7 +415,15 @@ func _spawn_enemy() -> void:
 	var speed_val := 65.0 + distance_m * 0.1 + run_time * 0.08
 	var dmg_val := 6.0 + distance_m * 0.02
 
-	enemy.init(tower, speed_val, hp_val, dmg_val)
+	# 敵タイプ選択: 60% normal, 25% swarmer, 15% tank（tankは50m以降）
+	var type_roll := randf()
+	var etype := "normal"
+	if type_roll < 0.25:
+		etype = "swarmer"
+	elif type_roll < 0.40 and distance_m >= 50.0:
+		etype = "tank"
+
+	enemy.init(tower, speed_val, hp_val, dmg_val, etype)
 	enemy.died.connect(_on_enemy_died)
 	enemies_alive += 1
 	add_child(enemy)
