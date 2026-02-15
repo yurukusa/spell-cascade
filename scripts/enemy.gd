@@ -225,7 +225,7 @@ func init(target: Node2D, spd: float = 80.0, health: float = 30.0, dmg: float = 
 			attack_cooldown = 1.5
 		"boss":
 			speed = spd * 0.6
-			max_hp = health * 20.0
+			max_hp = health * 8.0
 			damage = dmg * 1.5
 			xp_value = 10
 			attack_cooldown = 2.0
