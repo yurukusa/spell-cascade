@@ -154,15 +154,26 @@ func _show_upgrade_choice() -> void:
 		var skill_ids: Array = build_system.get_random_skill_ids(3)
 		upgrade_ui.show_skill_choice(empty_slot, skill_ids)
 	else:
-		# サポートかMod追加の選択
-		var choice_type := "support" if randf() < 0.6 else "mod"
-		if choice_type == "support":
+		# 全スロット埋まっている → サポート/Mod/入れ替え
+		var roll := randf()
+		if roll < 0.4:
+			# サポートリンク
 			var support_ids: Array = build_system.get_random_support_ids(3)
 			upgrade_ui.show_support_choice(support_ids)
-		else:
+		elif roll < 0.7:
+			# Mod付与
 			var prefix: Dictionary = build_system.roll_prefix()
 			var suffix: Dictionary = build_system.roll_suffix()
 			upgrade_ui.show_mod_choice(prefix, suffix)
+		else:
+			# スキル入れ替え（主体感を出す。受動成長だけにしない）
+			var swap_slot: int = randi() % tower.max_slots
+			var current_module: Variant = tower.get_module(swap_slot)
+			var exclude: Array[String] = []
+			if current_module:
+				exclude.append(current_module.skill_id)
+			var skill_ids: Array = build_system.get_random_skill_ids(3, exclude)
+			upgrade_ui.show_skill_swap(swap_slot, skill_ids)
 
 func _on_upgrade_chosen(upgrade_data: Dictionary) -> void:
 	var upgrade_type: String = upgrade_data.get("type", "")

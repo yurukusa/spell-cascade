@@ -99,6 +99,59 @@ func _on_skill_chosen(slot: int, skill_id: String) -> void:
 	hide_ui()
 	upgrade_chosen.emit({"type": "skill", "slot": slot, "skill_id": skill_id})
 
+# --- スキル入れ替え（VS感回避: 追加だけでなく入れ替えも） ---
+
+func show_skill_swap(slot: int, skill_ids: Array) -> void:
+	_clear_buttons()
+	var tower = get_tree().current_scene.get_node_or_null("Tower")
+	var current_name := "?"
+	if tower:
+		var module: Variant = tower.get_module(slot)
+		if module:
+			var stats: Dictionary = build_system.calculate_module_stats(module)
+			current_name = stats.get("name", "?")
+	title_label.text = "Replace %s in Slot %d?" % [current_name, slot + 1]
+
+	for skill_id in skill_ids:
+		var skill_data: Dictionary = build_system.skills.get(skill_id, {})
+		if skill_data.is_empty():
+			continue
+
+		var btn := Button.new()
+		var tags_str := ", ".join(PackedStringArray(skill_data.get("tags", [])))
+		btn.text = "%s\n%s\nDmg:%d CD:%.1fs [%s]" % [
+			skill_data.get("name", "?"),
+			skill_data.get("description", ""),
+			skill_data.get("base_damage", 0),
+			skill_data.get("base_cooldown", 1.0),
+			tags_str
+		]
+		btn.custom_minimum_size = Vector2(400, 70)
+		btn.add_theme_font_size_override("font_size", 13)
+
+		var style := _make_button_style(skill_data.get("tags", []))
+		btn.add_theme_stylebox_override("normal", style)
+		var hover := style.duplicate()
+		hover.bg_color = hover.bg_color.lightened(0.15)
+		btn.add_theme_stylebox_override("hover", hover)
+
+		btn.pressed.connect(_on_skill_chosen.bind(slot, skill_id))
+		buttons_container.add_child(btn)
+
+	# スキップ（入れ替えしない）
+	var skip_btn := Button.new()
+	skip_btn.text = "Keep %s (Skip)" % current_name
+	skip_btn.custom_minimum_size = Vector2(400, 40)
+	skip_btn.add_theme_font_size_override("font_size", 13)
+	skip_btn.pressed.connect(func():
+		get_tree().paused = false
+		hide_ui()
+	)
+	buttons_container.add_child(skip_btn)
+
+	visible = true
+	get_tree().paused = true
+
 # --- サポート選択 ---
 
 func show_support_choice(support_ids: Array) -> void:
@@ -132,39 +185,46 @@ func show_support_choice(support_ids: Array) -> void:
 	get_tree().paused = true
 
 func _on_support_chosen(support_id: String) -> void:
-	# どのスロットにリンクするか選ぶ（最初の空きリンクスロットに自動配置）
+	# Step 2: どのスロットにリンクするか選ばせる（PoEの"悩み=力"）
 	var tower = get_tree().current_scene.get_node_or_null("Tower")
 	if tower == null:
 		get_tree().paused = false
 		hide_ui()
 		return
 
-	var target_slot := -1
+	var sup_data: Dictionary = build_system.supports.get(support_id, {})
+	var req_tag: String = sup_data.get("requires_tag", "")
+	var candidates: Array[int] = []
+
 	for i in range(tower.max_slots):
 		var module: Variant = tower.get_module(i)
-		if module != null and module.support_ids.size() < 2:
-			# タグ互換性チェック
-			var sup_data: Dictionary = build_system.supports.get(support_id, {})
-			var req_tag: String = sup_data.get("requires_tag", "")
-			if req_tag == "":
-				target_slot = i
-				break
+		if module == null or module.support_ids.size() >= 2:
+			continue
+		# タグ互換性チェック
+		if req_tag == "":
+			candidates.append(i)
+		else:
 			var stats: Dictionary = build_system.calculate_module_stats(module)
 			if req_tag in stats.get("tags", []):
-				target_slot = i
-				break
+				candidates.append(i)
 
-	if target_slot < 0:
-		# 互換スロットがない → 最初のスロットに強制
+	if candidates.is_empty():
+		# 互換スロットがない → フォールバック（空きリンクがあるスロット）
 		for i in range(tower.max_slots):
-			if tower.get_module(i) != null and tower.get_module(i).support_ids.size() < 2:
-				target_slot = i
-				break
+			var module: Variant = tower.get_module(i)
+			if module != null and module.support_ids.size() < 2:
+				candidates.append(i)
 
-	get_tree().paused = false
-	hide_ui()
-	if target_slot >= 0:
-		upgrade_chosen.emit({"type": "support", "support_id": support_id, "target_slot": target_slot})
+	if candidates.is_empty():
+		get_tree().paused = false
+		hide_ui()
+		return
+
+	# スロット選択UIを表示
+	_show_slot_choice("Link %s to which slot?" % sup_data.get("name", "?"), tower, candidates,
+		func(slot: int) -> void:
+			upgrade_chosen.emit({"type": "support", "support_id": support_id, "target_slot": slot})
+	)
 
 # --- Mod選択 ---
 
@@ -219,16 +279,73 @@ func _on_mod_chosen(mod_data: Dictionary, mod_type: String) -> void:
 		hide_ui()
 		return
 
-	# 最初のスキル入りスロットに適用
-	var target_slot := 0
+	# スキルが入っているスロットを候補にする
+	var candidates: Array[int] = []
 	for i in range(tower.max_slots):
 		if tower.get_module(i) != null:
-			target_slot = i
-			break
+			candidates.append(i)
 
-	get_tree().paused = false
-	hide_ui()
-	upgrade_chosen.emit({"type": "mod", "mod_data": mod_data, "mod_type": mod_type, "target_slot": target_slot})
+	if candidates.is_empty():
+		get_tree().paused = false
+		hide_ui()
+		return
+
+	# スロット選択UIを表示
+	var mod_name: String = mod_data.get("name", "?")
+	_show_slot_choice("Apply %s to which slot?" % mod_name, tower, candidates,
+		func(slot: int) -> void:
+			upgrade_chosen.emit({"type": "mod", "mod_data": mod_data, "mod_type": mod_type, "target_slot": slot})
+	)
+
+## スロット選択（サポートリンク先 / Mod適用先を選ぶ共通UI）
+func _show_slot_choice(prompt: String, tower: Node2D, slots: Array[int], callback: Callable) -> void:
+	_clear_buttons()
+	title_label.text = prompt
+
+	for slot_idx in slots:
+		var module: Variant = tower.get_module(slot_idx)
+		if module == null:
+			continue
+		var stats: Dictionary = build_system.calculate_module_stats(module)
+		var skill_name: String = stats.get("name", "?")
+
+		# 現在のリンク状況を表示
+		var link_info := ""
+		if not module.support_ids.is_empty():
+			var sup_names: PackedStringArray = []
+			for sup_id in module.support_ids:
+				var sup_data: Dictionary = build_system.supports.get(sup_id, {})
+				sup_names.append(sup_data.get("name", sup_id))
+			link_info = " + " + " + ".join(sup_names)
+
+		var mod_info := ""
+		if not module.prefix.is_empty():
+			mod_info += module.prefix.get("name", "")
+		if not module.suffix.is_empty():
+			if mod_info != "":
+				mod_info += " "
+			mod_info += module.suffix.get("name", "")
+		if mod_info != "":
+			link_info += " [%s]" % mod_info
+
+		var btn := Button.new()
+		btn.text = "Slot %d: %s%s" % [(slot_idx + 1), skill_name, link_info]
+		btn.custom_minimum_size = Vector2(400, 50)
+		btn.add_theme_font_size_override("font_size", 14)
+
+		var tags: Array = stats.get("tags", [])
+		var style := _make_button_style(tags)
+		btn.add_theme_stylebox_override("normal", style)
+		var hover := style.duplicate()
+		hover.bg_color = hover.bg_color.lightened(0.15)
+		btn.add_theme_stylebox_override("hover", hover)
+
+		btn.pressed.connect(func() -> void:
+			get_tree().paused = false
+			hide_ui()
+			callback.call(slot_idx)
+		)
+		buttons_container.add_child(btn)
 
 func hide_ui() -> void:
 	visible = false

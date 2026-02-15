@@ -86,6 +86,18 @@ func calculate_module_stats(module: TowerModule) -> Dictionary:
 		"spread_angle": skill_data.get("spread_angle", 0),
 		"area_radius": skill_data.get("area_radius", 0),
 		"pierce": skill_data.get("pierce", false),
+		# Mod系デフォルト値（未定義参照防止）
+		"crit_chance": 0.0,
+		"crit_mult": 1.0,
+		"freeze_chance": 0.0,
+		"freeze_duration": 0.0,
+		"splash_radius": 0.0,
+		"splash_damage_pct": 0.0,
+		"life_on_hit": 0.0,
+		"first_strike_instant": false,
+		"misfire_chance": 0.0,
+		"self_damage_per_attack": 0.0,
+		"add_dot": {},
 	}
 
 	# サポート適用（挙動変化）
