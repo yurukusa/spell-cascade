@@ -303,6 +303,24 @@ func _on_mod_chosen(mod_data: Dictionary, mod_type: String) -> void:
 
 ## スロット選択（サポートリンク先 / Mod適用先を選ぶ共通UI）
 func _show_slot_choice(prompt: String, tower: Node2D, slots: Array[int], callback: Callable) -> void:
+	# Auto-link: 候補が1つだけなら自動適用（ゲームを止めない）
+	if slots.size() == 1:
+		var auto_slot: int = slots[0]
+		var module: Variant = tower.get_module(auto_slot)
+		var skill_name := "?"
+		if module:
+			var stats: Dictionary = build_system.calculate_module_stats(module)
+			skill_name = stats.get("name", "?")
+		# ダイアログを閉じてゲーム再開
+		get_tree().paused = false
+		hide_ui()
+		# 即適用
+		callback.call(auto_slot)
+		# トースト通知（0.8秒表示、ゲーム非停止）
+		var item_name: String = prompt.get_slice(" ", 1)  # "Link Chain to..." → "Chain"
+		_show_auto_link_toast(item_name, auto_slot + 1, skill_name)
+		return
+
 	_clear_buttons()
 	title_label.text = prompt
 
@@ -455,6 +473,35 @@ func show_levelup_choice(level: int, options: Array[Dictionary]) -> void:
 
 func hide_ui() -> void:
 	visible = false
+
+# --- Auto-link トースト ---
+
+var _toast_label: Label = null
+
+func _show_auto_link_toast(item_name: String, slot_num: int, skill_name: String) -> void:
+	## 画面左上にAUTO-LINKED通知を0.8秒表示（ゲームは止めない）
+	if _toast_label and is_instance_valid(_toast_label):
+		_toast_label.queue_free()
+
+	_toast_label = Label.new()
+	_toast_label.text = "AUTO-LINKED: %s -> Slot %d (%s)" % [item_name, slot_num, skill_name]
+	_toast_label.add_theme_font_size_override("font_size", 16)
+	_toast_label.add_theme_color_override("font_color", Color(0.4, 0.9, 0.4, 1.0))
+	_toast_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	_toast_label.add_theme_constant_override("shadow_offset_x", 1)
+	_toast_label.add_theme_constant_override("shadow_offset_y", 1)
+	_toast_label.position = Vector2(10, 80)
+	_toast_label.z_index = 100
+
+	# CanvasLayerに直接追加（UIが非表示でも見える）
+	add_child(_toast_label)
+
+	# 0.8秒後にフェードアウト
+	var tween := create_tween()
+	tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
+	tween.tween_interval(0.6)
+	tween.tween_property(_toast_label, "modulate:a", 0.0, 0.2)
+	tween.tween_callback(_toast_label.queue_free)
 
 # --- スタイルヘルパー ---
 
