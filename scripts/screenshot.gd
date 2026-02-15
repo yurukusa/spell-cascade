@@ -1,10 +1,13 @@
 extends Node
 
-## デバッグ用スクリーンショット。
-## 起動→初回スキルを自動選択→数秒待機→スクショ→終了。
+## テストプレイ観察モード。
+## 複数タイミングでスクショを撮り、ゲーム進行を記録。
 
 var timer := 0.0
-var phase := 0  # 0=wait_for_ui, 1=gameplay, 2=done
+var phase := 0  # 0=wait_for_ui, 1=gameplay
+var screenshot_times: Array[float] = [3.0, 8.0, 15.0, 25.0, 40.0]
+var screenshot_index := 0
+var gameplay_timer := 0.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -17,26 +20,24 @@ func _process(delta: float) -> void:
 		_auto_select_first_button()
 		phase = 1
 		timer = 0.0
+		gameplay_timer = 0.0
 
-	elif phase == 1 and timer >= 12.0:
-		# 12秒後にスクショ（敵がレンジ内に到達する時間）
-		phase = 2
-		_take_screenshot()
+	elif phase == 1:
+		gameplay_timer += delta
+		if screenshot_index < screenshot_times.size():
+			if gameplay_timer >= screenshot_times[screenshot_index]:
+				_take_screenshot(screenshot_index)
+				screenshot_index += 1
+				if screenshot_index >= screenshot_times.size():
+					# 全スクショ完了→終了
+					await get_tree().create_timer(0.1).timeout
+					get_tree().quit()
 
 func _auto_select_first_button() -> void:
 	var upgrade_ui := get_tree().current_scene.get_node_or_null("UpgradeUI")
 	if upgrade_ui == null:
-		# UpgradeUIが見つからない場合、pauseを解除
 		get_tree().paused = false
 		return
-	# ボタンコンテナ内の最初のボタンを押す
-	for child in upgrade_ui.get_children():
-		if child is Control:
-			for sub in child.get_children():
-				if sub is PanelContainer:
-					_find_and_press_button(sub)
-					return
-	# フォールバック: 直接全子ノードからButtonを探す
 	_find_and_press_button(upgrade_ui)
 
 func _find_and_press_button(node: Node) -> void:
@@ -46,13 +47,12 @@ func _find_and_press_button(node: Node) -> void:
 			return
 		_find_and_press_button(child)
 
-func _take_screenshot() -> void:
+func _take_screenshot(idx: int) -> void:
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
-	var path := "/home/namakusa/screenshots/spell-cascade-v6-player-avatar.png"
+	var path := "/home/namakusa/screenshots/spell-cascade-test-%02d-t%ds.png" % [idx, int(gameplay_timer)]
 	var err := img.save_png(path)
 	if err == OK:
-		print("SCREENSHOT_SAVED: %s" % path)
+		print("SCREENSHOT_%d_SAVED: %s (gameplay: %.1fs)" % [idx, path, gameplay_timer])
 	else:
-		print("SCREENSHOT_FAILED: error code ", err)
-	get_tree().quit()
+		print("SCREENSHOT_%d_FAILED: error code %d" % [idx, err])

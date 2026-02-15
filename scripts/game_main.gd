@@ -22,10 +22,11 @@ var current_wave := 0
 var max_waves := 20
 var enemies_alive := 0
 
-# 判断イベント管理（10分で>=6回保証）
+# 判断イベント管理（最初は頻繁に、徐々に間隔が開く）
 var upgrade_events_given := 0
 var next_upgrade_time := 0.0
-var upgrade_interval := 90.0  # 90秒ごと = 約6.7回/10分
+# 各イベントのタイミング: 15s, 35s, 60s, 90s, 130s, 180s, 240s, 310s, 390s, 480s, 570s
+var upgrade_schedule: Array[float] = [15.0, 35.0, 60.0, 90.0, 130.0, 180.0, 240.0, 310.0, 390.0, 480.0, 570.0]
 
 # 敵スポーン
 var enemy_scene: PackedScene
@@ -58,8 +59,9 @@ func _ready() -> void:
 	# 初回アップグレード（ゲーム開始時にスキル選択）
 	_show_initial_skill_choice()
 
-	# 最初の判断イベントタイミング
-	next_upgrade_time = upgrade_interval
+	# 最初の判断イベントタイミング（スケジュール式）
+	if not upgrade_schedule.is_empty():
+		next_upgrade_time = upgrade_schedule[0]
 
 func _process(delta: float) -> void:
 	if game_over:
@@ -80,9 +82,13 @@ func _process(delta: float) -> void:
 		spawn_timer = 0.0
 		_spawn_enemy()
 
-	# 定期判断イベント（タイマー保証）
-	if run_time >= next_upgrade_time and upgrade_events_given < 12:
-		next_upgrade_time += upgrade_interval
+	# 判断イベント（スケジュール式: 最初は頻繁に）
+	if run_time >= next_upgrade_time and upgrade_events_given < upgrade_schedule.size():
+		upgrade_events_given += 1
+		if upgrade_events_given < upgrade_schedule.size():
+			next_upgrade_time = upgrade_schedule[upgrade_events_given]
+		else:
+			next_upgrade_time = INF  # スケジュール終了
 		_show_upgrade_choice()
 
 func _update_timer_display() -> void:
@@ -140,8 +146,6 @@ func _show_initial_skill_choice() -> void:
 # --- アップグレード選択 ---
 
 func _show_upgrade_choice() -> void:
-	upgrade_events_given += 1
-
 	# 空スロットがあればスキル追加、なければサポート/Mod追加
 	var empty_slot := -1
 	for i in range(tower.max_slots):

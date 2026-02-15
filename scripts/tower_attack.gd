@@ -48,6 +48,12 @@ func _fire() -> void:
 			_fire_spread(behavior.get("directions", 8))
 			return
 
+	# areaスキル: 8方向に拡散（Poison Nova等）
+	var area_radius: float = stats.get("area_radius", 0)
+	if area_radius > 0:
+		_fire_spread(8)
+		return
+
 	# 通常: 最寄り敵をターゲット
 	var nearest := _find_nearest_enemy(enemies)
 	if nearest == null:
