@@ -179,11 +179,21 @@ func _physics_process(delta: float) -> void:
 		_:
 			move_dir = _get_manual_input()
 
-	if move_dir != Vector2.ZERO:
+	# Aim: mouse position overrides movement direction
+	var mouse_pos := get_global_mouse_position()
+	var to_mouse := mouse_pos - global_position
+	if to_mouse.length() > 10.0:
+		facing_dir = to_mouse.normalized()
+	elif move_dir != Vector2.ZERO:
 		facing_dir = move_dir.normalized()
 
 	velocity = move_dir * move_speed * move_speed_mult
 	move_and_slide()
+
+	# Rotate visual to face aiming direction
+	var stylized := get_node_or_null("StylizedVisual")
+	if stylized:
+		stylized.rotation = facing_dir.angle()
 
 	# X軸のみ画面内クランプ（Y軸は無制限 = 縦スクロール）
 	position.x = clampf(position.x, 24.0, 1256.0)
