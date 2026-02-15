@@ -234,17 +234,20 @@ func _create_projectile(direction: Vector2) -> void:
 	col.shape = shape
 	bullet.add_child(col)
 
-	# ビジュアル（視認性重視: 12px六角形 + グロー）
+	# ビジュアル（Design Lock: 10px core + 18px glow, 3:1 contrast vs BG）
 	var color := _get_bullet_color()
+
+	# 外側グロー（形状認識 + 存在感）
 	var glow := Polygon2D.new()
 	var glow_points: PackedVector2Array = []
 	for i in range(8):
 		var angle := i * TAU / 8
-		glow_points.append(Vector2(cos(angle), sin(angle)) * 16.0)
+		glow_points.append(Vector2(cos(angle), sin(angle)) * 18.0)
 	glow.polygon = glow_points
-	glow.color = Color(color.r, color.g, color.b, 0.25)
+	glow.color = Color(color.r, color.g, color.b, 0.3)
 	bullet.add_child(glow)
 
+	# 本体（六角形コア）
 	var visual := Polygon2D.new()
 	var points: PackedVector2Array = []
 	for i in range(6):
@@ -253,6 +256,16 @@ func _create_projectile(direction: Vector2) -> void:
 	visual.polygon = points
 	visual.color = color
 	bullet.add_child(visual)
+
+	# ホットスポット（中心の明るい点 — 弾道の視認性向上）
+	var hotspot := Polygon2D.new()
+	var hs_points: PackedVector2Array = []
+	for i in range(4):
+		var angle := i * TAU / 4
+		hs_points.append(Vector2(cos(angle), sin(angle)) * 3.0)
+	hotspot.polygon = hs_points
+	hotspot.color = Color(minf(color.r + 0.4, 1.0), minf(color.g + 0.4, 1.0), minf(color.b + 0.4, 1.0), 0.9)
+	bullet.add_child(hotspot)
 
 	# 弾スクリプト
 	var script := GDScript.new()

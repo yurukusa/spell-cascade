@@ -13,6 +13,7 @@ var suffixes: Array = []          # suffix mod pool
 var synergies: Array = []         # synergy definitions
 var chips: Dictionary = {}        # id -> chip data
 var presets: Dictionary = {}      # id -> preset data
+var art_config: Dictionary = {}   # Design Lock設定
 
 # 装備中のBehavior Chips（カテゴリ -> chip_id）
 var equipped_chips: Dictionary = {
@@ -36,6 +37,10 @@ func _load_data() -> void:
 	var syn_data: Variant = _load_json_raw("res://data/synergies.json")
 	if syn_data:
 		synergies = syn_data.get("synergies", [])
+
+	var art_raw: Variant = _load_json_raw("res://art_config.json")
+	if art_raw:
+		art_config = art_raw
 
 	var chip_data: Variant = _load_json_raw("res://data/behavior_chips.json")
 	if chip_data:

@@ -1,31 +1,76 @@
 {
-  "_comment": "見た目パラメータ集約ファイル。design.md反映後に差し替える。凍結中。",
-  "_status": "placeholder",
-  "sprite_scale": 3.0,
-  "player_texture": "res://assets/kenney-tiny-dungeon/tile_0084.png",
-  "enemy_textures": {
-    "tier1": "res://assets/kenney-tiny-dungeon/tile_0108.png",
-    "tier2": "res://assets/kenney-tiny-dungeon/tile_0110.png",
-    "tier3": "res://assets/kenney-tiny-dungeon/tile_0121.png"
+  "_comment": "Design Lock v1 — 視覚ルール強制ファイル。コードはここから読む。",
+  "_status": "locked",
+
+  "visual_hierarchy": {
+    "_rule": "4-tier: BG(0.2) → Collision(0.5) → Interactive(0.7) → Threat(1.0)",
+    "background_intensity": 0.2,
+    "collision_intensity": 0.5,
+    "interactive_intensity": 0.7,
+    "threat_intensity": 1.0
   },
-  "orb_texture": "res://assets/kenney-tiny-dungeon/tile_0056.png",
-  "background_color": [0.05, 0.02, 0.1, 1.0],
+
   "palette": {
-    "_note": "design.md確定後に置換",
-    "primary": "#4db2ff",
-    "secondary": "#80ccff",
-    "danger": "#ff4444",
-    "background": "#0d0520"
+    "_rule": "Semantic color locks. Color alone is forbidden — must pair with shape.",
+    "player": {"hex": "#59bfff", "rgb": [0.35, 0.75, 1.0], "meaning": "cyan=player"},
+    "danger": {"hex": "#f23838", "rgb": [0.95, 0.22, 0.20], "meaning": "red=enemy/threat"},
+    "fire": {"hex": "#ff6619", "rgb": [1.0, 0.4, 0.1], "meaning": "orange=fire"},
+    "cold": {"hex": "#4db3ff", "rgb": [0.3, 0.7, 1.0], "meaning": "blue=cold"},
+    "lightning": {"hex": "#ffff4d", "rgb": [1.0, 1.0, 0.3], "meaning": "yellow=lightning"},
+    "chaos": {"hex": "#66e633", "rgb": [0.4, 0.9, 0.2], "meaning": "green=chaos/poison"},
+    "holy": {"hex": "#fff2b3", "rgb": [1.0, 0.95, 0.7], "meaning": "warm white=holy"},
+    "background": {"hex": "#0d0520", "rgb": [0.05, 0.02, 0.1]}
   },
-  "ui": {
-    "_note": "レイアウトはdesign.md確定後に固定",
-    "hp_bar_position": "top_left",
-    "wave_label_position": "top_center",
-    "font": "default"
+
+  "player": {
+    "_rule": "50px+ size, silhouette identifiable, cyan core + magenta cape",
+    "body_radius": 26,
+    "outline_radius": 30,
+    "core_radius": 12,
+    "glow_radius": 18,
+    "body_color": [0.08, 0.09, 0.12, 1.0],
+    "core_color": [0.35, 0.75, 1.0, 1.0],
+    "cape_color": [0.71, 0.26, 0.53, 1.0]
   },
+
+  "enemy": {
+    "_rule": "Red diamond, 30px+ size, eye for facing, danger aura",
+    "body_radius": 30,
+    "outline_radius": 34,
+    "body_color": [0.95, 0.22, 0.20, 1.0],
+    "aura_radius": 44,
+    "aura_alpha": 0.08
+  },
+
+  "bullet": {
+    "_rule": "3:1+ contrast vs BG, 10px core + 16px glow, element-colored hexagon",
+    "core_radius": 10,
+    "glow_radius": 18,
+    "glow_alpha": 0.3,
+    "min_line_width": 2,
+    "shape_sides": 6
+  },
+
   "viewport": {
     "width": 1280,
-    "height": 720,
-    "_note": "解像度はdesign.md確定後に固定"
+    "height": 720
+  },
+
+  "ui": {
+    "_rule": "HUD ≤12% screen, text min 28px, 4.5:1 contrast",
+    "hp_bar_position": "top_left",
+    "timer_position": "top_right",
+    "build_info_position": "top_left_below_hp",
+    "min_font_size": 14,
+    "min_critical_font_size": 16
+  },
+
+  "effects": {
+    "_rule": "Max 3 flashes/sec, camera shake ≤15px, hit stop ≤40ms",
+    "max_flash_per_sec": 3,
+    "max_camera_shake_px": 15,
+    "hit_stop_ms": 40,
+    "blend_effect_max_duration": 0.25,
+    "particle_cap_constant": 800
   }
 }
