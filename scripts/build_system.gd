@@ -25,6 +25,19 @@ var equipped_chips: Dictionary = {
 
 func _ready() -> void:
 	_load_data()
+	_apply_saved_chips()
+
+## Chip Vault: セーブデータから解放済みチップを適用
+func _apply_saved_chips() -> void:
+	var save_mgr := get_node_or_null("/root/SaveManager")
+	if save_mgr == null:
+		return
+	var saved: Dictionary = save_mgr.get_unlocked_chips()
+	for category in saved.keys():
+		var chip_id: String = saved[category]
+		# チップが実際に存在するか確認してから適用
+		if chips.has(chip_id) or chip_id in ["manual", "manual_aim", "auto_cast"]:
+			equipped_chips[category] = chip_id
 
 func _load_data() -> void:
 	skills = _load_json("res://data/skills.json", "skills", "id")

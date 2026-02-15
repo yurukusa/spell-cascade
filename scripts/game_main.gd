@@ -1332,6 +1332,7 @@ func _win_game() -> void:
 
 func _show_result_screen(is_victory: bool) -> void:
 	## リザルト画面: 暗転 → タイトル → スタッツ → リトライ
+	_save_unlocked_chips()
 	var result_layer := CanvasLayer.new()
 	result_layer.layer = 100
 	add_child(result_layer)
@@ -1412,6 +1413,36 @@ func _show_result_screen(is_victory: bool) -> void:
 		vbox.add_child(lbl)
 		stat_labels.append(lbl)
 
+	# Chip Vault表示: 解放済みチップを表示
+	var save_mgr := get_node_or_null("/root/SaveManager")
+	if save_mgr and save_mgr.has_any_unlock():
+		var chip_spacer := Control.new()
+		chip_spacer.custom_minimum_size = Vector2(0, 8)
+		vbox.add_child(chip_spacer)
+		var chip_sep := HSeparator.new()
+		chip_sep.custom_minimum_size = Vector2(200, 2)
+		chip_sep.modulate.a = 0.0
+		vbox.add_child(chip_sep)
+		stat_labels.append(chip_sep)
+		var chips_saved: Dictionary = save_mgr.get_unlocked_chips()
+		var chip_names: Array[String] = []
+		for cat in ["move", "attack", "skill"]:
+			var cid: String = chips_saved.get(cat, "")
+			if cid != "manual" and cid != "manual_aim" and cid != "auto_cast":
+				chip_names.append(cid.replace("_", " ").capitalize())
+		if chip_names.size() > 0:
+			var vault_lbl := Label.new()
+			vault_lbl.text = "CHIP VAULT: %s" % ", ".join(chip_names)
+			vault_lbl.add_theme_font_size_override("font_size", 20)
+			vault_lbl.add_theme_color_override("font_color", Color(0.6, 0.9, 1.0, 1.0))
+			vault_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+			vault_lbl.add_theme_constant_override("shadow_offset_x", 1)
+			vault_lbl.add_theme_constant_override("shadow_offset_y", 1)
+			vault_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			vault_lbl.modulate.a = 0.0
+			vbox.add_child(vault_lbl)
+			stat_labels.append(vault_lbl)
+
 	# スペーサー
 	var spacer := Control.new()
 	spacer.custom_minimum_size = Vector2(0, 20)
@@ -1444,6 +1475,19 @@ func _show_result_screen(is_victory: bool) -> void:
 		blink.tween_property(retry, "modulate:a", 0.4, 0.6).set_trans(Tween.TRANS_SINE)
 		blink.tween_property(retry, "modulate:a", 1.0, 0.6).set_trans(Tween.TRANS_SINE)
 	)
+
+func _save_unlocked_chips() -> void:
+	## Chip Vault: 今ランで装備したチップを永続セーブに反映
+	var save_mgr := get_node_or_null("/root/SaveManager")
+	if save_mgr == null:
+		return
+	var newly_unlocked: Array[String] = []
+	for category in build_system.equipped_chips.keys():
+		var chip_id: String = build_system.equipped_chips[category]
+		if save_mgr.unlock_chip(category, chip_id):
+			newly_unlocked.append("%s: %s" % [category, chip_id])
+	if newly_unlocked.size() > 0:
+		print("Chip Vault: unlocked ", ", ".join(newly_unlocked))
 
 func _do_hitstop(duration: float) -> void:
 	## 一瞬のタイムスケール低下で「重い手応え」を演出

@@ -14,6 +14,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+SaveManager="*res://scripts/save_manager.gd"
 BuildSystem="*res://scripts/build_system.gd"
 SFX="*res://scripts/sfx.gd"
 ;Screenshot="*res://scripts/screenshot.gd"
