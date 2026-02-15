@@ -85,13 +85,14 @@ func _on_body_entered(body: Node2D) -> void:
 		_on_collected()
 
 func _on_collected() -> void:
-	# XP付与
-	if is_instance_valid(target) and "xp" in target:
+	if orb_type == "chip":
+		_equip_auto_aim()
+	elif is_instance_valid(target) and "xp" in target:
 		target.xp += xp_value
 		if target.has_signal("xp_gained"):
 			target.xp_gained.emit(target.xp, target.level)
 
-	# 回収エフェクト: 白い閃光
+	# 回収エフェクト
 	var flash := Polygon2D.new()
 	var pts: PackedVector2Array = []
 	for i in range(8):
@@ -111,3 +112,49 @@ func _on_collected() -> void:
 		tween.chain().tween_callback(flash.queue_free)
 
 	queue_free()
+
+func _equip_auto_aim() -> void:
+	var build_sys := get_node_or_null("/root/BuildSystem")
+	if build_sys:
+		build_sys.equip_chip("attack", "aim_nearest")
+
+	# 大きなピックアップエフェクト（ゲームが変わる瞬間）
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+
+	# "AUTO AIM ACQUIRED!" 表示
+	var label := Label.new()
+	label.text = "AUTO AIM ACQUIRED!"
+	label.add_theme_font_size_override("font_size", 28)
+	label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2, 1.0))
+	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	label.add_theme_constant_override("shadow_offset_x", 2)
+	label.add_theme_constant_override("shadow_offset_y", 2)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.global_position = global_position + Vector2(-120, -50)
+	label.z_index = 200
+	scene_root.add_child(label)
+
+	var announce_tween := label.create_tween()
+	announce_tween.set_parallel(true)
+	announce_tween.tween_property(label, "global_position:y", label.global_position.y - 60.0, 1.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	announce_tween.tween_property(label, "modulate:a", 0.0, 1.5).set_delay(0.8)
+	announce_tween.chain().tween_callback(label.queue_free)
+
+	# 金色の大きな閃光
+	var big_flash := Polygon2D.new()
+	var big_pts: PackedVector2Array = []
+	for i in range(12):
+		var a := i * TAU / 12
+		big_pts.append(Vector2(cos(a), sin(a)) * 30.0)
+	big_flash.polygon = big_pts
+	big_flash.color = Color(1.0, 0.9, 0.3, 0.8)
+	big_flash.global_position = global_position
+	scene_root.add_child(big_flash)
+
+	var flash_tween := big_flash.create_tween()
+	flash_tween.set_parallel(true)
+	flash_tween.tween_property(big_flash, "scale", Vector2(3.0, 3.0), 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	flash_tween.tween_property(big_flash, "modulate:a", 0.0, 0.3)
+	flash_tween.chain().tween_callback(big_flash.queue_free)

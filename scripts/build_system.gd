@@ -19,7 +19,7 @@ var art_config: Dictionary = {}   # Design Lock設定
 # Mirror War: デフォルトは手動。AutoはDropで"勝ち取る"
 var equipped_chips: Dictionary = {
 	"move": "manual",
-	"attack": "aim_nearest",
+	"attack": "manual_aim",  # 移動方向に発射。AutoAimチップで自動照準に
 	"skill": "auto_cast",
 }
 

@@ -137,9 +137,16 @@ func _fire_spread(directions: int) -> void:
 func _get_aim_direction(enemies: Array) -> Vector2:
 	## Attack chipに基づいてターゲット方向を決定
 	var attack_chip: Dictionary = build_system.get_equipped_chip("attack")
-	var attack_id: String = attack_chip.get("id", "aim_nearest")
+	var attack_id: String = attack_chip.get("id", "manual_aim")
 
 	match attack_id:
+		"manual_aim", "":
+			# 手動: プレイヤーの向いている方向に発射
+			var tower_node := get_parent()
+			if tower_node and "facing_dir" in tower_node:
+				return tower_node.facing_dir
+			return Vector2.UP  # デフォルト: 上方向
+
 		"aim_nearest":
 			var nearest := _find_nearest_enemy(enemies)
 			if nearest:
@@ -156,9 +163,11 @@ func _get_aim_direction(enemies: Array) -> Vector2:
 				return (cluster_pos - global_position).normalized()
 
 		_:
-			var nearest := _find_nearest_enemy(enemies)
-			if nearest:
-				return (nearest.global_position - global_position).normalized()
+			# フォールバック: 手動照準
+			var tower_node := get_parent()
+			if tower_node and "facing_dir" in tower_node:
+				return tower_node.facing_dir
+			return Vector2.UP
 
 	return Vector2.ZERO
 

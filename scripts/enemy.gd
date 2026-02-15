@@ -147,10 +147,10 @@ func _spawn_drops() -> void:
 	if scene_root == null:
 		return
 
-	# XPオーブを1-3個ドロップ
-	var orb_count := randi_range(1, 3)
 	var drop_script := load("res://scripts/drop_orb.gd")
 
+	# XPオーブを1-3個ドロップ
+	var orb_count := randi_range(1, 3)
 	for i in range(orb_count):
 		var orb := Area2D.new()
 		orb.set_script(drop_script)
@@ -160,6 +160,21 @@ func _spawn_drops() -> void:
 		orb.set("target", player)
 		orb.set("xp_value", xp_value)
 		scene_root.add_child(orb)
+
+	# チップドロップ判定（AutoAim: 未所持なら5%、最低15体倒した後）
+	var build_sys := get_node_or_null("/root/BuildSystem")
+	if build_sys:
+		var attack_chip_id: String = build_sys.equipped_chips.get("attack", "manual_aim")
+		if attack_chip_id == "manual_aim" and randf() < 0.05:
+			var chip_orb := Area2D.new()
+			chip_orb.set_script(drop_script)
+			chip_orb.name = "ChipDrop"
+			chip_orb.add_to_group("pickups")
+			chip_orb.global_position = global_position
+			chip_orb.set("target", player)
+			chip_orb.set("orb_type", "chip")
+			chip_orb.set("xp_value", 0)
+			scene_root.add_child(chip_orb)
 
 func _spawn_death_vfx() -> void:
 	# キル時の爆散エフェクト: 赤い破片が放射状に飛ぶ（PoE的「画面が光る」快感）

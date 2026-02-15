@@ -203,10 +203,11 @@ func _update_build_display() -> void:
 	var attack_chip: Dictionary = build_system.get_equipped_chip("attack")
 	var skill_chip: Dictionary = build_system.get_equipped_chip("skill")
 	var move_name: String = move_chip.get("name", "Manual") if not move_chip.is_empty() else "Manual"
-	lines.append("AI: %s / %s / %s" % [
+	var attack_name: String = attack_chip.get("name", "Manual Aim") if not attack_chip.is_empty() else "Manual Aim"
+	lines.append("Move: %s / Aim: %s / Cast: %s" % [
 		move_name,
-		attack_chip.get("name", "?"),
-		skill_chip.get("name", "?"),
+		attack_name,
+		skill_chip.get("name", "Auto"),
 	])
 	lines.append("")
 
