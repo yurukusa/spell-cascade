@@ -3,3 +3,6 @@
 
 # Export builds
 exports/
+
+# Release artifacts (large binaries)
+dist/
