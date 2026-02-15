@@ -7,6 +7,7 @@ extends Node
 var timer := 0.0
 var phase := 0  # 0=init, 1=gameplay
 var screenshot_times: Array[float] = [3.0, 10.0, 20.0, 35.0, 60.0, 90.0]
+var force_death_at := -1.0  # >0にするとその秒数で即死（テスト用）
 var screenshot_index := 0
 var gameplay_timer := 0.0
 var auto_dismiss_interval := 0.5
@@ -27,6 +28,13 @@ func _process(delta: float) -> void:
 
 		# 自動で上移動をシミュレート（テスト用）
 		_simulate_move_up()
+
+		# Game Overテスト: 指定時間で即死
+		if force_death_at > 0.0 and gameplay_timer >= force_death_at:
+			force_death_at = -1.0  # 一度だけ
+			var tower := get_tree().current_scene.get_node_or_null("Tower")
+			if tower and tower.has_method("take_damage"):
+				tower.take_damage(99999.0)
 
 		# 定期的にアップグレードUIを自動処理
 		auto_dismiss_timer += delta

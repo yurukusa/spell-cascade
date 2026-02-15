@@ -25,6 +25,7 @@ var game_over := false
 var enemies_alive := 0
 var game_started := false
 var boss_spawned := false
+var kill_count := 0
 const BOSS_DISTANCE := 200.0  # メートル
 
 # 判断イベント管理
@@ -423,6 +424,7 @@ func _spawn_boss() -> void:
 
 func _on_boss_died(_enemy: Node2D) -> void:
 	enemies_alive -= 1
+	kill_count += 1
 	tower.enemy_killed.emit()
 
 	# ボス撃破のお祝い表示
@@ -501,7 +503,7 @@ func _spawn_enemy() -> void:
 
 func _on_enemy_died(_enemy: Node2D) -> void:
 	enemies_alive -= 1
-	# enemy_killed シグナルをtowerから発火（on_killチップ用）
+	kill_count += 1
 	tower.enemy_killed.emit()
 
 # --- タワーイベント ---
@@ -592,17 +594,126 @@ func _spawn_levelup_vfx() -> void:
 
 func _on_tower_destroyed() -> void:
 	game_over = true
-	wave_label.text = "DESTROYED"
-	wave_label.add_theme_color_override("font_color", Color(1.0, 0.25, 0.2, 1.0))
-	restart_label.visible = true
-	restart_label.text = "Press R to Restart"
+	_show_result_screen(false)
 
 func _win_game() -> void:
 	game_over = true
-	wave_label.text = "SURVIVED 10 MINUTES!"
-	wave_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3, 1.0))
-	restart_label.visible = true
-	restart_label.text = "Press R to Restart"
+	_show_result_screen(true)
+
+func _show_result_screen(is_victory: bool) -> void:
+	## リザルト画面: 暗転 → タイトル → スタッツ → リトライ
+	var result_layer := CanvasLayer.new()
+	result_layer.layer = 100
+	add_child(result_layer)
+
+	# 暗転オーバーレイ
+	var overlay := ColorRect.new()
+	overlay.color = Color(0.0, 0.0, 0.0, 0.0)
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	result_layer.add_child(overlay)
+
+	# フェードイン
+	var fade_tween := overlay.create_tween()
+	fade_tween.tween_property(overlay, "color:a", 0.75, 0.8).set_trans(Tween.TRANS_QUAD)
+
+	# コンテンツ（VBox中央配置）
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	result_layer.add_child(center)
+
+	var vbox := VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_theme_constant_override("separation", 12)
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.add_child(vbox)
+
+	# タイトル
+	var title := Label.new()
+	if is_victory:
+		title.text = "VICTORY"
+		title.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3, 1.0))
+	else:
+		title.text = "GAME OVER"
+		title.add_theme_color_override("font_color", Color(1.0, 0.2, 0.15, 1.0))
+	title.add_theme_font_size_override("font_size", 48)
+	title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	title.add_theme_constant_override("shadow_offset_x", 3)
+	title.add_theme_constant_override("shadow_offset_y", 3)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.modulate.a = 0.0
+	vbox.add_child(title)
+
+	# 区切り線
+	var sep := HSeparator.new()
+	sep.custom_minimum_size = Vector2(300, 2)
+	sep.modulate.a = 0.0
+	vbox.add_child(sep)
+
+	# スタッツ
+	var distance_m: float = float(tower.distance_traveled) / 10.0
+	var time_sec := int(run_time)
+	@warning_ignore("integer_division")
+	var t_min := time_sec / 60
+	var t_sec := time_sec % 60
+
+	var stats_data: Array[Array] = [
+		["Distance", "%dm" % int(distance_m)],
+		["Level", "%d" % tower.level],
+		["Kills", "%d" % kill_count],
+		["Time", "%d:%02d" % [t_min, t_sec]],
+	]
+
+	var stat_labels: Array[Label] = []
+	var stat_color := Color(0.85, 0.82, 0.92, 1.0)
+	var value_color := Color(0.4, 0.8, 1.0, 1.0)
+
+	for stat in stats_data:
+		var lbl := Label.new()
+		lbl.text = "%s:  %s" % [stat[0], stat[1]]
+		lbl.add_theme_font_size_override("font_size", 24)
+		lbl.add_theme_color_override("font_color", stat_color)
+		lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+		lbl.add_theme_constant_override("shadow_offset_x", 1)
+		lbl.add_theme_constant_override("shadow_offset_y", 1)
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.modulate.a = 0.0
+		vbox.add_child(lbl)
+		stat_labels.append(lbl)
+
+	# スペーサー
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, 20)
+	vbox.add_child(spacer)
+
+	# リトライ
+	var retry := Label.new()
+	retry.text = "Press R to Retry"
+	retry.add_theme_font_size_override("font_size", 22)
+	retry.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5, 1.0))
+	retry.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	retry.add_theme_constant_override("shadow_offset_x", 2)
+	retry.add_theme_constant_override("shadow_offset_y", 2)
+	retry.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	retry.modulate.a = 0.0
+	vbox.add_child(retry)
+
+	# 順番にフェードインするアニメーション
+	var anim := create_tween()
+	anim.tween_property(title, "modulate:a", 1.0, 0.3).set_delay(0.5)
+	anim.tween_property(sep, "modulate:a", 0.4, 0.2)
+	for lbl in stat_labels:
+		anim.tween_property(lbl, "modulate:a", 1.0, 0.15)
+	anim.tween_property(retry, "modulate:a", 1.0, 0.3).set_delay(0.3)
+
+	# リトライラベルの点滅
+	anim.tween_callback(func():
+		var blink := retry.create_tween()
+		blink.set_loops()
+		blink.tween_property(retry, "modulate:a", 0.4, 0.6).set_trans(Tween.TRANS_SINE)
+		blink.tween_property(retry, "modulate:a", 1.0, 0.6).set_trans(Tween.TRANS_SINE)
+	)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed:
