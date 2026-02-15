@@ -290,7 +290,7 @@ func _check_boss_phase() -> void:
 
 func _boss_phase_transition() -> void:
 	## フェーズ移行演出: 短い無敵 + 視覚バースト + パラメータ強化
-	boss_phase_invuln = 0.8
+	boss_phase_invuln = 1.2
 	boss_state = "cooldown"
 	boss_timer = 0.0
 
@@ -299,9 +299,16 @@ func _boss_phase_transition() -> void:
 		2:
 			boss_attack_cd = maxf(boss_attack_cd * 0.7, 1.5)
 			speed *= 1.2
+			# Phase2移行: 全方位バーストで距離を取らせる
+			_boss_fire_burst()
 		3:
-			boss_attack_cd = maxf(boss_attack_cd * 0.6, 1.0)
-			speed *= 1.3
+			boss_attack_cd = maxf(boss_attack_cd * 0.5, 0.8)
+			speed *= 1.4
+			# Phase3移行: 二重バーストで圧をかける
+			_boss_fire_burst()
+			# 0.3s後に2回目のバースト（微妙にずれた角度）
+			var timer := get_tree().create_timer(0.3)
+			timer.timeout.connect(_boss_fire_burst)
 
 	# 視覚: 紫のパルスリング
 	var scene_root := get_tree().current_scene
