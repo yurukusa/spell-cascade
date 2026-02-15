@@ -36,6 +36,10 @@ const COMBO_WINDOW := 2.0  # 秒以内に次のキルで継続
 var combo_label_node: Label = null  # HUD上のコンボ表示
 var best_combo := 0  # リザルト画面用
 
+# Crush ring visual（タワー周囲の危険ゾーン表示）
+var crush_ring: Line2D = null
+var crush_warning_label: Label = null  # pre-crush "DANGER" 表示
+
 # 画面外敵インジケーター
 var indicator_pool: Array[Polygon2D] = []
 const MAX_INDICATORS := 8
@@ -71,6 +75,11 @@ func _ready() -> void:
 	tower.tower_damaged.connect(_on_tower_damaged)
 	tower.tower_destroyed.connect(_on_tower_destroyed)
 	tower.crush_changed.connect(_on_crush_changed)
+	tower.crush_warning.connect(_on_crush_warning)
+	tower.crush_breakout.connect(_on_crush_breakout)
+
+	# Crush ring visual（ワールド空間でタワーに追従）
+	_setup_crush_ring()
 
 	# UI初期化（Design Lock準拠スタイル適用）
 	_style_hud()
@@ -106,7 +115,13 @@ func _process(delta: float) -> void:
 
 	# Crush表示更新（敵数が変わるので毎フレーム更新）
 	if tower.crush_active:
-		crush_label.text = "SURROUNDED x%d" % tower.crush_count
+		var sec_left := maxf(tower.CRUSH_BREAKOUT_TIME - tower.crush_duration, 0.0)
+		if tower.crush_breakout_ready:
+			crush_label.text = "SURROUNDED x%d - BURST!" % tower.crush_count
+		else:
+			crush_label.text = "SURROUNDED x%d  %.1fs" % [tower.crush_count, sec_left]
+	# Crush ring visual更新
+	_update_crush_ring()
 
 	# 10分経過 → 勝利
 	if run_time >= max_run_time:
@@ -650,8 +665,111 @@ func _on_crush_changed(active: bool, count: int) -> void:
 		crush_label.visible = true
 		# 包囲開始: 警告シェイク
 		tower.shake(4.0)
+		# Warning labelは非表示に（crushが上位表示）
+		if crush_warning_label:
+			crush_warning_label.visible = false
 	else:
 		crush_label.visible = false
+
+func _setup_crush_ring() -> void:
+	## タワー周囲のCRUSH_RADIUSを示すリング（ワールド座標、タワーの子）
+	crush_ring = Line2D.new()
+	crush_ring.name = "CrushRing"
+	crush_ring.width = 1.5
+	crush_ring.default_color = Color(1.0, 0.3, 0.2, 0.0)  # 初期は透明
+	crush_ring.z_index = 50
+	var pts: PackedVector2Array = []
+	for i in range(25):  # 24セグメント + 閉じる
+		var a := i * TAU / 24
+		pts.append(Vector2(cos(a), sin(a)) * tower.CRUSH_RADIUS)
+	crush_ring.points = pts
+	tower.add_child(crush_ring)
+
+	# Pre-crush warning label（UI空間）
+	crush_warning_label = Label.new()
+	crush_warning_label.name = "CrushWarning"
+	crush_warning_label.text = "DANGER"
+	crush_warning_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	crush_warning_label.position = Vector2(540, 365)
+	crush_warning_label.custom_minimum_size = Vector2(200, 0)
+	crush_warning_label.add_theme_font_size_override("font_size", 18)
+	crush_warning_label.add_theme_color_override("font_color", Color(1.0, 0.8, 0.2, 0.9))
+	crush_warning_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+	crush_warning_label.add_theme_constant_override("shadow_offset_x", 1)
+	crush_warning_label.add_theme_constant_override("shadow_offset_y", 1)
+	crush_warning_label.visible = false
+	ui_layer.add_child(crush_warning_label)
+
+func _update_crush_ring() -> void:
+	## Crush ringの色・透明度を状態に応じて更新
+	if crush_ring == null:
+		return
+
+	if tower.crush_active:
+		# Crush中: 赤く脈動（duration長いほど濃く）
+		var pulse := 0.5 + sin(run_time * 6.0) * 0.2
+		var alpha := minf(0.4 + tower.crush_duration * 0.08, 0.8)
+		crush_ring.default_color = Color(1.0, 0.2, 0.1, alpha * pulse + 0.2)
+		crush_ring.width = 2.0
+	elif tower.crush_count > 0:
+		# Pre-crush: 黄色で警告
+		var alpha: float = 0.15 + float(tower.crush_count) * 0.1
+		crush_ring.default_color = Color(1.0, 0.8, 0.2, alpha)
+		crush_ring.width = 1.5
+	else:
+		# 安全: 非表示
+		crush_ring.default_color = Color(1.0, 0.3, 0.2, 0.0)
+
+func _on_crush_warning(count: int) -> void:
+	if crush_warning_label == null:
+		return
+	if count >= 2 and not tower.crush_active:
+		crush_warning_label.text = "DANGER x%d" % count
+		crush_warning_label.visible = true
+	elif count == 1:
+		crush_warning_label.visible = false
+	else:
+		crush_warning_label.visible = false
+
+func _on_crush_breakout() -> void:
+	## Breakout burst VFX: 金色の衝撃波リング
+	var ring := Polygon2D.new()
+	var pts: PackedVector2Array = []
+	for i in range(24):
+		var a := i * TAU / 24
+		pts.append(Vector2(cos(a), sin(a)) * 15.0)
+	ring.polygon = pts
+	ring.color = Color(1.0, 0.85, 0.3, 0.7)
+	ring.global_position = tower.global_position
+	ring.z_index = 140
+	add_child(ring)
+
+	var tween := ring.create_tween()
+	tween.set_parallel(true)
+	var target_scale: float = tower.CRUSH_BREAKOUT_RADIUS / 15.0
+	tween.tween_property(ring, "scale", Vector2(target_scale, target_scale), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(ring, "modulate:a", 0.0, 0.35)
+	tween.chain().tween_callback(ring.queue_free)
+
+	# "BREAKOUT!" テキスト
+	var label := Label.new()
+	label.text = "BREAKOUT!"
+	label.add_theme_font_size_override("font_size", 28)
+	label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3, 1.0))
+	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	label.add_theme_constant_override("shadow_offset_x", 2)
+	label.add_theme_constant_override("shadow_offset_y", 2)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.position = Vector2(540, 280)
+	label.custom_minimum_size = Vector2(200, 0)
+	label.z_index = 200
+	ui_layer.add_child(label)
+
+	var text_tween := label.create_tween()
+	text_tween.tween_property(label, "scale", Vector2(1.2, 1.2), 0.1).set_trans(Tween.TRANS_BACK)
+	text_tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1)
+	text_tween.tween_property(label, "modulate:a", 0.0, 1.0).set_delay(0.5)
+	text_tween.tween_callback(label.queue_free)
 
 # --- レベルアップ選択肢プール ---
 var levelup_pool: Array[Dictionary] = [

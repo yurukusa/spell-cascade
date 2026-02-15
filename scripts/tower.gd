@@ -43,12 +43,19 @@ var crush_active := false
 var crush_count := 0  # 包囲敵数
 var crush_tick_timer := 0.0
 var crush_invuln_timer := 0.0
+var crush_duration := 0.0  # 連続crush秒数（DPS escalation用）
+var crush_breakout_ready := false  # breakout burst準備完了
 const CRUSH_RADIUS := 48.0
 const CRUSH_THRESHOLD := 3
 const CRUSH_BASE_DPS := 6.0
 const CRUSH_K_DPS := 4.0
 const CRUSH_TICK := 0.2
 const CRUSH_INVULN := 0.15
+const CRUSH_ESCALATION_RATE := 0.5  # 秒あたりDPS増加倍率
+const CRUSH_BREAKOUT_TIME := 3.0  # breakout burst発動までの秒数
+const CRUSH_BREAKOUT_DAMAGE := 30.0
+const CRUSH_BREAKOUT_RADIUS := 120.0
+const CRUSH_BREAKOUT_KNOCKBACK := 80.0
 
 func _ready() -> void:
 	hp = max_hp
@@ -202,6 +209,8 @@ func _get_manual_input() -> Vector2:
 # --- Crush state（包囲DPS）---
 
 signal crush_changed(active: bool, count: int)
+signal crush_warning(count: int)  # pre-crush: 1-2 enemies in radius
+signal crush_breakout  # breakout burst発動
 
 func _update_crush(enemies: Array, delta: float) -> void:
 	# 半径内の敵をカウント（凍結中は除外）
@@ -210,39 +219,61 @@ func _update_crush(enemies: Array, delta: float) -> void:
 		if not is_instance_valid(e):
 			continue
 		if global_position.distance_to(e.global_position) <= CRUSH_RADIUS:
-			# 将来: 凍結中の敵は除外（freeze_remaining > 0）
 			crush_count += 1
 
 	var was_active := crush_active
 	crush_active = crush_count >= CRUSH_THRESHOLD
 
+	# Pre-crush warning（1-2 enemies in radius）
+	if not crush_active and crush_count > 0:
+		crush_warning.emit(crush_count)
+	elif crush_count == 0:
+		crush_warning.emit(0)
+
 	if crush_active != was_active:
 		crush_changed.emit(crush_active, crush_count)
 		if crush_active:
 			# Crush開始: 小ノックバック（逃げ道を作る）
+			crush_duration = 0.0
+			crush_breakout_ready = false
 			_crush_knockback(enemies)
+		else:
+			# Crush終了: duration リセット
+			crush_duration = 0.0
+			crush_breakout_ready = false
 
 	if not crush_active:
 		crush_tick_timer = 0.0
 		crush_invuln_timer = 0.0
 		return
 
+	# Crush duration追跡（escalation + breakout用）
+	crush_duration += delta
+
+	# Breakout burst: 3秒耐えたらburst発動
+	if not crush_breakout_ready and crush_duration >= CRUSH_BREAKOUT_TIME:
+		crush_breakout_ready = true
+		_do_crush_breakout(enemies)
+
 	# 無敵中はダメージスキップ
 	if crush_invuln_timer > 0:
 		crush_invuln_timer -= delta
 		return
 
-	# DPSティック
+	# DPSティック（時間経過でエスカレーション）
 	crush_tick_timer += delta
 	if crush_tick_timer >= CRUSH_TICK:
 		crush_tick_timer -= CRUSH_TICK
-		var dps := CRUSH_BASE_DPS + CRUSH_K_DPS * float(crush_count - 2)
-		var tick_dmg := dps * CRUSH_TICK
+		var base_dps := CRUSH_BASE_DPS + CRUSH_K_DPS * float(crush_count - 2)
+		# 時間経過で最大2倍までDPS増加（脱出の緊急性）
+		var escalation := 1.0 + minf(crush_duration * CRUSH_ESCALATION_RATE, 1.0)
+		var tick_dmg := base_dps * escalation * CRUSH_TICK
 		take_damage(tick_dmg)
 		crush_invuln_timer = CRUSH_INVULN
 
-		# 視覚: 赤フラッシュ（Crush中のみ）
-		modulate = Color(1.5, 0.4, 0.3, 1)
+		# 視覚: 赤フラッシュ（Crush中のみ、長いほど赤く）
+		var intensity := minf(1.0 + crush_duration * 0.15, 2.0)
+		modulate = Color(intensity, 0.4, 0.3, 1)
 		var tween := create_tween()
 		tween.tween_property(self, "modulate", Color.WHITE, 0.1)
 
@@ -256,6 +287,25 @@ func _crush_knockback(enemies: Array) -> void:
 			push_dir -= (e.global_position - global_position).normalized()
 	if push_dir.length() > 0:
 		position += push_dir.normalized() * 3.0
+
+func _do_crush_breakout(enemies: Array) -> void:
+	## Crush 3秒耐えたご褒美: 周囲に衝撃波ダメージ+ノックバック
+	crush_breakout.emit()
+	shake(6.0)
+
+	# 範囲内の全敵にダメージ+ノックバック
+	for e in enemies:
+		if not is_instance_valid(e):
+			continue
+		var enemy_pos: Vector2 = e.global_position
+		var dist: float = global_position.distance_to(enemy_pos)
+		if dist <= CRUSH_BREAKOUT_RADIUS:
+			if e.has_method("take_damage"):
+				e.take_damage(CRUSH_BREAKOUT_DAMAGE * damage_mult)
+			# ノックバック（距離に反比例）
+			var knockback_dir: Vector2 = (enemy_pos - global_position).normalized()
+			var knockback_force: float = CRUSH_BREAKOUT_KNOCKBACK * (1.0 - dist / CRUSH_BREAKOUT_RADIUS)
+			e.position += knockback_dir * knockback_force
 
 # --- Move AI パターン ---
 
