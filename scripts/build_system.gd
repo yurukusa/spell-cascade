@@ -11,6 +11,14 @@ var supports: Dictionary = {}     # id -> support data
 var prefixes: Array = []          # prefix mod pool
 var suffixes: Array = []          # suffix mod pool
 var synergies: Array = []         # synergy definitions
+var chips: Dictionary = {}        # id -> chip data
+
+# 装備中のBehavior Chips（カテゴリ -> chip_id）
+var equipped_chips: Dictionary = {
+	"move": "kite",
+	"attack": "aim_nearest",
+	"skill": "auto_cast",
+}
 
 func _ready() -> void:
 	_load_data()
@@ -27,6 +35,12 @@ func _load_data() -> void:
 	var syn_data: Variant = _load_json_raw("res://data/synergies.json")
 	if syn_data:
 		synergies = syn_data.get("synergies", [])
+
+	var chip_data: Variant = _load_json_raw("res://data/behavior_chips.json")
+	if chip_data:
+		for chip in chip_data.get("chips", []):
+			if chip.has("id"):
+				chips[chip["id"]] = chip
 
 func _load_json(path: String, array_key: String, id_key: String) -> Dictionary:
 	var result: Dictionary = {}
@@ -264,3 +278,22 @@ func get_random_support_ids(count: int, exclude: Array[String] = []) -> Array[St
 			available.append(id)
 	available.shuffle()
 	return available.slice(0, mini(count, available.size()))
+
+# --- Behavior Chips ---
+
+func get_chip(chip_id: String) -> Dictionary:
+	return chips.get(chip_id, {})
+
+func get_equipped_chip(category: String) -> Dictionary:
+	var chip_id: String = equipped_chips.get(category, "")
+	return get_chip(chip_id)
+
+func equip_chip(category: String, chip_id: String) -> void:
+	equipped_chips[category] = chip_id
+
+func get_chips_by_category(category: String) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for chip in chips.values():
+		if chip.get("category", "") == category:
+			result.append(chip)
+	return result

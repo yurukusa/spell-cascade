@@ -347,6 +347,41 @@ func _show_slot_choice(prompt: String, tower: Node2D, slots: Array[int], callbac
 		)
 		buttons_container.add_child(btn)
 
+# --- Behavior Chip選択 ---
+
+func show_chip_choice(category_label: String, chip_options: Array[Dictionary]) -> void:
+	_clear_buttons()
+	title_label.text = "Choose %s" % category_label
+
+	for chip in chip_options:
+		var btn := Button.new()
+		var rarity: String = chip.get("rarity", "common")
+		btn.text = "%s [%s]\n%s" % [
+			chip.get("name", "?"),
+			rarity.to_upper(),
+			chip.get("description", ""),
+		]
+		btn.custom_minimum_size = Vector2(400, 60)
+		btn.add_theme_font_size_override("font_size", 13)
+
+		var style := _make_chip_style(rarity)
+		btn.add_theme_stylebox_override("normal", style)
+		var hover := style.duplicate()
+		hover.bg_color = hover.bg_color.lightened(0.15)
+		btn.add_theme_stylebox_override("hover", hover)
+
+		var chip_id: String = chip.get("id", "")
+		btn.pressed.connect(_on_chip_chosen.bind(chip_id))
+		buttons_container.add_child(btn)
+
+	visible = true
+	get_tree().paused = true
+
+func _on_chip_chosen(chip_id: String) -> void:
+	get_tree().paused = false
+	hide_ui()
+	upgrade_chosen.emit({"type": "chip", "chip_id": chip_id})
+
 func hide_ui() -> void:
 	visible = false
 
@@ -390,6 +425,26 @@ func _make_mod_style(mod_type: String) -> StyleBoxFlat:
 	else:
 		style.bg_color = Color(0.08, 0.12, 0.2, 0.9)
 		style.border_color = Color(0.2, 0.35, 0.6, 0.8)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(4)
+	style.set_content_margin_all(8)
+	return style
+
+func _make_chip_style(rarity: String) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	match rarity:
+		"common":
+			style.bg_color = Color(0.12, 0.15, 0.2, 0.9)
+			style.border_color = Color(0.4, 0.5, 0.6, 0.8)
+		"uncommon":
+			style.bg_color = Color(0.08, 0.2, 0.12, 0.9)
+			style.border_color = Color(0.3, 0.7, 0.4, 0.8)
+		"rare":
+			style.bg_color = Color(0.2, 0.12, 0.25, 0.9)
+			style.border_color = Color(0.6, 0.3, 0.8, 0.8)
+		_:
+			style.bg_color = Color(0.15, 0.12, 0.2, 0.9)
+			style.border_color = Color(0.4, 0.4, 0.5, 0.8)
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(4)
 	style.set_content_margin_all(8)

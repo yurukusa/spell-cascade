@@ -1,0 +1,79 @@
+{
+  "_comment": "Behavior Chips: 操作機序そのものが装備。3カテゴリ×3+選択肢。",
+  "categories": ["move", "attack", "skill"],
+
+  "chips": [
+    {
+      "id": "kite",
+      "name": "Kite",
+      "category": "move",
+      "rarity": "common",
+      "description": "Keep distance from nearest enemy. Retreat when they get close.",
+      "params": {"safe_distance": 200, "retreat_speed_mult": 1.0}
+    },
+    {
+      "id": "orbit",
+      "name": "Orbit",
+      "category": "move",
+      "rarity": "common",
+      "description": "Circle around the nearest enemy group at a fixed distance.",
+      "params": {"orbit_distance": 150, "orbit_speed": 120}
+    },
+    {
+      "id": "greedy",
+      "name": "Greedy",
+      "category": "move",
+      "rarity": "common",
+      "description": "Prioritize moving toward drops and pickups.",
+      "params": {"pickup_range": 300, "fallback": "kite"}
+    },
+    {
+      "id": "aim_nearest",
+      "name": "Nearest",
+      "category": "attack",
+      "rarity": "common",
+      "description": "Always target the closest enemy.",
+      "params": {}
+    },
+    {
+      "id": "aim_highest_hp",
+      "name": "Highest HP",
+      "category": "attack",
+      "rarity": "common",
+      "description": "Focus fire on the enemy with the most health.",
+      "params": {}
+    },
+    {
+      "id": "aim_cluster",
+      "name": "Cluster",
+      "category": "attack",
+      "rarity": "uncommon",
+      "description": "Target the densest group of enemies for maximum splash value.",
+      "params": {"cluster_radius": 100}
+    },
+    {
+      "id": "auto_cast",
+      "name": "Auto Cast",
+      "category": "skill",
+      "rarity": "common",
+      "description": "Fire as soon as cooldown is ready. Simple and reliable.",
+      "params": {}
+    },
+    {
+      "id": "on_kill",
+      "name": "On Kill",
+      "category": "skill",
+      "rarity": "uncommon",
+      "description": "Fire only after killing an enemy. Chains feel amazing.",
+      "params": {"burst_count": 2}
+    },
+    {
+      "id": "panic",
+      "name": "Panic",
+      "category": "skill",
+      "rarity": "uncommon",
+      "description": "Fire rapidly when HP drops below 30%. Desperation mode.",
+      "params": {"hp_threshold": 0.3, "cooldown_mult": 0.5}
+    }
+  ]
+}

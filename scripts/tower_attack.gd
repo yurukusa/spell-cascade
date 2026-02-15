@@ -2,23 +2,37 @@ extends Node2D
 
 ## TowerAttack - タワーの各スロットの攻撃処理。
 ## BuildSystemから計算されたステータスに基づいて弾を生成。
+## Attack ChipとSkill Chipで照準と発動条件を制御。
 
 var slot_index: int = 0
 var stats: Dictionary = {}
 var timer := 0.0
 var is_first_strike := true
+var build_system: Node
+
+# Skill chip state
+var pending_on_kill := false  # on_kill チップ: キル後に発動待ち
 
 func setup(idx: int, calculated_stats: Dictionary) -> void:
 	slot_index = idx
 	stats = calculated_stats
 	timer = 0.0
 	is_first_strike = true
+	build_system = get_node("/root/BuildSystem")
+
+	# on_killトリガー接続
+	var tower_node := get_parent()
+	if tower_node and tower_node.has_signal("enemy_killed"):
+		if not tower_node.enemy_killed.is_connected(_on_enemy_killed):
+			tower_node.enemy_killed.connect(_on_enemy_killed)
 
 func _process(delta: float) -> void:
 	if stats.is_empty():
 		return
 
 	var cooldown: float = stats.get("cooldown", 1.0)
+	var skill_chip: Dictionary = build_system.get_equipped_chip("skill")
+	var skill_id: String = skill_chip.get("id", "auto_cast")
 
 	# first_strike_instant: アイドル後の最初の攻撃は即発動
 	if is_first_strike and stats.get("first_strike_instant", false):
@@ -26,11 +40,53 @@ func _process(delta: float) -> void:
 		_fire()
 		return
 
-	timer += delta
-	if timer >= cooldown:
-		timer -= cooldown
-		is_first_strike = false
-		_fire()
+	# Skill chipによる発動条件分岐
+	match skill_id:
+		"auto_cast":
+			# CD毎に自動発射
+			timer += delta
+			if timer >= cooldown:
+				timer -= cooldown
+				is_first_strike = false
+				_fire()
+
+		"on_kill":
+			# キル後にバースト発射
+			timer += delta
+			if pending_on_kill and timer >= cooldown:
+				timer -= cooldown
+				is_first_strike = false
+				var burst: int = skill_chip.get("params", {}).get("burst_count", 2)
+				for i in range(burst):
+					_fire()
+				pending_on_kill = false
+
+		"panic":
+			# HP低下時にCD短縮して連射
+			var tower_node := get_parent()
+			var hp_pct := 1.0
+			if tower_node and "hp" in tower_node and "max_hp" in tower_node:
+				hp_pct = tower_node.hp / tower_node.max_hp
+			var threshold: float = skill_chip.get("params", {}).get("hp_threshold", 0.3)
+			var cd_mult: float = skill_chip.get("params", {}).get("cooldown_mult", 0.5)
+			var effective_cd := cooldown
+			if hp_pct < threshold:
+				effective_cd = cooldown * cd_mult  # パニック時はCD半分
+			timer += delta
+			if timer >= effective_cd:
+				timer -= effective_cd
+				is_first_strike = false
+				_fire()
+
+		_:
+			# フォールバック: auto_cast
+			timer += delta
+			if timer >= cooldown:
+				timer -= cooldown
+				_fire()
+
+func _on_enemy_killed() -> void:
+	pending_on_kill = true
 
 func _fire() -> void:
 	# misfire判定
@@ -54,7 +110,7 @@ func _fire() -> void:
 		_fire_spread(8)
 		return
 
-	# 方向決定: 移動入力があれば移動方向、なければ最寄り敵
+	# Attack chipで方向決定
 	var direction := _get_aim_direction(enemies)
 	if direction == Vector2.ZERO:
 		return
@@ -79,24 +135,31 @@ func _fire_spread(directions: int) -> void:
 		_create_projectile(dir)
 
 func _get_aim_direction(enemies: Array) -> Vector2:
-	# プレイヤーが移動中 → 移動方向に撃つ（自分で狙う感覚）
-	var input_dir := Vector2.ZERO
-	if Input.is_action_pressed("move_up"):
-		input_dir.y -= 1
-	if Input.is_action_pressed("move_down"):
-		input_dir.y += 1
-	if Input.is_action_pressed("move_left"):
-		input_dir.x -= 1
-	if Input.is_action_pressed("move_right"):
-		input_dir.x += 1
+	## Attack chipに基づいてターゲット方向を決定
+	var attack_chip: Dictionary = build_system.get_equipped_chip("attack")
+	var attack_id: String = attack_chip.get("id", "aim_nearest")
 
-	if input_dir != Vector2.ZERO:
-		return input_dir.normalized()
+	match attack_id:
+		"aim_nearest":
+			var nearest := _find_nearest_enemy(enemies)
+			if nearest:
+				return (nearest.global_position - global_position).normalized()
 
-	# 停止中 → 最寄り敵をフォールバック（idle時の安全網）
-	var nearest := _find_nearest_enemy(enemies)
-	if nearest:
-		return (nearest.global_position - global_position).normalized()
+		"aim_highest_hp":
+			var target := _find_highest_hp_enemy(enemies)
+			if target:
+				return (target.global_position - global_position).normalized()
+
+		"aim_cluster":
+			var cluster_pos := _find_cluster_center(enemies, attack_chip.get("params", {}).get("cluster_radius", 100))
+			if cluster_pos != Vector2.ZERO:
+				return (cluster_pos - global_position).normalized()
+
+		_:
+			var nearest := _find_nearest_enemy(enemies)
+			if nearest:
+				return (nearest.global_position - global_position).normalized()
+
 	return Vector2.ZERO
 
 func _find_nearest_enemy(enemies: Array) -> Node2D:
@@ -113,6 +176,50 @@ func _find_nearest_enemy(enemies: Array) -> Node2D:
 			nearest = enemy
 
 	return nearest
+
+func _find_highest_hp_enemy(enemies: Array) -> Node2D:
+	var target: Node2D = null
+	var highest_hp := -1.0
+	var attack_range: float = stats.get("range", 200)
+
+	for enemy in enemies:
+		if not is_instance_valid(enemy):
+			continue
+		var dist := global_position.distance_to(enemy.global_position)
+		if dist > attack_range:
+			continue
+		var enemy_hp: float = enemy.get("hp") if "hp" in enemy else 0.0
+		if enemy_hp > highest_hp:
+			highest_hp = enemy_hp
+			target = enemy
+
+	return target
+
+func _find_cluster_center(enemies: Array, cluster_radius: float) -> Vector2:
+	## 最も密集している場所の重心を返す
+	var attack_range: float = stats.get("range", 200)
+	var best_center := Vector2.ZERO
+	var best_count := 0
+
+	for enemy in enemies:
+		if not is_instance_valid(enemy):
+			continue
+		if global_position.distance_to(enemy.global_position) > attack_range:
+			continue
+		# この敵の周りにどれだけ敵がいるか
+		var count := 0
+		var center := Vector2.ZERO
+		for other in enemies:
+			if not is_instance_valid(other):
+				continue
+			if enemy.global_position.distance_to(other.global_position) <= cluster_radius:
+				count += 1
+				center += other.global_position
+		if count > best_count:
+			best_count = count
+			best_center = center / float(count)
+
+	return best_center
 
 func _create_projectile(direction: Vector2) -> void:
 	var bullet := Area2D.new()
@@ -255,6 +362,12 @@ func _on_body_entered(body):
 
 	body.take_damage(damage)
 	hit_enemies.append(body)
+
+	# enemy_killed シグナル（on_killチップ用）
+	if \"hp\" in body and body.hp <= 0:
+		var tower := get_tree().current_scene.get_node_or_null(\"Tower\")
+		if tower and tower.has_signal(\"enemy_killed\"):
+			tower.enemy_killed.emit()
 
 	# Chain: 次の敵にバウンス
 	if chain_remaining > 0:

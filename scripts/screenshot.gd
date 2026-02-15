@@ -2,12 +2,15 @@ extends Node
 
 ## テストプレイ観察モード。
 ## 複数タイミングでスクショを撮り、ゲーム進行を記録。
+## 自動でアップグレードUIも処理し、フルゲームプレイを記録する。
 
 var timer := 0.0
 var phase := 0  # 0=wait_for_ui, 1=gameplay
-var screenshot_times: Array[float] = [3.0, 8.0, 15.0, 25.0, 40.0]
+var screenshot_times: Array[float] = [5.0, 12.0, 20.0, 30.0, 45.0]
 var screenshot_index := 0
 var gameplay_timer := 0.0
+var auto_dismiss_interval := 0.5  # 0.5秒ごとにUI確認
+var auto_dismiss_timer := 0.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -24,6 +27,14 @@ func _process(delta: float) -> void:
 
 	elif phase == 1:
 		gameplay_timer += delta
+
+		# 定期的にアップグレードUIを自動処理（ゲーム中に出てくるやつ）
+		auto_dismiss_timer += delta
+		if auto_dismiss_timer >= auto_dismiss_interval:
+			auto_dismiss_timer = 0.0
+			if get_tree().paused:
+				_auto_select_first_button()
+
 		if screenshot_index < screenshot_times.size():
 			if gameplay_timer >= screenshot_times[screenshot_index]:
 				_take_screenshot(screenshot_index)

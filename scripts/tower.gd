@@ -1,12 +1,13 @@
 extends CharacterBody2D
 
 ## Tower - プレイヤーアバター兼装備台。
-## WASD移動 + モジュールスロット。攻撃はアバターから発射。
-## PoEの「自分のビルドで自分が暴れる」を体現。
+## Behavior Chipsで制御されるAI移動。操作機序そのものが装備。
+## 「プログラムが装備品」= 知識は力。
 
 signal module_changed(slot_index: int)
 signal tower_damaged(current_hp: float, max_hp: float)
 signal tower_destroyed
+signal enemy_killed  # Skill chip "on_kill" トリガー用
 
 @export var max_hp := 500.0
 @export var max_slots := 3
@@ -14,30 +15,119 @@ signal tower_destroyed
 
 var hp: float
 var modules: Array = []  # Array of BuildSystem.TowerModule
+var build_system: Node
+
+# Move AI state
+var orbit_angle := 0.0  # Orbit chip用
 
 func _ready() -> void:
 	hp = max_hp
 	for i in range(max_slots):
 		modules.append(null)
+	build_system = get_node("/root/BuildSystem")
 
-func _physics_process(_delta: float) -> void:
-	var input_dir := Vector2.ZERO
-	if Input.is_action_pressed("move_up"):
-		input_dir.y -= 1
-	if Input.is_action_pressed("move_down"):
-		input_dir.y += 1
-	if Input.is_action_pressed("move_left"):
-		input_dir.x -= 1
-	if Input.is_action_pressed("move_right"):
-		input_dir.x += 1
+func _physics_process(delta: float) -> void:
+	var move_chip: Dictionary = build_system.get_equipped_chip("move")
+	var move_id: String = move_chip.get("id", "kite")
+	var move_dir := Vector2.ZERO
 
-	velocity = input_dir.normalized() * move_speed
+	var enemies := get_tree().get_nodes_in_group("enemies")
+
+	match move_id:
+		"kite":
+			move_dir = _ai_kite(enemies, move_chip.get("params", {}))
+		"orbit":
+			move_dir = _ai_orbit(enemies, move_chip.get("params", {}), delta)
+		"greedy":
+			move_dir = _ai_greedy(enemies, move_chip.get("params", {}))
+		_:
+			move_dir = _ai_kite(enemies, {})
+
+	velocity = move_dir * move_speed
 	move_and_slide()
 
 	# 画面外に出ないようクランプ
 	var vp := get_viewport_rect().size
 	position.x = clampf(position.x, 24.0, vp.x - 24.0)
 	position.y = clampf(position.y, 24.0, vp.y - 24.0)
+
+# --- Move AI パターン ---
+
+func _ai_kite(enemies: Array, params: Dictionary) -> Vector2:
+	## 最寄り敵から距離を取る。安全距離より近ければ逃げる。
+	if enemies.is_empty():
+		return Vector2.ZERO
+	var safe_dist: float = params.get("safe_distance", 200)
+	var nearest := _find_nearest_valid(enemies)
+	if nearest == null:
+		return Vector2.ZERO
+	var to_enemy := nearest.global_position - global_position
+	var dist := to_enemy.length()
+	if dist < safe_dist:
+		# 逃げる（敵と反対方向）
+		return -to_enemy.normalized()
+	elif dist < safe_dist * 1.5:
+		# 安全距離付近: 横に動いて円弧的に距離を保つ
+		return to_enemy.normalized().rotated(PI * 0.5)
+	return Vector2.ZERO  # 十分遠ければ止まる
+
+func _ai_orbit(enemies: Array, params: Dictionary, delta: float) -> Vector2:
+	## 敵群の重心を周回する。
+	if enemies.is_empty():
+		return Vector2.ZERO
+	var orbit_dist: float = params.get("orbit_distance", 150)
+	var orbit_spd: float = params.get("orbit_speed", 120)
+
+	# 敵群の重心
+	var center := Vector2.ZERO
+	var count := 0
+	for e in enemies:
+		if is_instance_valid(e):
+			center += e.global_position
+			count += 1
+	if count == 0:
+		return Vector2.ZERO
+	center /= float(count)
+
+	# 現在角度を更新
+	orbit_angle += orbit_spd * delta / orbit_dist
+	var target_pos := center + Vector2(cos(orbit_angle), sin(orbit_angle)) * orbit_dist
+	var to_target := target_pos - global_position
+	if to_target.length() < 5.0:
+		return Vector2.ZERO
+	return to_target.normalized()
+
+func _ai_greedy(_enemies: Array, params: Dictionary) -> Vector2:
+	## ドロップ品を優先回収。なければkiteにフォールバック。
+	var pickup_range: float = params.get("pickup_range", 300)
+	var pickups := get_tree().get_nodes_in_group("pickups")
+	if not pickups.is_empty():
+		var nearest_pickup: Node2D = null
+		var nearest_dist := pickup_range
+		for p in pickups:
+			if is_instance_valid(p):
+				var d := global_position.distance_to(p.global_position)
+				if d < nearest_dist:
+					nearest_dist = d
+					nearest_pickup = p
+		if nearest_pickup:
+			return (nearest_pickup.global_position - global_position).normalized()
+	# フォールバック: kite
+	return _ai_kite(_enemies, {"safe_distance": 200})
+
+func _find_nearest_valid(nodes: Array) -> Node2D:
+	var nearest: Node2D = null
+	var nearest_dist := INF
+	for node in nodes:
+		if not is_instance_valid(node):
+			continue
+		var dist := global_position.distance_to(node.global_position)
+		if dist < nearest_dist:
+			nearest_dist = dist
+			nearest = node
+	return nearest
+
+# --- Module API ---
 
 func get_module(slot: int):
 	if slot >= 0 and slot < modules.size():
