@@ -50,6 +50,9 @@ var indicator_pool: Array[Polygon2D] = []
 const MAX_INDICATORS := 8
 const SCREEN_MARGIN := 40.0  # 画面端からの余白
 const BOSS_DISTANCE := 100.0  # メートル（200mでは到達不可能だったため短縮）
+const BOSS_TIME_TRIGGER := 360.0  # 6分で距離未達でもボス出現（時間救済）
+const BOSS_WARNING_TIME := 350.0  # ボス10秒前予告
+var boss_warning_shown := false
 
 # 判断イベント管理
 var upgrade_events_given := 0
@@ -137,6 +140,9 @@ func _process(delta: float) -> void:
 	# 敵スポーン（縦スクロール: 上方スポーン中心）
 	spawn_timer += delta
 	var current_interval := maxf(spawn_interval - run_time * 0.002, 0.4)
+	# ボス出現後は雑魚スポーンを25%に抑制（ボス戦に集中）
+	if boss_spawned:
+		current_interval *= 4.0
 	if spawn_timer >= current_interval:
 		spawn_timer = 0.0
 		_spawn_enemy()
@@ -151,8 +157,13 @@ func _process(delta: float) -> void:
 			next_upgrade_time = INF
 		_show_upgrade_choice()
 
-	# ボスの出現判定
-	if not boss_spawned and distance_m >= BOSS_DISTANCE:
+	# ボス予告（350sで "BOSS IN 10s"）
+	if not boss_spawned and not boss_warning_shown and run_time >= BOSS_WARNING_TIME:
+		boss_warning_shown = true
+		_show_boss_warning()
+
+	# ボスの出現判定（距離100m OR 時間6:00）
+	if not boss_spawned and (distance_m >= BOSS_DISTANCE or run_time >= BOSS_TIME_TRIGGER):
 		_spawn_boss()
 
 	# 画面外敵インジケーター更新
@@ -474,6 +485,28 @@ func _setup_tower_attacks() -> void:
 		attack_node.setup(i, stats)
 
 # --- 敵スポーン ---
+
+func _show_boss_warning() -> void:
+	var label := Label.new()
+	label.text = "BOSS IN 10s"
+	label.add_theme_font_size_override("font_size", 28)
+	label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3, 1.0))
+	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	label.add_theme_constant_override("shadow_offset_x", 2)
+	label.add_theme_constant_override("shadow_offset_y", 2)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.position = Vector2(640 - 150, 160)
+	label.custom_minimum_size = Vector2(300, 0)
+	label.z_index = 200
+	ui_layer.add_child(label)
+	# パルスアニメーション→フェードアウト
+	var tween := label.create_tween()
+	tween.tween_property(label, "modulate:a", 0.3, 0.4).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(label, "modulate:a", 1.0, 0.4).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(label, "modulate:a", 0.3, 0.4).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(label, "modulate:a", 1.0, 0.4).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(label, "modulate:a", 0.0, 0.5).set_delay(0.5)
+	tween.tween_callback(label.queue_free)
 
 func _spawn_boss() -> void:
 	if enemy_scene == null:
