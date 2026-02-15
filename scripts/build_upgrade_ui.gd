@@ -419,6 +419,40 @@ func _on_chip_chosen(chip_id: String) -> void:
 	hide_ui()
 	upgrade_chosen.emit({"type": "chip", "chip_id": chip_id})
 
+# --- レベルアップ選択（VSライク） ---
+
+func show_levelup_choice(level: int, options: Array[Dictionary]) -> void:
+	_clear_buttons()
+	title_label.text = "LEVEL UP!  Lv.%d" % level
+
+	for opt in options:
+		var btn := Button.new()
+		btn.text = "%s\n%s" % [opt.get("name", "?"), opt.get("description", "")]
+		btn.custom_minimum_size = Vector2(400, 60)
+		btn.add_theme_font_size_override("font_size", 14)
+
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(0.12, 0.08, 0.25, 0.9)
+		style.border_color = Color(0.6, 0.5, 1.0, 0.8)
+		style.set_border_width_all(1)
+		style.set_corner_radius_all(5)
+		style.set_content_margin_all(10)
+		btn.add_theme_stylebox_override("normal", style)
+		var hover := style.duplicate()
+		hover.bg_color = hover.bg_color.lightened(0.15)
+		btn.add_theme_stylebox_override("hover", hover)
+
+		var opt_id: String = opt.get("id", "")
+		btn.pressed.connect(func() -> void:
+			get_tree().paused = false
+			hide_ui()
+			upgrade_chosen.emit({"type": "levelup", "stat_id": opt_id})
+		)
+		buttons_container.add_child(btn)
+
+	visible = true
+	get_tree().paused = true
+
 func hide_ui() -> void:
 	visible = false
 

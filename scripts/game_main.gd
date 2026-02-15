@@ -64,12 +64,15 @@ func _ready() -> void:
 
 	# XP表示接続
 	tower.xp_gained.connect(_on_xp_gained)
+	tower.level_up.connect(_on_level_up)
 
 	# Mirror War: 即スタート。初期スキルはFireball
 	var module: Variant = build_system.TowerModule.new("fireball")
 	tower.set_module(0, module)
 	_setup_tower_attacks()
 	_update_build_display()
+	var initial_xp_target: int = tower.get_xp_for_next_level()
+	wave_label.text = "Lv.1  XP: 0/%d" % initial_xp_target
 	game_started = true
 
 	# 最初の判断イベントタイミング（距離ベース）
@@ -252,6 +255,10 @@ func _on_upgrade_chosen(upgrade_data: Dictionary) -> void:
 	var upgrade_type: String = upgrade_data.get("type", "")
 
 	match upgrade_type:
+		"levelup":
+			var stat_id: String = upgrade_data.get("stat_id", "")
+			_apply_levelup_stat(stat_id)
+
 		"chip":
 			var chip_id: String = upgrade_data.get("chip_id", "")
 			var chip_data: Dictionary = build_system.get_chip(chip_id)
@@ -435,8 +442,9 @@ func _on_tower_damaged(current: float, max_val: float) -> void:
 		else:
 			fill_style.bg_color = Color(0.9, 0.2, 0.15, 1.0)  # red danger
 
-func _on_xp_gained(total_xp: int, _level: int) -> void:
-	wave_label.text = "XP: %d" % total_xp
+func _on_xp_gained(total_xp: int, current_level: int) -> void:
+	var next_xp: int = tower.get_xp_for_next_level()
+	wave_label.text = "Lv.%d  XP: %d/%d" % [current_level, total_xp, next_xp]
 
 func _on_crush_changed(active: bool, count: int) -> void:
 	if active:
@@ -444,6 +452,64 @@ func _on_crush_changed(active: bool, count: int) -> void:
 		crush_label.visible = true
 	else:
 		crush_label.visible = false
+
+# --- レベルアップ選択肢プール ---
+var levelup_pool: Array[Dictionary] = [
+	{"id": "damage", "name": "+25% Damage", "description": "All attacks deal 25% more damage"},
+	{"id": "fire_rate", "name": "+20% Fire Rate", "description": "Attack cooldown reduced by 20%"},
+	{"id": "projectile", "name": "+1 Projectile", "description": "Fire an extra projectile per attack"},
+	{"id": "move_speed", "name": "+15% Move Speed", "description": "Move 15% faster"},
+	{"id": "max_hp", "name": "+50 Max HP", "description": "Increase max HP by 50 and heal 50"},
+	{"id": "attract", "name": "+100 Attract Range", "description": "Pick up XP orbs from further away"},
+]
+
+func _on_level_up(new_level: int) -> void:
+	# 3つランダムに選んで表示
+	var pool := levelup_pool.duplicate()
+	pool.shuffle()
+	var choices: Array[Dictionary] = []
+	for i in range(mini(3, pool.size())):
+		choices.append(pool[i])
+	upgrade_ui.show_levelup_choice(new_level, choices)
+
+	# レベルアップフラッシュVFX
+	_spawn_levelup_vfx()
+
+func _apply_levelup_stat(stat_id: String) -> void:
+	match stat_id:
+		"damage":
+			tower.damage_mult *= 1.25
+		"fire_rate":
+			tower.cooldown_mult *= 0.8
+		"projectile":
+			tower.projectile_bonus += 1
+		"move_speed":
+			tower.move_speed_mult *= 1.15
+		"max_hp":
+			tower.max_hp += 50.0
+			tower.heal(50.0)
+			hp_bar.max_value = tower.max_hp
+		"attract":
+			tower.attract_range_bonus += 100.0
+
+func _spawn_levelup_vfx() -> void:
+	# 金色の拡散リングで「レベルアップ感」
+	var ring := Polygon2D.new()
+	var pts: PackedVector2Array = []
+	for i in range(16):
+		var a := i * TAU / 16
+		pts.append(Vector2(cos(a), sin(a)) * 20.0)
+	ring.polygon = pts
+	ring.color = Color(1.0, 0.9, 0.4, 0.6)
+	ring.global_position = tower.global_position
+	ring.z_index = 150
+	add_child(ring)
+
+	var tween := ring.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(ring, "scale", Vector2(4.0, 4.0), 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(ring, "modulate:a", 0.0, 0.4)
+	tween.chain().tween_callback(ring.queue_free)
 
 func _on_tower_destroyed() -> void:
 	game_over = true

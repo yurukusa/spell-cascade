@@ -26,7 +26,17 @@ var start_y := 0.0  # 開始Y位置
 # XP / レベル
 var xp := 0
 var level := 1
+# レベルアップに必要な累計XP（Lv2=10, Lv3=25, ...）
+var level_thresholds: Array[int] = [10, 25, 50, 80, 120, 170, 230, 300, 380, 470, 570, 680, 800]
 signal xp_gained(total_xp: int, level: int)
+signal level_up(new_level: int)
+
+# ステータス乗数（レベルアップで更新）
+var damage_mult := 1.0
+var cooldown_mult := 1.0
+var projectile_bonus := 0  # 追加弾数
+var move_speed_mult := 1.0
+var attract_range_bonus := 0.0  # オーブ吸引範囲追加
 
 # Crush state（包囲DPS）
 var crush_active := false
@@ -165,7 +175,7 @@ func _physics_process(delta: float) -> void:
 	if move_dir != Vector2.ZERO:
 		facing_dir = move_dir.normalized()
 
-	velocity = move_dir * move_speed
+	velocity = move_dir * move_speed * move_speed_mult
 	move_and_slide()
 
 	# X軸のみ画面内クランプ（Y軸は無制限 = 縦スクロール）
@@ -376,3 +386,16 @@ func take_damage(amount: float) -> void:
 func heal(amount: float) -> void:
 	hp = minf(hp + amount, max_hp)
 	tower_damaged.emit(hp, max_hp)
+
+func add_xp(amount: int) -> void:
+	xp += amount
+	xp_gained.emit(xp, level)
+	# レベルアップ判定（連続レベルアップ対応）
+	while level - 1 < level_thresholds.size() and xp >= level_thresholds[level - 1]:
+		level += 1
+		level_up.emit(level)
+
+func get_xp_for_next_level() -> int:
+	if level - 1 < level_thresholds.size():
+		return level_thresholds[level - 1]
+	return 9999  # 上限到達

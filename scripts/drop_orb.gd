@@ -71,8 +71,13 @@ func _process(delta: float) -> void:
 
 	var dist := global_position.distance_to(target.global_position)
 
+	# ターゲットのattract_range_bonusを加算
+	var effective_range := attract_range
+	if "attract_range_bonus" in target:
+		effective_range += target.attract_range_bonus
+
 	# 吸い寄せ範囲内か、2秒後は常に吸い寄せ
-	if dist < attract_range or lifetime < 4.0:
+	if dist < effective_range or lifetime < 4.0:
 		speed = minf(speed + acceleration * delta, max_speed)
 		var dir := (target.global_position - global_position).normalized()
 		position += dir * speed * delta
@@ -87,10 +92,8 @@ func _on_body_entered(body: Node2D) -> void:
 func _on_collected() -> void:
 	if orb_type == "chip":
 		_equip_auto_aim()
-	elif is_instance_valid(target) and "xp" in target:
-		target.xp += xp_value
-		if target.has_signal("xp_gained"):
-			target.xp_gained.emit(target.xp, target.level)
+	elif is_instance_valid(target) and target.has_method("add_xp"):
+		target.add_xp(xp_value)
 
 	# 回収エフェクト
 	var flash := Polygon2D.new()

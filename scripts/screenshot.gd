@@ -47,7 +47,7 @@ func _simulate_move_up() -> void:
 	# テスト用: タワーを直接上に移動させる（WASDシミュレート）
 	var tower := get_tree().current_scene.get_node_or_null("Tower")
 	if tower and is_instance_valid(tower):
-		tower.position.y -= 200.0 * get_process_delta_time()  # 200px/s上昇
+		tower.position.y -= 30.0 * get_process_delta_time()  # 30px/s上昇（テスト用: 敵が倒せる範囲で）
 		tower.distance_traveled = maxf(tower.start_y - tower.position.y, tower.distance_traveled)
 
 func _auto_select_first_button() -> void:

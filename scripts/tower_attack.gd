@@ -31,6 +31,10 @@ func _process(delta: float) -> void:
 		return
 
 	var cooldown: float = stats.get("cooldown", 1.0)
+	# レベルアップ乗数適用
+	var tower_node := get_parent()
+	if tower_node and "cooldown_mult" in tower_node:
+		cooldown *= tower_node.cooldown_mult
 	var skill_chip: Dictionary = build_system.get_equipped_chip("skill")
 	var skill_id: String = skill_chip.get("id", "auto_cast")
 
@@ -63,7 +67,6 @@ func _process(delta: float) -> void:
 
 		"panic":
 			# HP低下時にCD短縮して連射
-			var tower_node := get_parent()
 			var hp_pct := 1.0
 			if tower_node and "hp" in tower_node and "max_hp" in tower_node:
 				hp_pct = tower_node.hp / tower_node.max_hp
@@ -115,6 +118,10 @@ func _fire() -> void:
 	if direction == Vector2.ZERO:
 		return
 	var proj_count: int = stats.get("projectile_count", 1)
+	# レベルアップの追加弾数
+	var tower_ref := get_parent()
+	if tower_ref and "projectile_bonus" in tower_ref:
+		proj_count += tower_ref.projectile_bonus
 	var spread_angle: float = stats.get("spread_angle", 0)
 
 	if proj_count <= 1:
@@ -138,13 +145,13 @@ func _get_aim_direction(enemies: Array) -> Vector2:
 	## Attack chipに基づいてターゲット方向を決定
 	var attack_chip: Dictionary = build_system.get_equipped_chip("attack")
 	var attack_id: String = attack_chip.get("id", "manual_aim")
+	var tower_ref := get_parent()
 
 	match attack_id:
 		"manual_aim", "":
 			# 手動: プレイヤーの向いている方向に発射
-			var tower_node := get_parent()
-			if tower_node and "facing_dir" in tower_node:
-				return tower_node.facing_dir
+			if tower_ref and "facing_dir" in tower_ref:
+				return tower_ref.facing_dir
 			return Vector2.UP  # デフォルト: 上方向
 
 		"aim_nearest":
@@ -164,9 +171,8 @@ func _get_aim_direction(enemies: Array) -> Vector2:
 
 		_:
 			# フォールバック: 手動照準
-			var tower_node := get_parent()
-			if tower_node and "facing_dir" in tower_node:
-				return tower_node.facing_dir
+			if tower_ref and "facing_dir" in tower_ref:
+				return tower_ref.facing_dir
 			return Vector2.UP
 
 	return Vector2.ZERO
@@ -283,7 +289,11 @@ func _create_projectile(direction: Vector2) -> void:
 	bullet.set_script(script)
 	bullet.set("direction", direction)
 	bullet.set("speed", 350.0)
-	bullet.set("damage", stats.get("damage", 10))
+	var base_damage: float = stats.get("damage", 10)
+	var t := get_parent()
+	if t and "damage_mult" in t:
+		base_damage *= t.damage_mult
+	bullet.set("damage", int(base_damage))
 	bullet.set("lifetime", 3.0)
 	bullet.set("behaviors", stats.get("behaviors", []))
 	bullet.set("pierce_remaining", _get_pierce_count())
