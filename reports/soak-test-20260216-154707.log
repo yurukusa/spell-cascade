@@ -1,0 +1,52 @@
+[Soak 15:47:07] ============================================
+[Soak 15:47:07] Pipeline Orchestrator Soak Test v1
+[Soak 15:47:07] ============================================
+[Soak 15:47:07] Iterations: 10
+[Soak 15:47:07] With autotest: true
+[Soak 15:47:07] Results path: /tmp/godot_auto_test/results.json
+[Soak 15:47:07] 
+[Soak 15:47:07] Initial state: gate-log=290 lines, reports=7 files
+[Soak 15:47:07] 
+[Soak 15:47:07] --- Test 1: --help flag ---
+[Soak 15:47:07]   PASS: --help exits 0
+[Soak 15:47:07]   PASS: --help contains usage text
+[Soak 15:47:07] 
+[Soak 15:47:07] --- Test 2: Missing results error handling ---
+[Soak 15:47:07]   PASS: Missing results exits non-zero
+[Soak 15:47:07]   PASS: Error message mentions results
+[Soak 15:47:07] 
+[Soak 15:47:07] --- Test 3: --skip-run stability (10 iterations) ---
+[Soak 15:47:19]   PASS: All --skip-run iterations exit 0
+[Soak 15:47:19]   PASS: Reports created = iterations (10/10)
+[Soak 15:47:19]   PASS: Reports are unique (content varies)
+[Soak 15:47:19] 
+[Soak 15:47:19] --- Test 4: JSON output validity (10 iterations) ---
+[Soak 15:47:31]   PASS: All --json outputs are valid JSON
+[Soak 15:47:31] 
+[Soak 15:47:31] --- Test 5: --report-only mode ---
+[Soak 15:47:31]   PASS: --report-only exits 0
+[Soak 15:47:31]   PASS: --report-only shows SKIPPED
+[Soak 15:47:31] 
+[Soak 15:47:31] --- Test 6: Concurrent execution (3 parallel) ---
+[Soak 15:47:31]   PASS: Concurrent runs all succeed
+[Soak 15:47:31] 
+[Soak 15:47:31] --- Test 7: Gate-log integrity ---
+[Soak 15:47:31]   PASS: Gate-log is valid JSONL (50 entries)
+[Soak 15:47:31]   PASS: Gate-log has no duplicate timestamps (50/50)
+[Soak 15:47:31] 
+[Soak 15:47:31] --- Test 8: Resource leak check ---
+[Soak 15:47:32]   PASS: No file descriptor leak (diff=0)
+[Soak 15:47:32] 
+[Soak 15:47:32] --- Test 9: Live autotest run ---
+[Soak 15:48:36]   PASS: Live autotest completes within 3min
+[Soak 15:48:36]   PASS: Live autotest produces verdict
+[Soak 15:48:36] 
+[Soak 15:48:36] ============================================
+[Soak 15:48:36] Soak Test Summary
+[Soak 15:48:36] ============================================
+[Soak 15:48:36] PASS: 16 / 16
+[Soak 15:48:36] FAIL: 0
+[Soak 15:48:36] WARN: 0
+[Soak 15:48:36] Log: /home/namakusa/projects/spell-cascade/reports/soak-test-20260216-154707.log
+[Soak 15:48:36] 
+[Soak 15:48:36] VERDICT: PASS
