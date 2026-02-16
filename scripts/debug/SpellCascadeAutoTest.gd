@@ -28,8 +28,11 @@ var in_game := false
 var pressed_start := false
 var upgrade_auto_pick_timer := 0.0
 var log_lines: PackedStringArray = []
+var test_finished := false
 
 func _ready() -> void:
+	# ポーズ中もprocessを継続（アップグレード自動選択のため）
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	DirAccess.make_dir_recursive_absolute(OUTPUT_DIR)
 	_clear_output_dir()
 	print("[AutoTest] Spell Cascade自動テスト開始")
@@ -68,7 +71,10 @@ func _process(delta: float) -> void:
 
 	# ゲーム画面に遷移したか検出
 	if not in_game:
-		var tower = get_tree().current_scene.get_node_or_null("Tower")
+		var scene = get_tree().current_scene
+		if scene == null:
+			return
+		var tower = scene.get_node_or_null("Tower")
 		if tower:
 			in_game = true
 			test_start_time = Time.get_ticks_msec() / 1000.0
@@ -97,7 +103,8 @@ func _process(delta: float) -> void:
 	_collect_telemetry()
 
 	# 終了判定
-	if elapsed >= GAME_DURATION:
+	if elapsed >= GAME_DURATION and not test_finished:
+		test_finished = true
 		_finish_test()
 
 func _auto_pick_upgrade() -> void:
@@ -187,7 +194,7 @@ func _finish_test() -> void:
 	print("[AutoTest] === TEST RESULTS ===")
 
 	# チェック1: スキルが発射されたか
-	var any_fired := results.telemetry.total_fires > 0
+	var any_fired: bool = results.telemetry.total_fires > 0
 	results.checks["skills_fired"] = any_fired
 	if not any_fired:
 		results.pass = false
@@ -200,7 +207,7 @@ func _finish_test() -> void:
 		print("[AutoTest]   %s: %d fires" % [skill_name, count])
 
 	# チェック3: レベルアップが発生したか
-	var leveled := results.telemetry.level_ups > 0
+	var leveled: bool = results.telemetry.level_ups > 0
 	results.checks["level_ups_occurred"] = leveled
 	print("[AutoTest] Level ups: %d" % results.telemetry.level_ups)
 
