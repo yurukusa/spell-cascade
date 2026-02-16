@@ -1,7 +1,10 @@
 extends Node
 
-## SFX — ランタイム生成サウンドエフェクトマネージャー（Autoload）
-## WAVファイルのインポート不要。AudioStreamWAVでPCMデータを直接生成。
+## SFX — サウンドエフェクトマネージャー（Autoload）
+## WAVファイルがあればロード、なければランタイムPCM生成にフォールバック。
+## Why: pyfxr生成WAVはランタイム生成より音質が良い。フォールバックで堅牢性を確保。
+
+const SOUNDS_DIR := "res://assets/sounds/"
 
 # プレイヤープール
 var _shot_players: Array[AudioStreamPlayer] = []
@@ -24,7 +27,10 @@ var _bgm_player: AudioStreamPlayer
 var _wave_clear_player: AudioStreamPlayer
 var _boss_entrance_player: AudioStreamPlayer
 var _ui_cancel_player: AudioStreamPlayer
-var _damage_taken_player: AudioStreamPlayer
+# 被弾は複数バリアント（4種）をプールして自然なバリエーション
+var _damage_taken_players: Array[AudioStreamPlayer] = []
+const DAMAGE_POOL_SIZE := 4
+var _damage_idx := 0
 
 var _low_hp_cooldown := 0.0
 const LOW_HP_INTERVAL := 2.0
@@ -34,8 +40,18 @@ const DAMAGE_COOLDOWN := 0.15  # 被弾SE連続再生を制限（150ms間隔）
 
 const SAMPLE_RATE := 22050
 
+## WAVファイルロード: あればWAVを使い、なければnullを返す（呼び出し側でフォールバック）
+func _try_load_wav(filename: String) -> AudioStream:
+	var path := SOUNDS_DIR + filename
+	if ResourceLoader.exists(path):
+		return load(path)
+	return null
+
 func _ready() -> void:
-	var shot_stream := _gen_shot()
+	# Shot: pyfxr WAV (laser_alt) があればそれ、なければ procedural
+	var shot_stream: AudioStream = _try_load_wav("laser_alt.wav")
+	if shot_stream == null:
+		shot_stream = _gen_shot()
 	for i in SHOT_POOL_SIZE:
 		var p := AudioStreamPlayer.new()
 		p.stream = shot_stream
@@ -51,8 +67,12 @@ func _ready() -> void:
 		add_child(p)
 		_hit_players.append(p)
 
+	# Kill: pyfxr WAV (explosion) があればそれ、なければ procedural
+	var kill_stream: AudioStream = _try_load_wav("explosion.wav")
+	if kill_stream == null:
+		kill_stream = _gen_kill()
 	_kill_player = AudioStreamPlayer.new()
-	_kill_player.stream = _gen_kill()
+	_kill_player.stream = kill_stream
 	_kill_player.volume_db = -3.0
 	add_child(_kill_player)
 
@@ -66,15 +86,30 @@ func _ready() -> void:
 	_low_hp_player.volume_db = -4.0
 	add_child(_low_hp_player)
 
+	# Level Up: pyfxr WAV (upgrade_acquired) があればそれ、なければ procedural
+	var lvl_stream: AudioStream = _try_load_wav("upgrade_acquired.wav")
+	if lvl_stream == null:
+		lvl_stream = _gen_level_up()
 	_level_up_player = AudioStreamPlayer.new()
-	_level_up_player.stream = _gen_level_up()
+	_level_up_player.stream = lvl_stream
 	_level_up_player.volume_db = -2.0
 	add_child(_level_up_player)
 
-	var xp_stream := _gen_xp_pickup()
+	# XP Pickup: pyfxr WAV (xp_pickup_v1/v2) をプール、なければ procedural
+	var xp_streams: Array[AudioStream] = []
+	var xp_v1: AudioStream = _try_load_wav("xp_pickup_v1.wav")
+	var xp_v2: AudioStream = _try_load_wav("xp_pickup_v2.wav")
+	if xp_v1 != null:
+		xp_streams.append(xp_v1)
+	if xp_v2 != null:
+		xp_streams.append(xp_v2)
+	var xp_fallback: AudioStream = _gen_xp_pickup()
 	for i in XP_PICKUP_POOL_SIZE:
 		var p := AudioStreamPlayer.new()
-		p.stream = xp_stream
+		if xp_streams.size() > 0:
+			p.stream = xp_streams[i % xp_streams.size()]
+		else:
+			p.stream = xp_fallback
 		p.volume_db = -10.0
 		add_child(p)
 		_xp_pickup_players.append(p)
@@ -84,8 +119,12 @@ func _ready() -> void:
 	_bgm_player.volume_db = -12.0  # BGMは控えめに（SE優先）
 	add_child(_bgm_player)
 
+	# Wave Clear: pyfxr WAV (combo_tierup) があればそれ、なければ procedural
+	var wc_stream: AudioStream = _try_load_wav("combo_tierup.wav")
+	if wc_stream == null:
+		wc_stream = _gen_wave_clear()
 	_wave_clear_player = AudioStreamPlayer.new()
-	_wave_clear_player.stream = _gen_wave_clear()
+	_wave_clear_player.stream = wc_stream
 	_wave_clear_player.volume_db = -3.0
 	add_child(_wave_clear_player)
 
@@ -99,10 +138,23 @@ func _ready() -> void:
 	_ui_cancel_player.volume_db = -4.0
 	add_child(_ui_cancel_player)
 
-	_damage_taken_player = AudioStreamPlayer.new()
-	_damage_taken_player.stream = _gen_damage_taken()
-	_damage_taken_player.volume_db = -2.0  # 被弾は高優先: 他SEより大きめ
-	add_child(_damage_taken_player)
+	# Damage Taken: pyfxr WAVバリアント (player_damage v1-v4) をプール
+	# Why: 被弾は最重要フィードバック。4バリアントで反復疲労を防ぐ
+	var dmg_wavs: Array[AudioStream] = []
+	for suffix in ["", "_v2", "_v3", "_v4"]:
+		var wav: AudioStream = _try_load_wav("player_damage%s.wav" % suffix)
+		if wav != null:
+			dmg_wavs.append(wav)
+	var dmg_fallback: AudioStream = _gen_damage_taken()
+	for i in DAMAGE_POOL_SIZE:
+		var p := AudioStreamPlayer.new()
+		if dmg_wavs.size() > 0:
+			p.stream = dmg_wavs[i % dmg_wavs.size()]
+		else:
+			p.stream = dmg_fallback
+		p.volume_db = -2.0  # 被弾は高優先: 他SEより大きめ
+		add_child(p)
+		_damage_taken_players.append(p)
 
 func _process(delta: float) -> void:
 	if _low_hp_cooldown > 0.0:
@@ -167,8 +219,10 @@ func play_ui_cancel() -> void:
 
 func play_damage_taken() -> void:
 	if _damage_cooldown <= 0.0:
-		_damage_taken_player.pitch_scale = randf_range(0.85, 1.15)
-		_damage_taken_player.play()
+		var p := _damage_taken_players[_damage_idx]
+		p.pitch_scale = randf_range(0.85, 1.15)
+		p.play()
+		_damage_idx = (_damage_idx + 1) % DAMAGE_POOL_SIZE
 		_damage_cooldown = DAMAGE_COOLDOWN
 
 func play_low_hp_warning() -> void:
