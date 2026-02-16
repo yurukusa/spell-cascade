@@ -18,3 +18,13 @@
   "peak_enemies": 8,
   "reasons": "pacing_warn"
 }
+{
+  "timestamp": "2026-02-16T13:39:17+09:00",
+  "verdict": "GO",
+  "tier2_score": "3/4",
+  "damage_taken": 0,
+  "lowest_hp_pct": "1",
+  "avg_levelup_interval": "9.7",
+  "peak_enemies": 6,
+  "reasons": "difficulty_floor_warn"
+}

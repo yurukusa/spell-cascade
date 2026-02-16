@@ -3,6 +3,7 @@ extends Node
 ## godot-testから読み込まれ、AutoPlayer.gdの代わりに使用する。
 ## タイトル画面通過→ゲームプレイ→テレメトリ検証→スクショ→結果出力の一連のフロー。
 ## v0.2.4: 品質指標（Difficulty Curve, Reward Timing）の自動出力追加
+## v0.3: Feel Scorecard（Dead Time, Action Density, Reward Frequency）追加
 
 const OUTPUT_DIR = "/tmp/godot_auto_test/"
 const SCREENSHOT_INTERVAL = 10.0
@@ -29,6 +30,13 @@ var qm_lowest_hp_pct := 1.0             # 最低HP割合
 var qm_enemy_count_samples: Array = []   # [{t, count}] 5秒間隔
 var qm_levelup_timestamps: Array = []    # レベルアップ発生時刻（秒）
 var qm_upgrade_menu_total_time := 0.0    # メニュー滞在秒数（疲労指標）
+
+# Feel Scorecard（v0.3）
+var feel_event_timestamps: Array[float] = []  # 全イベントのタイムスタンプ
+var feel_kill_count := 0                      # キル数（action density計算用）
+var feel_xp_pickup_count := 0                 # XP回収数（reward frequency計算用）
+var _last_kill_count := 0                     # 前フレームのkill_count
+var _last_xp := 0                            # 前フレームのXP（回収検出用）
 
 var test_start_time := 0.0
 var screenshot_timer := 0.0
@@ -147,10 +155,28 @@ func _collect_quality_metrics(elapsed: float, delta: float) -> void:
 		var max_hp_val: float = tower.max_hp
 		if _last_hp >= 0.0 and cur_hp < _last_hp:
 			qm_damage_taken_count += 1
+			feel_event_timestamps.append(elapsed)  # 被ダメもイベント
 		_last_hp = cur_hp
 		var hp_pct: float = cur_hp / maxf(max_hp_val, 1.0)
 		if hp_pct < qm_lowest_hp_pct:
 			qm_lowest_hp_pct = hp_pct
+
+	# Feel Scorecard: キル数/XP回収追跡
+	var game_main = scene
+	if "kill_count" in game_main:
+		var cur_kills: int = game_main.kill_count
+		if cur_kills > _last_kill_count:
+			var new_kills := cur_kills - _last_kill_count
+			feel_kill_count += new_kills
+			for _k in range(new_kills):
+				feel_event_timestamps.append(elapsed)
+			_last_kill_count = cur_kills
+	if "xp" in tower:
+		var cur_xp: int = tower.xp
+		if cur_xp > _last_xp and _last_xp >= 0:
+			feel_xp_pickup_count += 1
+			feel_event_timestamps.append(elapsed)
+		_last_xp = cur_xp
 
 	# 定期サンプリング（5秒間隔）
 	_metric_sample_timer += delta
@@ -332,6 +358,54 @@ func _finish_test() -> void:
 
 	print("[AutoTest] === END QUALITY METRICS ===")
 
+	# --- Feel Scorecard ---
+	print("[AutoTest] === FEEL SCORECARD ===")
+
+	# Dead Time: max gap between events
+	feel_event_timestamps.sort()
+	var dead_time := 0.0
+	if feel_event_timestamps.size() >= 2:
+		for idx in range(1, feel_event_timestamps.size()):
+			var gap: float = feel_event_timestamps[idx] - feel_event_timestamps[idx - 1]
+			dead_time = maxf(dead_time, gap)
+	var dead_time_rating := "EXCELLENT"
+	if dead_time > 10.0:
+		dead_time_rating = "FAIL"
+	elif dead_time > 5.0:
+		dead_time_rating = "WARN"
+	elif dead_time > 3.0:
+		dead_time_rating = "GOOD"
+	print("[AutoTest] Dead Time: %.1fs (%s)" % [dead_time, dead_time_rating])
+
+	# Action Density: events per second
+	var total_events: int = results.telemetry.total_fires + feel_kill_count + feel_xp_pickup_count + results.telemetry.level_ups
+	var action_density: float = float(total_events) / maxf(GAME_DURATION, 1.0)
+	var density_rating := "GOOD"
+	if action_density < 1.0:
+		density_rating = "BORING"
+	elif action_density > 15.0:
+		density_rating = "CHAOTIC"
+	elif action_density > 8.0:
+		density_rating = "INTENSE"
+	print("[AutoTest] Action Density: %.1f events/s (%s) [fires=%d kills=%d pickups=%d levelups=%d]" % [
+		action_density, density_rating,
+		results.telemetry.total_fires, feel_kill_count,
+		feel_xp_pickup_count, results.telemetry.level_ups,
+	])
+
+	# Reward Frequency: XP pickups per minute
+	var reward_freq: float = float(feel_xp_pickup_count) / maxf(GAME_DURATION / 60.0, 0.01)
+	var reward_rating := "GOOD"
+	if reward_freq < 10.0:
+		reward_rating = "SPARSE"
+	elif reward_freq > 100.0:
+		reward_rating = "OVERWHELMING"
+	elif reward_freq > 60.0:
+		reward_rating = "ABUNDANT"
+	print("[AutoTest] Reward Frequency: %.0f pickups/min (%s)" % [reward_freq, reward_rating])
+
+	print("[AutoTest] === END FEEL SCORECARD ===")
+
 	# 品質指標をresultsに統合（JSON出力用）
 	results["quality_metrics"] = {
 		"hp_samples": qm_hp_samples,
@@ -343,6 +417,20 @@ func _finish_test() -> void:
 		"upgrade_menu_total_time": qm_upgrade_menu_total_time,
 		"difficulty_rating": diff_rating,
 		"fatigue_rating": fatigue_rating,
+	}
+
+	# Feel Scorecard をresultsに追加
+	results["feel_scorecard"] = {
+		"dead_time": snappedf(dead_time, 0.1),
+		"dead_time_rating": dead_time_rating,
+		"action_density": snappedf(action_density, 0.1),
+		"action_density_rating": density_rating,
+		"reward_frequency": snappedf(reward_freq, 0.1),
+		"reward_frequency_rating": reward_rating,
+		"total_events": total_events,
+		"kill_count": feel_kill_count,
+		"xp_pickup_count": feel_xp_pickup_count,
+		"event_count": feel_event_timestamps.size(),
 	}
 
 	# 全体判定
