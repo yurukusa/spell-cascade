@@ -342,38 +342,61 @@ func _update_build_display() -> void:
 	var skill_chip: Dictionary = build_system.get_equipped_chip("skill")
 	var move_name: String = move_chip.get("name", "Manual") if not move_chip.is_empty() else "Manual"
 	var attack_name: String = attack_chip.get("name", "Manual Aim") if not attack_chip.is_empty() else "Manual Aim"
-	lines.append("Move: %s / Aim: %s / Cast: %s" % [
+	var skill_chip_name: String = skill_chip.get("name", "Auto Cast") if not skill_chip.is_empty() else "Auto Cast"
+	lines.append("Move: %s | Aim: %s | Trigger: %s" % [
 		move_name,
 		attack_name,
-		skill_chip.get("name", "Auto"),
+		skill_chip_name,
 	])
+
+	# Projectile bonus（+1 Projectile取得時に表示）
+	if tower.projectile_bonus > 0:
+		lines.append("+%d Projectile" % tower.projectile_bonus)
 	lines.append("")
 
-	# スキルスロット
+	# スキルスロット（トリガー情報付き）
 	for i in range(tower.max_slots):
 		var module: Variant = tower.get_module(i)
 		if module == null:
-			lines.append("Slot %d: [Empty]" % (i + 1))
+			lines.append("[%d] empty" % (i + 1))
 		else:
 			var stats: Dictionary = build_system.calculate_module_stats(module)
 			var skill_name: String = stats.get("name", "?")
-			var sup_names: PackedStringArray = []
+			var cd: float = stats.get("cooldown", 1.0)
+			if "cooldown_mult" in tower:
+				cd *= tower.cooldown_mult
+			var proj_count: int = stats.get("projectile_count", 1) + tower.projectile_bonus
+			# トリガー＋CD＋弾数の1行サマリー
+			var trigger_info := "%.1fs" % cd
+			if proj_count > 1:
+				trigger_info += " x%d" % proj_count
+			# 特殊効果タグ
+			var effects: PackedStringArray = []
+			var on_hit: Dictionary = stats.get("on_hit", {})
+			if on_hit.has("slow"):
+				effects.append("Slow")
+			if on_hit.has("dot_damage"):
+				effects.append("DoT")
+			if stats.get("pierce", false):
+				effects.append("Pierce")
+			if stats.get("area_radius", 0) > 0:
+				effects.append("AoE")
+			var effect_str := ""
+			if not effects.is_empty():
+				effect_str = " [%s]" % ", ".join(effects)
+			# サポート＋Mod
+			var extras: PackedStringArray = []
 			for sup_id in module.support_ids:
 				var sup_data: Dictionary = build_system.supports.get(sup_id, {})
-				sup_names.append(sup_data.get("name", sup_id))
-			var mod_info := ""
+				extras.append(sup_data.get("name", sup_id))
 			if not module.prefix.is_empty():
-				mod_info += module.prefix.get("name", "")
+				extras.append(module.prefix.get("name", ""))
 			if not module.suffix.is_empty():
-				if mod_info != "":
-					mod_info += " "
-				mod_info += module.suffix.get("name", "")
-			var link_str := ""
-			if not sup_names.is_empty():
-				link_str = " + " + " + ".join(sup_names)
-			if mod_info != "":
-				link_str += " [%s]" % mod_info
-			lines.append("Slot %d: %s%s" % [(i + 1), skill_name, link_str])
+				extras.append(module.suffix.get("name", ""))
+			var extras_str := ""
+			if not extras.is_empty():
+				extras_str = " + " + ", ".join(extras)
+			lines.append("[%d] %s (%s)%s%s" % [(i + 1), skill_name, trigger_info, effect_str, extras_str])
 
 	# シナジー表示
 	var filled: Array = tower.get_filled_modules()

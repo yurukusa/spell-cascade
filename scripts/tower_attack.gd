@@ -138,8 +138,13 @@ func _fire() -> void:
 			_create_projectile(dir)
 
 func _fire_spread(directions: int) -> void:
-	for i in range(directions):
-		var angle := i * TAU / directions
+	# projectile_bonusを反映（spread/areaパスでも+1 Projectileが効くように）
+	var total := directions
+	var tower_ref := get_parent()
+	if tower_ref and "projectile_bonus" in tower_ref:
+		total += tower_ref.projectile_bonus
+	for i in range(total):
+		var angle := i * TAU / total
 		var dir := Vector2(cos(angle), sin(angle))
 		_create_projectile(dir)
 
@@ -393,29 +398,44 @@ func _visual_ice_shard(bullet: Area2D, color: Color, direction: Vector2) -> void
 	bullet.add_child(highlight)
 
 func _visual_spark(bullet: Area2D, color: Color) -> void:
-	## スパーク: 小さな電気球 + ジグザグのフリッカー
-	# 電気オーラ（不規則な形）
+	## スパーク: 電気球 + 稲妻の腕（視認性強化版）
+	# 電気オーラ（大きめ、明るめ）
 	var glow := Polygon2D.new()
 	var glow_pts: PackedVector2Array = []
 	for i in range(8):
 		var a := i * TAU / 8
-		var r := randf_range(12.0, 20.0)  # 不規則な半径
+		var r := randf_range(16.0, 26.0)
 		glow_pts.append(Vector2(cos(a), sin(a)) * r)
 	glow.polygon = glow_pts
-	glow.color = Color(1.0, 1.0, 0.4, 0.2)
+	glow.color = Color(1.0, 1.0, 0.4, 0.35)
 	bullet.add_child(glow)
 
-	# 電気コア（小さめ）
+	# 電気コア（大きめ）
 	var core := Polygon2D.new()
-	core.polygon = _make_ngon(5, 7.0)
+	core.polygon = _make_ngon(5, 10.0)
 	core.color = color
 	bullet.add_child(core)
 
 	# 中心のホットスポット
 	var hot := Polygon2D.new()
-	hot.polygon = _make_ngon(4, 3.0)
+	hot.polygon = _make_ngon(4, 4.0)
 	hot.color = Color(1.0, 1.0, 0.9, 1.0)
 	bullet.add_child(hot)
+
+	# 稲妻の腕（3本のジグザグ線で電気感を強調）
+	for j in range(3):
+		var bolt := Line2D.new()
+		bolt.width = 2.0
+		bolt.default_color = Color(1.0, 1.0, 0.5, 0.7)
+		var base_angle := float(j) * TAU / 3.0
+		var pts: PackedVector2Array = [Vector2.ZERO]
+		var pos := Vector2.ZERO
+		for k in range(2):
+			pos += Vector2(cos(base_angle), sin(base_angle)) * randf_range(6.0, 10.0)
+			pos += Vector2(randf_range(-3, 3), randf_range(-3, 3))
+			pts.append(pos)
+		bolt.points = pts
+		bullet.add_child(bolt)
 
 func _visual_poison(bullet: Area2D, color: Color) -> void:
 	## 毒弾: 不定形のぶよぶよした球体

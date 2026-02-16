@@ -44,8 +44,10 @@ func _next_wave() -> void:
 	wave_active = true
 	wave_started.emit(current_wave)
 
-	# 敵数: Wave * 3 + 2
+	# 敵数: Wave * 3 + 2（後半はさらに増加）
 	var enemy_count := current_wave * 3 + 2
+	if current_wave > 10:
+		enemy_count += (current_wave - 10) * 2
 	enemies_alive = enemy_count
 
 	for i in range(enemy_count):
@@ -74,8 +76,10 @@ func _spawn_enemy() -> void:
 
 	enemy.position = spawn_pos
 
-	# Wave に応じてスケール
-	var hp_scale := 1.0 + (current_wave - 1) * 0.15
+	# Wave に応じてスケール（線形+二次曲線でプレイヤー火力に追従）
+	var hp_scale := 1.0 + (current_wave - 1) * 0.2
+	if current_wave > 5:
+		hp_scale += pow((current_wave - 5) * 0.15, 2)
 	var speed_scale := 1.0 + (current_wave - 1) * 0.05
 
 	enemy.init(player, 80.0 * speed_scale, 30.0 * hp_scale, 10.0)
