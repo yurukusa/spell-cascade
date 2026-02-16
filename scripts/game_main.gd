@@ -121,6 +121,7 @@ func _ready() -> void:
 	var initial_xp_target: int = tower.get_xp_for_next_level()
 	wave_label.text = "Lv.1  XP: 0/%d" % initial_xp_target
 	game_started = true
+	SFX.play_bgm()
 
 	# Onboarding overlay（操作説明 + 目的）
 	_show_onboarding()
@@ -765,6 +766,7 @@ func _spawn_boss() -> void:
 	if enemy_scene == null:
 		return
 	boss_spawned = true
+	SFX.play_boss_entrance()
 
 	var boss := enemy_scene.instantiate() as CharacterBody2D
 	# ボスは上方から出現
@@ -814,6 +816,7 @@ func _on_boss_died(_enemy: Node2D) -> void:
 	enemies_alive -= 1
 	kill_count += 1
 	tower.enemy_killed.emit()
+	SFX.play_wave_clear()
 	# ボス撃破: 大きなシェイク
 	tower.shake(8.0)
 	# コンボ: ボスは+3カウント
@@ -1431,6 +1434,8 @@ func _show_milestone(meters: int) -> void:
 	tween.tween_property(label, "modulate:a", 0.0, 0.5)
 	tween.tween_callback(label.queue_free)
 
+	SFX.play_wave_clear()
+
 	# 画面フラッシュ（白く一瞬光る）
 	var flash := ColorRect.new()
 	flash.color = Color(0.4, 0.8, 1.0, 0.15)
@@ -1444,10 +1449,12 @@ func _show_milestone(meters: int) -> void:
 
 func _on_tower_destroyed() -> void:
 	game_over = true
+	SFX.stop_bgm()
 	_show_result_screen(false)
 
 func _win_game() -> void:
 	game_over = true
+	SFX.stop_bgm()
 	_show_result_screen(true)
 
 func _show_result_screen(is_victory: bool) -> void:
@@ -1637,4 +1644,5 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.keycode == KEY_ESCAPE and not game_over:
 			get_tree().paused = not get_tree().paused
 			if get_tree().paused:
+				SFX.play_ui_cancel()
 				wave_label.text = "PAUSED"

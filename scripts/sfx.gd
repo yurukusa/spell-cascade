@@ -20,8 +20,14 @@ const HIT_POOL_SIZE := 6
 var _shot_idx := 0
 var _hit_idx := 0
 
+var _bgm_player: AudioStreamPlayer
+var _wave_clear_player: AudioStreamPlayer
+var _boss_entrance_player: AudioStreamPlayer
+var _ui_cancel_player: AudioStreamPlayer
+
 var _low_hp_cooldown := 0.0
 const LOW_HP_INTERVAL := 2.0
+var _bgm_playing := false
 
 const SAMPLE_RATE := 22050
 
@@ -70,6 +76,26 @@ func _ready() -> void:
 		add_child(p)
 		_xp_pickup_players.append(p)
 
+	_bgm_player = AudioStreamPlayer.new()
+	_bgm_player.stream = _gen_bgm()
+	_bgm_player.volume_db = -12.0  # BGMは控えめに（SE優先）
+	add_child(_bgm_player)
+
+	_wave_clear_player = AudioStreamPlayer.new()
+	_wave_clear_player.stream = _gen_wave_clear()
+	_wave_clear_player.volume_db = -3.0
+	add_child(_wave_clear_player)
+
+	_boss_entrance_player = AudioStreamPlayer.new()
+	_boss_entrance_player.stream = _gen_boss_entrance()
+	_boss_entrance_player.volume_db = -2.0
+	add_child(_boss_entrance_player)
+
+	_ui_cancel_player = AudioStreamPlayer.new()
+	_ui_cancel_player.stream = _gen_ui_cancel()
+	_ui_cancel_player.volume_db = -4.0
+	add_child(_ui_cancel_player)
+
 func _process(delta: float) -> void:
 	if _low_hp_cooldown > 0.0:
 		_low_hp_cooldown -= delta
@@ -109,6 +135,25 @@ func play_level_up() -> void:
 	_level_up_player.pitch_scale = randf_range(0.95, 1.05)
 	_level_up_player.play()
 	_xp_pitch_streak = 0.0  # レベルアップでリセット
+
+func play_bgm() -> void:
+	if not _bgm_playing:
+		_bgm_player.play()
+		_bgm_playing = true
+
+func stop_bgm() -> void:
+	_bgm_player.stop()
+	_bgm_playing = false
+
+func play_wave_clear() -> void:
+	_wave_clear_player.pitch_scale = randf_range(0.95, 1.05)
+	_wave_clear_player.play()
+
+func play_boss_entrance() -> void:
+	_boss_entrance_player.play()
+
+func play_ui_cancel() -> void:
+	_ui_cancel_player.play()
 
 func play_low_hp_warning() -> void:
 	if _low_hp_cooldown <= 0.0:
@@ -276,5 +321,132 @@ func _gen_xp_pickup() -> AudioStreamWAV:
 			env = (dur - t) / 0.015
 		var s := env * 0.3 * sin(TAU * freq * t)
 		s += env * 0.1 * sin(TAU * freq * 1.5 * t)
+		samples[i] = s
+	return _make_stream(samples)
+
+## BGM: ダークアンビエントループ (8s)
+## Am調のベースドローン + 4音アルペジオパターンで不穏なムードを維持
+## ループ再生前提: AudioStreamWAV.loop_mode = LOOP_FORWARD
+func _gen_bgm() -> AudioStreamWAV:
+	var dur := 8.0
+	var count := int(SAMPLE_RATE * dur)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	# Am系: A2=110, C3=130.81, E3=164.81, A3=220
+	var bass_freq := 110.0  # A2 ドローン
+	# 4音アルペジオ (Am): A3, C4, E4, A4
+	var arp_notes := [220.0, 261.63, 329.63, 440.0]
+	var arp_speed := 0.5  # 1ノート0.5s = 2sで1サイクル
+	for i in count:
+		var t := float(i) / SAMPLE_RATE
+		var s := 0.0
+		# ベースドローン: 低周波のうねりを持つサイン波
+		var bass_lfo := 1.0 + 0.02 * sin(TAU * 0.3 * t)
+		s += 0.25 * sin(TAU * bass_freq * bass_lfo * t)
+		# ベースの5度上 (E3) をうっすら
+		s += 0.08 * sin(TAU * 164.81 * t)
+		# アルペジオ: 時間に応じたノート選択
+		var arp_idx := int(t / arp_speed) % 4
+		var arp_t := fmod(t, arp_speed)
+		var arp_freq: float = arp_notes[arp_idx]
+		# ノートごとのエンベロープ（立ち上がり + 減衰）
+		var arp_env := 0.0
+		if arp_t < 0.02:
+			arp_env = arp_t / 0.02
+		else:
+			arp_env = exp(-(arp_t - 0.02) * 4.0)
+		# アルペジオを控えめに + 倍音
+		s += 0.12 * arp_env * sin(TAU * arp_freq * t)
+		s += 0.04 * arp_env * sin(TAU * arp_freq * 2.0 * t)
+		# パッド: フィルタードノイズ風（低周波ノイズの擬似）
+		# LFO変調した低いサイン波2つの干渉でパッド感を出す
+		var pad_lfo := sin(TAU * 0.1 * t)
+		s += 0.06 * sin(TAU * (130.81 + pad_lfo * 2.0) * t)
+		s += 0.04 * sin(TAU * (196.0 + pad_lfo * 1.5) * t)  # G3
+		# 全体のスロウLFO（呼吸感）
+		var breath := 0.85 + 0.15 * sin(TAU * 0.125 * t)  # 8s cycle
+		samples[i] = s * breath * 0.6
+	var stream := _make_stream(samples)
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_begin = 0
+	stream.loop_end = count
+	return stream
+
+## Wave Clear: 勝利の短いファンファーレ (0.4s)
+## 上昇5音: C5→D5→E5→G5→C6（メジャー感で達成感）
+func _gen_wave_clear() -> AudioStreamWAV:
+	var dur := 0.4
+	var count := int(SAMPLE_RATE * dur)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var notes := [523.25, 587.33, 659.25, 783.99, 1046.50]
+	var note_dur := 0.07
+	for i in count:
+		var t := float(i) / SAMPLE_RATE
+		var note_idx := mini(int(t / note_dur), 4)
+		var note_t := t - note_idx * note_dur
+		var freq: float = notes[note_idx]
+		var note_env := 1.0
+		if note_t < 0.003:
+			note_env = note_t / 0.003
+		if note_idx < 4 and note_t > note_dur - 0.008:
+			note_env = (note_dur - note_t) / 0.008
+		if note_idx == 4:
+			note_env *= exp(-note_t * 5.0)
+		var global_env := 1.0
+		if t > dur - 0.06:
+			global_env = (dur - t) / 0.06
+		var s := global_env * note_env * 0.35 * sin(TAU * freq * t)
+		s += global_env * note_env * 0.12 * sin(TAU * freq * 2.0 * t)
+		# 3度ハーモニー（メジャー感を強調）
+		s += global_env * note_env * 0.08 * sin(TAU * freq * 1.25 * t)
+		samples[i] = s
+	return _make_stream(samples)
+
+## Boss Entrance: ドラマチックな低音インパクト (0.6s)
+## 低い轟音 + 金属的なリング + 不穏な下降
+func _gen_boss_entrance() -> AudioStreamWAV:
+	var dur := 0.6
+	var count := int(SAMPLE_RATE * dur)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	for i in count:
+		var t := float(i) / SAMPLE_RATE
+		# 低い轟音（指数減衰）
+		var rumble := 0.5 * sin(TAU * 55.0 * t) * exp(-t * 3.0)
+		rumble += 0.3 * sin(TAU * 82.5 * t) * exp(-t * 4.0)
+		# 金属的なリング（高周波、長い減衰）
+		var ring := 0.2 * sin(TAU * 1200.0 * t) * exp(-t * 8.0)
+		ring += 0.1 * sin(TAU * 1800.0 * t) * exp(-t * 10.0)
+		# 不穏な下降スイープ
+		var sweep_freq := 400.0 * exp(-t * 5.0) + 80.0
+		var sweep := 0.15 * sin(TAU * sweep_freq * t) * exp(-t * 4.0)
+		# インパクトの瞬間（最初の20ms）
+		var impact := 0.0
+		if t < 0.02:
+			impact = 0.4 * (1.0 - t / 0.02) * sin(TAU * 3000.0 * t)
+		var s := rumble + ring + sweep + impact
+		# 全体エンベロープ
+		if t > dur - 0.1:
+			s *= (dur - t) / 0.1
+		samples[i] = s
+	return _make_stream(samples)
+
+## UI Cancel: ソフトな下降ブリップ (0.08s)
+func _gen_ui_cancel() -> AudioStreamWAV:
+	var dur := 0.08
+	var count := int(SAMPLE_RATE * dur)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	for i in count:
+		var t := float(i) / SAMPLE_RATE
+		# 下降周波数（select の逆）
+		var freq := 660.0 - 300.0 * (t / dur)
+		var env := 1.0
+		if t < 0.003:
+			env = t / 0.003
+		elif t > dur - 0.03:
+			env = (dur - t) / 0.03
+		var s := env * 0.35 * sin(TAU * freq * t)
 		samples[i] = s
 	return _make_stream(samples)
