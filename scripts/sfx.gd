@@ -57,14 +57,20 @@ func _process(delta: float) -> void:
 		_low_hp_cooldown -= delta
 
 func play_shot() -> void:
-	_shot_players[_shot_idx].play()
+	var p := _shot_players[_shot_idx]
+	p.pitch_scale = randf_range(0.9, 1.1)
+	p.play()
 	_shot_idx = (_shot_idx + 1) % SHOT_POOL_SIZE
 
 func play_hit() -> void:
-	_hit_players[_hit_idx].play()
+	var p := _hit_players[_hit_idx]
+	# ±15%のピッチ変動で聴覚疲労を防ぐ（同じ音の反復は「AI製」の兆候）
+	p.pitch_scale = randf_range(0.85, 1.15)
+	p.play()
 	_hit_idx = (_hit_idx + 1) % HIT_POOL_SIZE
 
 func play_kill() -> void:
+	_kill_player.pitch_scale = randf_range(0.9, 1.1)
 	_kill_player.play()
 
 func play_ui_select() -> void:
