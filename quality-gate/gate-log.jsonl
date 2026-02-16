@@ -1,0 +1,10 @@
+{
+  "timestamp": "2026-02-16T13:23:49+09:00",
+  "verdict": "GO",
+  "tier2_score": "3/4",
+  "damage_taken": 2,
+  "lowest_hp_pct": "0.988658333333333",
+  "avg_levelup_interval": "6.1",
+  "peak_enemies": 8,
+  "reasons": "pacing_warn"
+}

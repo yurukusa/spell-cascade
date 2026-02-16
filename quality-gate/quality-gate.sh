@@ -47,8 +47,8 @@ if [[ "$SKIP_RUN" == false ]]; then
         echo "[QualityGate] Added SpellCascadeAutoTest to autoload"
     fi
 
-    # Run with xvfb
-    timeout 90 xvfb-run -a godot --path "$PROJECT_DIR" --quit-after 70 2>&1 || true
+    # Run with xvfb (no --quit-after; AutoTest calls get_tree().quit() after 60s)
+    timeout 90 xvfb-run -a godot --path "$PROJECT_DIR" 2>&1 || true
 
     # Remove SpellCascadeAutoTest from autoload
     if [[ "${AUTOTEST_ADDED:-false}" == true ]]; then
