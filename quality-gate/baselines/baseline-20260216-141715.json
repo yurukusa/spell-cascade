@@ -1,0 +1,158 @@
+{
+	"checks": {
+		"level_ups_occurred": true,
+		"player_level": 5,
+		"projectile_bonus": 0,
+		"skills_fired": true
+	},
+	"errors": [],
+	"feel_scorecard": {
+		"action_density": 2.3,
+		"action_density_rating": "GOOD",
+		"dead_time": 3.4,
+		"dead_time_rating": "GOOD",
+		"event_count": 89,
+		"kill_count": 32,
+		"reward_frequency": 53,
+		"reward_frequency_rating": "GOOD",
+		"total_events": 138,
+		"xp_pickup_count": 53
+	},
+	"pass": true,
+	"quality_metrics": {
+		"avg_levelup_interval": 11.7,
+		"damage_taken_count": 4,
+		"difficulty_rating": "CHALLENGING",
+		"enemy_count_samples": [
+			{
+				"count": 3,
+				"t": 5
+			},
+			{
+				"count": 5,
+				"t": 10.1
+			},
+			{
+				"count": 5,
+				"t": 15.2
+			},
+			{
+				"count": 5,
+				"t": 20.2
+			},
+			{
+				"count": 6,
+				"t": 25.3
+			},
+			{
+				"count": 7,
+				"t": 30.4
+			},
+			{
+				"count": 7,
+				"t": 35.5
+			},
+			{
+				"count": 9,
+				"t": 40.5
+			},
+			{
+				"count": 8,
+				"t": 45.6
+			},
+			{
+				"count": 9,
+				"t": 50.7
+			},
+			{
+				"count": 8,
+				"t": 55.8
+			}
+		],
+		"fatigue_rating": "OK",
+		"hp_samples": [
+			{
+				"hp": 500,
+				"hp_pct": 1,
+				"t": 5
+			},
+			{
+				"hp": 500,
+				"hp_pct": 1,
+				"t": 10.1
+			},
+			{
+				"hp": 500,
+				"hp_pct": 1,
+				"t": 15.2
+			},
+			{
+				"hp": 500,
+				"hp_pct": 1,
+				"t": 20.2
+			},
+			{
+				"hp": 500,
+				"hp_pct": 1,
+				"t": 25.3
+			},
+			{
+				"hp": 550,
+				"hp_pct": 1,
+				"t": 30.4
+			},
+			{
+				"hp": 550,
+				"hp_pct": 1,
+				"t": 35.5
+			},
+			{
+				"hp": 550,
+				"hp_pct": 1,
+				"t": 40.5
+			},
+			{
+				"hp": 550,
+				"hp_pct": 1,
+				"t": 45.6
+			},
+			{
+				"hp": 550,
+				"hp_pct": 1,
+				"t": 50.7
+			},
+			{
+				"hp": 540.4,
+				"hp_pct": 0.98,
+				"t": 55.8
+			}
+		],
+		"levelup_timestamps": [
+			9.6,
+			17.1,
+			25.4,
+			36.8,
+			56.3
+		],
+		"lowest_hp_pct": 0.982545454545454,
+		"upgrade_menu_total_time": 2.48100000000001
+	},
+	"screenshots": [
+		"/tmp/godot_auto_test/sc_game_start_000.png",
+		"/tmp/godot_auto_test/sc_gameplay_10s_001.png",
+		"/tmp/godot_auto_test/sc_gameplay_20s_002.png",
+		"/tmp/godot_auto_test/sc_gameplay_30s_003.png",
+		"/tmp/godot_auto_test/sc_gameplay_40s_004.png",
+		"/tmp/godot_auto_test/sc_gameplay_51s_005.png"
+	],
+	"telemetry": {
+		"enemies_killed": 0,
+		"level_ups": 5,
+		"player_level": 5,
+		"projectile_bonus": 0,
+		"skills_fired": {
+			"Fireball": 48
+		},
+		"total_fires": 48
+	}
+}

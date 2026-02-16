@@ -1,0 +1,169 @@
+{
+	"checks": {
+		"level_ups_occurred": true,
+		"player_level": 14,
+		"projectile_bonus": 3,
+		"skills_fired": true
+	},
+	"errors": [],
+	"feel_scorecard": {
+		"action_density": 15.9,
+		"action_density_rating": "CHAOTIC",
+		"dead_time": 2.4,
+		"dead_time_rating": "EXCELLENT",
+		"event_count": 920,
+		"kill_count": 543,
+		"reward_frequency": 357,
+		"reward_frequency_rating": "OVERWHELMING",
+		"total_events": 957,
+		"xp_pickup_count": 357
+	},
+	"pass": true,
+	"quality_metrics": {
+		"avg_levelup_interval": 3.7,
+		"damage_taken_count": 20,
+		"difficulty_rating": "CHALLENGING",
+		"enemy_count_samples": [
+			{
+				"count": 3,
+				"t": 5
+			},
+			{
+				"count": 6,
+				"t": 10
+			},
+			{
+				"count": 6,
+				"t": 15.1
+			},
+			{
+				"count": 6,
+				"t": 20.2
+			},
+			{
+				"count": 10,
+				"t": 25.4
+			},
+			{
+				"count": 17,
+				"t": 30.6
+			},
+			{
+				"count": 30,
+				"t": 35.9
+			},
+			{
+				"count": 44,
+				"t": 41.3
+			},
+			{
+				"count": 78,
+				"t": 46.7
+			},
+			{
+				"count": 121,
+				"t": 51.9
+			},
+			{
+				"count": 153,
+				"t": 57.3
+			}
+		],
+		"fatigue_rating": "TOO_FREQUENT",
+		"hp_samples": [
+			{
+				"hp": 500,
+				"hp_pct": 1,
+				"t": 5
+			},
+			{
+				"hp": 500,
+				"hp_pct": 1,
+				"t": 10
+			},
+			{
+				"hp": 500,
+				"hp_pct": 1,
+				"t": 15.1
+			},
+			{
+				"hp": 500,
+				"hp_pct": 1,
+				"t": 20.2
+			},
+			{
+				"hp": 500,
+				"hp_pct": 1,
+				"t": 25.4
+			},
+			{
+				"hp": 550,
+				"hp_pct": 1,
+				"t": 30.6
+			},
+			{
+				"hp": 550,
+				"hp_pct": 1,
+				"t": 35.9
+			},
+			{
+				"hp": 550,
+				"hp_pct": 1,
+				"t": 41.3
+			},
+			{
+				"hp": 540.285666666667,
+				"hp_pct": 0.98,
+				"t": 46.7
+			},
+			{
+				"hp": 550,
+				"hp_pct": 1,
+				"t": 51.9
+			},
+			{
+				"hp": 550,
+				"hp_pct": 1,
+				"t": 57.3
+			}
+		],
+		"levelup_timestamps": [
+			6.1,
+			7.7,
+			18.1,
+			21.1,
+			28.7,
+			32.3,
+			34.9,
+			38,
+			41.3,
+			44.9,
+			48.3,
+			51.5,
+			54.6,
+			57,
+			58.5
+		],
+		"lowest_hp_pct": 0.793454545454545,
+		"upgrade_menu_total_time": 7.643
+	},
+	"screenshots": [
+		"/tmp/godot_auto_test/sc_game_start_000.png",
+		"/tmp/godot_auto_test/sc_gameplay_10s_001.png",
+		"/tmp/godot_auto_test/sc_gameplay_20s_002.png",
+		"/tmp/godot_auto_test/sc_gameplay_30s_003.png",
+		"/tmp/godot_auto_test/sc_gameplay_41s_004.png",
+		"/tmp/godot_auto_test/sc_gameplay_52s_005.png"
+	],
+	"telemetry": {
+		"enemies_killed": 0,
+		"level_ups": 15,
+		"player_level": 14,
+		"projectile_bonus": 3,
+		"skills_fired": {
+			"Fireball": 42,
+			"Holy Beam": 17
+		},
+		"total_fires": 42
+	}
+}
