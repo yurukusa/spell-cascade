@@ -404,6 +404,36 @@ func _finish_test() -> void:
 		reward_rating = "ABUNDANT"
 	print("[AutoTest] Reward Frequency: %.0f pickups/min (%s)" % [reward_freq, reward_rating])
 
+	# Run Completion Desire (THE ONE feel heuristic)
+	# なぜ: 「もう1回遊びたいか」の代理指標。ランの終わり方がリテンションを予測する
+	# HP 30-70%で生存終了 = 理想。100%=ぬるい、0%=死亡（到達時間で評価）
+	var final_hp_pct := 1.0
+	if not qm_hp_samples.is_empty():
+		final_hp_pct = qm_hp_samples[-1].hp_pct
+	var survived := final_hp_pct > 0.0
+	var desire_score := 0.0
+	if survived:
+		desire_score = 1.0 - absf(final_hp_pct - 0.50) * 1.5
+		desire_score = clampf(desire_score, 0.0, 1.0)
+	else:
+		# 死亡: ランの進行度で評価（後半の死亡は前半より評価高い）
+		var run_time_elapsed: float = GAME_DURATION
+		if not qm_hp_samples.is_empty():
+			run_time_elapsed = qm_hp_samples[-1].t
+		var run_completion: float = run_time_elapsed / GAME_DURATION
+		var fought_hard: float = 1.0 if qm_damage_taken_count >= 3 else 0.5
+		desire_score = run_completion * 0.7 * fought_hard
+	var desire_rating := "FAIL"
+	if desire_score >= 0.8:
+		desire_rating = "EXCELLENT"
+	elif desire_score >= 0.6:
+		desire_rating = "GOOD"
+	elif desire_score >= 0.4:
+		desire_rating = "WARN"
+	print("[AutoTest] Run Completion Desire: %.2f (%s) [hp=%.0f%% survived=%s]" % [
+		desire_score, desire_rating, final_hp_pct * 100.0, str(survived)
+	])
+
 	print("[AutoTest] === END FEEL SCORECARD ===")
 
 	# 品質指標をresultsに統合（JSON出力用）
@@ -431,6 +461,10 @@ func _finish_test() -> void:
 		"kill_count": feel_kill_count,
 		"xp_pickup_count": feel_xp_pickup_count,
 		"event_count": feel_event_timestamps.size(),
+		"run_desire": snappedf(desire_score, 0.01),
+		"run_desire_rating": desire_rating,
+		"run_survived": survived,
+		"final_hp_pct": snappedf(final_hp_pct, 0.01),
 	}
 
 	# 全体判定
