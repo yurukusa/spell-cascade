@@ -316,10 +316,16 @@ if [[ "$VERDICT" == "GO" ]]; then
     echo "[QualityGate] Baseline saved: baseline-$TIMESTAMP.json"
 fi
 
-# Append to log
+# Append to log (skip when using cached results to prevent pollution)
+if [[ "$SKIP_RUN" == false ]]; then
+    LOG_SOURCE="autotest"
+else
+    LOG_SOURCE="replay"
+fi
 LOG_ENTRY=$(jq -n \
     --arg verdict "$VERDICT" \
     --arg timestamp "$(date -Is)" \
+    --arg source "$LOG_SOURCE" \
     --arg reasons "$(IFS=','; echo "${REASONS[*]}")" \
     --argjson tier2_passes "$TIER2_PASSES" \
     --argjson tier2_checks "$TIER2_CHECKS" \
@@ -327,9 +333,13 @@ LOG_ENTRY=$(jq -n \
     --arg lowest_hp "$LOWEST_HP" \
     --arg avg_interval "$AVG_INTERVAL" \
     --argjson peak_enemies "$PEAK_ENEMIES" \
-    '{timestamp: $timestamp, verdict: $verdict, tier2_score: "\($tier2_passes)/\($tier2_checks)", damage_taken: $damage, lowest_hp_pct: $lowest_hp, avg_levelup_interval: $avg_interval, peak_enemies: $peak_enemies, reasons: $reasons}')
-echo "$LOG_ENTRY" >> "$LOG_FILE"
-echo "[QualityGate] Log appended to: $LOG_FILE"
+    '{timestamp: $timestamp, verdict: $verdict, source: $source, tier2_score: "\($tier2_passes)/\($tier2_checks)", damage_taken: $damage, lowest_hp_pct: $lowest_hp, avg_levelup_interval: $avg_interval, peak_enemies: $peak_enemies, reasons: $reasons}')
+if [[ "$SKIP_RUN" == false ]]; then
+    echo "$LOG_ENTRY" >> "$LOG_FILE"
+    echo "[QualityGate] Log appended to: $LOG_FILE"
+else
+    echo "[QualityGate] Replay mode — gate-log not updated (use live run to log)"
+fi
 
 # Exit code
 if [[ "$VERDICT" == "NO-GO" ]]; then

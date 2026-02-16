@@ -1,0 +1,133 @@
+# Feedback → Fix → Re-Evaluation Traceability Audit v1
+
+**Date**: 2026-02-16
+**Auditor**: CC (autonomous)
+**Scope**: All human feedback events for Spell Cascade, tracked from capture through fix to re-evaluation
+
+---
+
+## Audit Methodology
+
+For each human feedback event, verify:
+1. **Capture**: Was the feedback recorded in a machine-readable format?
+2. **Fix**: Was a commit created addressing each feedback item?
+3. **Re-evaluation**: Was the quality gate run after the fix to verify improvement?
+4. **Traceability**: Can we link feedback → commit → gate result?
+
+---
+
+## Feedback Event #1: v0.2.6 Hotfix (ぐらすプレイテストFB)
+
+### 1. Capture
+
+| ID | Priority | Feedback Item | Machine-readable? |
+|----|----------|---------------|-------------------|
+| P0-1 | P0 | 距離ベースupgradeは混乱する。削除して | Commit msg only |
+| P0-2 | P0 | Bullets xNとTrigger条件が見えない | Commit msg only |
+| P0-3 | P0 | 敵不在で弾が出ないのは直感に反する | Commit msg only |
+| P0-4 | P0 | AutoMove中にWASDが効かないことがある | Commit msg only |
+| P0-5 | P0 | Chain range狭すぎて繋がらない | Commit msg only |
+
+**Gap**: Feedback is captured only in commit messages, not in a structured feedback log.
+
+### 2. Fix
+
+**Commit**: `297d71e` (2026-02-16 14:57)
+**Files Changed**: 4 files, +53/-39 lines
+- `data/supports.json` — distance upgrade removed
+- `scripts/game_main.gd` — input priority fix, HUD display
+- `scripts/tower.gd` — facing-direction fire, chain range 150→450
+- `scripts/tower_attack.gd` — firing without target
+
+**Traceability**: Each P0-x maps to a specific code change. **PASS**
+
+### 3. Re-Evaluation
+
+**Before Hotfix** (13:23-14:56):
+| Metric | Before (avg of 6 valid runs) |
+|--------|-----|
+| Verdict | 3 GO, 3 CONDITIONAL, 1 NO-GO |
+| Tier2 Score | 2.7/4 |
+| Damage Taken | 1.2 avg |
+| Lowest HP | 0.99 (almost never hurt) |
+| Common Warnings | `difficulty_floor_warn`, `pacing_warn` |
+
+**After Hotfix** (15:26-15:48):
+| Metric | After (unique runs) |
+|--------|------|
+| Verdict | 100% GO |
+| Tier2 Score | 3.5/4 (first 4/4 ever!) |
+| Damage Taken | 12-16 (10-13x increase) |
+| Lowest HP | 0.66-0.94 (meaningful HP pressure) |
+| Common Warnings | `pacing_warn` (1 metric away from 4/4) |
+
+**Improvement Summary**:
+- `difficulty_floor_warn` **eliminated** (was most frequent pre-hotfix issue)
+- Damage taken increased from ~1 to ~14 (enemies actually threaten)
+- HP floor dropped from 0.99 to 0.66 (real danger moments)
+- First perfect 4/4 tier2 scores achieved
+
+**Re-evaluation traceability**: **PASS** — gate-log timestamps directly follow the commit timestamp.
+
+### 4. Overall Traceability Score
+
+| Check | Status |
+|-------|--------|
+| Feedback captured? | PARTIAL — commit msg only, no structured feedback log |
+| Fix committed? | PASS — clear commit with item-by-item mapping |
+| Re-evaluation run? | PASS — quality gate run immediately after |
+| Metrics improved? | PASS — dramatic improvement across all metrics |
+| Linkable chain? | PARTIAL — requires manual timestamp matching |
+
+---
+
+## System-Level Gaps Found
+
+### Gap 1: No Structured Feedback Log
+**Current**: Human feedback is embedded in commit messages or verbal (unrecorded).
+**Impact**: Can't query "what feedback items are unaddressed?" or "how often do we get this type of feedback?"
+**Recommendation**: Create `quality-gate/feedback-log.jsonl`:
+```json
+{
+  "ts": "2026-02-16T14:30:00+09:00",
+  "source": "playtest-glass",
+  "items": [
+    {"id": "P0-1", "priority": "P0", "category": "ux", "desc": "距離upgrade混乱"},
+    {"id": "P0-2", "priority": "P0", "category": "ui", "desc": "Bullets表示なし"}
+  ],
+  "fix_commit": "297d71e",
+  "re_eval_verdict": "GO",
+  "re_eval_ts": "2026-02-16T15:26:08+09:00"
+}
+```
+
+### Gap 2: No Automatic Feedback→Fix→Reeval Linkage
+**Current**: Must manually match timestamps between commit log and gate-log.
+**Impact**: Traceability requires human investigation.
+**Recommendation**: Gate-log entries should include `trigger_commit` field when run after a code change.
+
+### Gap 3: Soak Test Gate-Log Pollution
+**Current**: Soak test (10 iterations of --skip-run) wrote 26 duplicate entries to gate-log (same results.json, 1-second intervals).
+**Impact**: Inflates gate-log, makes trend analysis noisy.
+**Recommendation**: `--skip-run` mode should not append to gate-log (or gate-log entries should include a `source` field: "autotest" vs "pipeline-replay").
+
+### Gap 4: No Feedback Item Closure Tracking
+**Current**: Once committed, feedback items are "done" implicitly.
+**Impact**: Can't verify if specific items actually improved (e.g., "chain range still too short?").
+**Recommendation**: Feedback items should be tracked to closure with before/after metric evidence.
+
+---
+
+## Audit Verdict: CONDITIONAL PASS
+
+**Traceability exists** but is manual. The v0.2.6 feedback cycle demonstrates:
+- Human plays → identifies 5 issues → CC fixes all 5 → quality gate confirms dramatic improvement
+
+**For FULL PASS**, implement:
+1. Structured feedback-log.jsonl (Gap 1)
+2. Commit-linked gate-log entries (Gap 2)
+3. Source tagging in gate-log (Gap 3)
+
+---
+
+*Generated by CC autonomous audit, 2026-02-16*
