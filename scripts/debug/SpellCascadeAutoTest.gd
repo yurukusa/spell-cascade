@@ -2,6 +2,7 @@ extends Node
 ## Spell Cascade自動テスト
 ## godot-testから読み込まれ、AutoPlayer.gdの代わりに使用する。
 ## タイトル画面通過→ゲームプレイ→テレメトリ検証→スクショ→結果出力の一連のフロー。
+## v0.2.4: 品質指標（Difficulty Curve, Reward Timing）の自動出力追加
 
 const OUTPUT_DIR = "/tmp/godot_auto_test/"
 const SCREENSHOT_INTERVAL = 10.0
@@ -21,6 +22,14 @@ var results := {
 	"errors": [],
 }
 
+# 品質指標（トップレベル変数としてドットアクセス問題を回避）
+var qm_hp_samples: Array = []            # [{t, hp, hp_pct}] 5秒間隔
+var qm_damage_taken_count := 0           # 被ダメ回数
+var qm_lowest_hp_pct := 1.0             # 最低HP割合
+var qm_enemy_count_samples: Array = []   # [{t, count}] 5秒間隔
+var qm_levelup_timestamps: Array = []    # レベルアップ発生時刻（秒）
+var qm_upgrade_menu_total_time := 0.0    # メニュー滞在秒数（疲労指標）
+
 var test_start_time := 0.0
 var screenshot_timer := 0.0
 var screenshots_taken := 0
@@ -29,6 +38,13 @@ var pressed_start := false
 var upgrade_auto_pick_timer := 0.0
 var log_lines: PackedStringArray = []
 var test_finished := false
+
+# 品質指標トラッキング用
+var _metric_sample_timer := 0.0
+const METRIC_SAMPLE_INTERVAL := 5.0
+var _last_hp := -1.0  # 前フレームHP（被ダメ検出用）
+var _upgrade_menu_start := 0.0
+var _in_upgrade_menu := false
 
 func _ready() -> void:
 	# ポーズ中もprocessを継続（アップグレード自動選択のため）
@@ -92,12 +108,22 @@ func _process(delta: float) -> void:
 
 	# アップグレード画面の自動選択（ゲームがpause中なら）
 	if get_tree().paused:
+		if not _in_upgrade_menu:
+			_in_upgrade_menu = true
+			_upgrade_menu_start = Time.get_ticks_msec() / 1000.0
 		upgrade_auto_pick_timer += delta
 		if upgrade_auto_pick_timer > 0.5:
 			_auto_pick_upgrade()
 			upgrade_auto_pick_timer = 0.0
 	else:
+		if _in_upgrade_menu:
+			_in_upgrade_menu = false
+			var menu_dur: float = Time.get_ticks_msec() / 1000.0 - _upgrade_menu_start
+			qm_upgrade_menu_total_time += menu_dur
 		upgrade_auto_pick_timer = 0.0
+
+	# 品質指標サンプリング
+	_collect_quality_metrics(elapsed, delta)
 
 	# テレメトリ収集（towerのfire_count等を読む）
 	_collect_telemetry()
@@ -106,6 +132,43 @@ func _process(delta: float) -> void:
 	if elapsed >= GAME_DURATION and not test_finished:
 		test_finished = true
 		_finish_test()
+
+func _collect_quality_metrics(elapsed: float, delta: float) -> void:
+	var scene = get_tree().current_scene
+	if scene == null:
+		return
+	var tower = scene.get_node_or_null("Tower")
+	if not tower:
+		return
+
+	# HP追跡: 被ダメ検出
+	if "hp" in tower and "max_hp" in tower:
+		var cur_hp: float = tower.hp
+		var max_hp_val: float = tower.max_hp
+		if _last_hp >= 0.0 and cur_hp < _last_hp:
+			qm_damage_taken_count += 1
+		_last_hp = cur_hp
+		var hp_pct: float = cur_hp / maxf(max_hp_val, 1.0)
+		if hp_pct < qm_lowest_hp_pct:
+			qm_lowest_hp_pct = hp_pct
+
+	# 定期サンプリング（5秒間隔）
+	_metric_sample_timer += delta
+	if _metric_sample_timer >= METRIC_SAMPLE_INTERVAL:
+		_metric_sample_timer = 0.0
+		# HPサンプル
+		if "hp" in tower and "max_hp" in tower:
+			qm_hp_samples.append({
+				"t": snappedf(elapsed, 0.1),
+				"hp": tower.hp,
+				"hp_pct": snappedf(tower.hp / maxf(tower.max_hp, 1.0), 0.01),
+			})
+		# 敵数サンプル
+		var enemy_count: int = get_tree().get_nodes_in_group("enemies").size()
+		qm_enemy_count_samples.append({
+			"t": snappedf(elapsed, 0.1),
+			"count": enemy_count,
+		})
 
 func _auto_pick_upgrade() -> void:
 	# アップグレードUI上の最初のボタンを自動クリック
@@ -128,6 +191,7 @@ func _auto_pick_upgrade() -> void:
 					child.emit_signal("pressed")
 					print("[AutoTest] Auto-picked upgrade: %s" % child.text.get_slice("\n", 0))
 					results.telemetry.level_ups += 1
+					_record_levelup_timestamp()
 					return
 		# ボタンコンテナが見つからない場合、直接Buttonを探す
 		var btn := _find_first_button(upgrade_ui)
@@ -135,6 +199,11 @@ func _auto_pick_upgrade() -> void:
 			btn.emit_signal("pressed")
 			print("[AutoTest] Auto-picked upgrade (fallback): %s" % btn.text.get_slice("\n", 0))
 			results.telemetry.level_ups += 1
+			_record_levelup_timestamp()
+
+func _record_levelup_timestamp() -> void:
+	var elapsed: float = Time.get_ticks_msec() / 1000.0 - test_start_time
+	qm_levelup_timestamps.append(snappedf(elapsed, 0.1))
 
 func _find_first_button_container(node: Node) -> Node:
 	for child in node.get_children():
@@ -157,7 +226,10 @@ func _find_first_button(node: Node) -> Button:
 	return null
 
 func _collect_telemetry() -> void:
-	var tower = get_tree().current_scene.get_node_or_null("Tower")
+	var scene = get_tree().current_scene
+	if scene == null:
+		return
+	var tower = scene.get_node_or_null("Tower")
 	if not tower:
 		return
 
@@ -168,8 +240,6 @@ func _collect_telemetry() -> void:
 			results.telemetry.skills_fired[skill_name] = child.fire_count
 			results.telemetry.total_fires = maxi(results.telemetry.total_fires, child.fire_count)
 
-	# 敵の数を追跡
-	var enemies := get_tree().get_nodes_in_group("enemies")
 	# projectile_bonus も記録
 	if "projectile_bonus" in tower:
 		results.telemetry["projectile_bonus"] = tower.projectile_bonus
@@ -220,6 +290,60 @@ func _finish_test() -> void:
 	var proj_bonus: int = results.telemetry.get("projectile_bonus", 0)
 	results.checks["projectile_bonus"] = proj_bonus
 	print("[AutoTest] Projectile bonus: %d" % proj_bonus)
+
+	# --- 品質指標サマリー ---
+	print("[AutoTest] === QUALITY METRICS ===")
+
+	# Difficulty Curve
+	print("[AutoTest] Damage taken: %d times" % qm_damage_taken_count)
+	print("[AutoTest] Lowest HP: %.0f%%" % (qm_lowest_hp_pct * 100.0))
+	# 難易度判定: 被ダメ0回 = too easy, 1-3回 = OK, 4+ = challenging
+	var diff_rating := "TOO_EASY"
+	if qm_damage_taken_count >= 4:
+		diff_rating = "CHALLENGING"
+	elif qm_damage_taken_count >= 1:
+		diff_rating = "OK"
+	print("[AutoTest] Difficulty: %s" % diff_rating)
+
+	# HP推移
+	for sample in qm_hp_samples:
+		print("[AutoTest]   HP@%.0fs: %.0f%%" % [sample.t, sample.hp_pct * 100.0])
+
+	# 敵密度推移
+	for sample in qm_enemy_count_samples:
+		print("[AutoTest]   Enemies@%.0fs: %d" % [sample.t, sample.count])
+
+	# Reward Timing / Upgrade Fatigue
+	var avg_interval := 0.0
+	if qm_levelup_timestamps.size() >= 2:
+		var total_interval := 0.0
+		for idx in range(1, qm_levelup_timestamps.size()):
+			total_interval += qm_levelup_timestamps[idx] - qm_levelup_timestamps[idx - 1]
+		avg_interval = snappedf(total_interval / (qm_levelup_timestamps.size() - 1), 0.1)
+	print("[AutoTest] Avg levelup interval: %.1fs (target: ~23s)" % avg_interval)
+	print("[AutoTest] Upgrade menu total time: %.1fs" % qm_upgrade_menu_total_time)
+	# 疲労判定: 平均間隔<10sは過頻度
+	var fatigue_rating := "OK"
+	if avg_interval > 0.0 and avg_interval < 10.0:
+		fatigue_rating = "TOO_FREQUENT"
+	elif avg_interval > 30.0:
+		fatigue_rating = "TOO_SLOW"
+	print("[AutoTest] Upgrade fatigue: %s" % fatigue_rating)
+
+	print("[AutoTest] === END QUALITY METRICS ===")
+
+	# 品質指標をresultsに統合（JSON出力用）
+	results["quality_metrics"] = {
+		"hp_samples": qm_hp_samples,
+		"damage_taken_count": qm_damage_taken_count,
+		"lowest_hp_pct": qm_lowest_hp_pct,
+		"enemy_count_samples": qm_enemy_count_samples,
+		"levelup_timestamps": qm_levelup_timestamps,
+		"avg_levelup_interval": avg_interval,
+		"upgrade_menu_total_time": qm_upgrade_menu_total_time,
+		"difficulty_rating": diff_rating,
+		"fatigue_rating": fatigue_rating,
+	}
 
 	# 全体判定
 	print("[AutoTest] PASS: %s" % str(results.pass))
