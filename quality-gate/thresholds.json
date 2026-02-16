@@ -1,0 +1,32 @@
+{
+  "tier1_stability": {
+    "max_exit_code": 0,
+    "max_script_errors": 0,
+    "min_total_fires": 1,
+    "min_level_ups": 1
+  },
+  "tier2_balance": {
+    "difficulty_floor": {
+      "min_damage_taken": 1
+    },
+    "difficulty_ceiling": {
+      "min_lowest_hp_pct": 0.10,
+      "must_survive_60s": true
+    },
+    "pacing": {
+      "min_avg_interval": 8.0,
+      "max_avg_interval": 35.0,
+      "min_gap_between_levelups": 2.0
+    },
+    "density": {
+      "min_peak_enemies": 5,
+      "min_avg_enemies": 3
+    },
+    "pass_threshold": 3,
+    "nogo_on_ceiling_fail": true
+  },
+  "tier3_regression": {
+    "warn_threshold_pct": 25,
+    "nogo_threshold_pct": 50
+  }
+}
