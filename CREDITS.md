@@ -1,6 +1,6 @@
 # Credits
 
-## Spell Cascade v0.1.0
+## Spell Cascade v0.3.1
 
 ### Development
 

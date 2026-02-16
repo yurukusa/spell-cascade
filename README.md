@@ -52,7 +52,7 @@ godot --headless --export-release "Web" exports/web/SpellCascade.html
 
 ## Version
 
-Current: **v0.2.2** (see [VERSION](VERSION))
+Current: **v0.3.1** (see [VERSION](VERSION))
 
 ## Known Issues
 

@@ -10,7 +10,7 @@
 | **Platforms** | Browser (HTML5), Windows |
 | **Genre** | Roguelike, Horde Survival, Action |
 | **Price** | Free (Name Your Price) |
-| **Status** | Published (v0.2.2) |
+| **Status** | Published (v0.3.1) |
 | **Release** | February 16, 2026 |
 | **Play Now** | https://yurukusa.itch.io/spell-cascade |
 
