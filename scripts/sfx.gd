@@ -24,10 +24,13 @@ var _bgm_player: AudioStreamPlayer
 var _wave_clear_player: AudioStreamPlayer
 var _boss_entrance_player: AudioStreamPlayer
 var _ui_cancel_player: AudioStreamPlayer
+var _damage_taken_player: AudioStreamPlayer
 
 var _low_hp_cooldown := 0.0
 const LOW_HP_INTERVAL := 2.0
 var _bgm_playing := false
+var _damage_cooldown := 0.0
+const DAMAGE_COOLDOWN := 0.15  # 被弾SE連続再生を制限（150ms間隔）
 
 const SAMPLE_RATE := 22050
 
@@ -96,9 +99,16 @@ func _ready() -> void:
 	_ui_cancel_player.volume_db = -4.0
 	add_child(_ui_cancel_player)
 
+	_damage_taken_player = AudioStreamPlayer.new()
+	_damage_taken_player.stream = _gen_damage_taken()
+	_damage_taken_player.volume_db = -2.0  # 被弾は高優先: 他SEより大きめ
+	add_child(_damage_taken_player)
+
 func _process(delta: float) -> void:
 	if _low_hp_cooldown > 0.0:
 		_low_hp_cooldown -= delta
+	if _damage_cooldown > 0.0:
+		_damage_cooldown -= delta
 	# XP回収ストリークのピッチは時間で減衰（0.5s何も拾わないとリセット）
 	if _xp_pitch_streak > 0.0:
 		_xp_pitch_streak = maxf(_xp_pitch_streak - delta * 0.8, 0.0)
@@ -154,6 +164,12 @@ func play_boss_entrance() -> void:
 
 func play_ui_cancel() -> void:
 	_ui_cancel_player.play()
+
+func play_damage_taken() -> void:
+	if _damage_cooldown <= 0.0:
+		_damage_taken_player.pitch_scale = randf_range(0.85, 1.15)
+		_damage_taken_player.play()
+		_damage_cooldown = DAMAGE_COOLDOWN
 
 func play_low_hp_warning() -> void:
 	if _low_hp_cooldown <= 0.0:
@@ -430,6 +446,35 @@ func _gen_boss_entrance() -> AudioStreamWAV:
 		if t > dur - 0.1:
 			s *= (dur - t) / 0.1
 		samples[i] = s
+	return _make_stream(samples)
+
+## Damage Taken: 金属的なクランチ (0.12s)
+## 低音インパクト(100-200Hz) + 高音クリック(2kHz) + ノイズバースト
+## 被弾を即座に認識できる: 最重要フィードバック音
+func _gen_damage_taken() -> AudioStreamWAV:
+	var dur := 0.12
+	var count := int(SAMPLE_RATE * dur)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	for i in count:
+		var t := float(i) / SAMPLE_RATE
+		# 低音インパクト: 急速減衰
+		var low := 0.5 * sin(TAU * 120.0 * t) * exp(-t * 25.0)
+		low += 0.3 * sin(TAU * 180.0 * t) * exp(-t * 30.0)
+		# 高音クリック: 金属的な質感
+		var high := 0.25 * sin(TAU * 2000.0 * t) * exp(-t * 50.0)
+		high += 0.1 * sin(TAU * 3200.0 * t) * exp(-t * 60.0)
+		# ノイズバースト（冒頭10ms）: 衝撃感
+		var noise := 0.0
+		if t < 0.01:
+			noise = 0.35 * (randf() * 2.0 - 1.0) * (1.0 - t / 0.01)
+		# エンベロープ
+		var env := 1.0
+		if t < 0.002:
+			env = t / 0.002  # 超短アタック
+		elif t > dur - 0.03:
+			env = (dur - t) / 0.03
+		samples[i] = env * (low + high + noise)
 	return _make_stream(samples)
 
 ## UI Cancel: ソフトな下降ブリップ (0.08s)

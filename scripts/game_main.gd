@@ -1076,6 +1076,9 @@ func _on_tower_damaged(current: float, max_val: float) -> void:
 	# Heal flash（HP増加を検出）
 	if hp_bar_last_value >= 0 and current > hp_bar_last_value:
 		_flash_hp_bar_heal()
+	# 被弾SE（HP減少時のみ）
+	elif hp_bar_last_value >= 0 and current < hp_bar_last_value:
+		SFX.play_damage_taken()
 	hp_bar_last_value = current
 
 	hp_bar.value = current
