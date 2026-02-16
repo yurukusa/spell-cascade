@@ -27,7 +27,7 @@ var start_y := 0.0  # 開始Y位置
 var xp := 0
 var level := 1
 # レベルアップに必要な累計XP（Lv2=10, Lv3=25, ...）
-var level_thresholds: Array[int] = [5, 12, 22, 36, 55, 80, 115, 160, 220, 300, 400, 520, 660]  # v0.2.3: 序盤は早め、中盤以降大幅減速
+var level_thresholds: Array[int] = [8, 18, 33, 54, 83, 120, 173, 240, 330, 450, 600, 780, 990]  # v0.3.1: +50%リバランス（fatigue_rating: TOO_FREQUENT対策、+35%では6.4s→目標8s未達）
 signal xp_gained(total_xp: int, level: int)
 signal level_up(new_level: int)
 

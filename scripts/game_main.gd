@@ -163,6 +163,12 @@ func _process(delta: float) -> void:
 		spawn_timer = 0.0
 		_spawn_enemy()
 
+	# スポーンフロア: t=15s以降、最低4体を維持（後半の敵圧崩壊対策）
+	# spawn_timerが50%以上溜まっている場合のみ前倒しスポーン（毎フレーム防止）
+	if run_time >= 15.0 and enemies_alive < 4 and not boss_spawned and spawn_timer >= current_interval * 0.5:
+		spawn_timer = 0.0
+		_spawn_enemy()
+
 	# 判断イベント（距離ベース: メートル単位）
 	var distance_m: float = float(tower.distance_traveled) / 10.0  # 10px = 1m
 	if distance_m >= next_upgrade_time and upgrade_events_given < upgrade_schedule.size():
@@ -775,9 +781,9 @@ func _spawn_boss() -> void:
 
 	var distance_m: float = float(tower.distance_traveled) / 10.0
 	var progress_scale := 1.0 + distance_m / 50.0 + run_time / 120.0
-	var hp_val := 25.0 * progress_scale
-	var speed_val := 65.0 + distance_m * 0.1 + run_time * 0.08
-	var dmg_val := 6.0 + distance_m * 0.02
+	var hp_val := 35.0 * progress_scale  # v0.3.1: HP+40%
+	var speed_val := 75.0 + distance_m * 0.12 + run_time * 0.12  # v0.3.1: 速度+15%
+	var dmg_val := 10.0 + distance_m * 0.03  # v0.3.1: 敵圧+67%
 
 	boss.init(tower, speed_val, hp_val, dmg_val, "boss")
 	boss.add_to_group("enemies")
@@ -1000,9 +1006,9 @@ func _spawn_enemy() -> void:
 	# 距離＋時間でスケーリング
 	var distance_m: float = float(tower.distance_traveled) / 10.0
 	var progress_scale := 1.0 + distance_m / 50.0 + run_time / 120.0
-	var hp_val := 25.0 * progress_scale
-	var speed_val := 65.0 + distance_m * 0.1 + run_time * 0.08
-	var dmg_val := 6.0 + distance_m * 0.02
+	var hp_val := 35.0 * progress_scale  # v0.3.1: HP+40%（敵がタワーに到達する前に全滅する問題対策）
+	var speed_val := 75.0 + distance_m * 0.12 + run_time * 0.12  # v0.3.1: 速度+15%/スケール+50%
+	var dmg_val := 10.0 + distance_m * 0.03  # v0.3.1: 敵圧+67%
 
 	# 敵タイプ選択: 60% normal, 25% swarmer, 15% tank（tankは50m以降）
 	var type_roll := randf()
