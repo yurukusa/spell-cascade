@@ -78,6 +78,14 @@ var enemy_scene: PackedScene
 var spawn_timer := 0.0
 var spawn_interval := 1.5  # 縦スクロール: 少しゆったり（手動操作のため）
 
+# ステージランプ（v0.3.2: 3-Act構造）
+var current_stage := 1  # 1=vulnerability, 2=growth, 3=crisis
+const STAGE_2_TIME := 20.0  # Stage 2 開始時間
+const STAGE_3_TIME := 40.0  # Stage 3 開始時間
+const STAGE_SPAWN_MULT = [0.8, 1.2, 1.6]  # ステージ別スポーン速度倍率
+const STAGE_HP_MULT = [1.0, 1.3, 1.8]  # ステージ別敵HP倍率
+const DESPERATE_PUSH_TIME = 45.0  # 最後15秒のスポーン加速開始
+
 func _ready() -> void:
 	build_system = get_node("/root/BuildSystem")
 
@@ -153,9 +161,22 @@ func _process(delta: float) -> void:
 		_win_game()
 		return
 
+	# ステージ遷移（v0.3.2: 3-Act構造）
+	var prev_stage := current_stage
+	if run_time >= STAGE_3_TIME and current_stage < 3:
+		current_stage = 3
+		spawn_timer = -2.0  # 2秒の呼吸タイム（ステージ間ブリージングルーム）
+	elif run_time >= STAGE_2_TIME and current_stage < 2:
+		current_stage = 2
+		spawn_timer = -2.0
+
 	# 敵スポーン（縦スクロール: 上方スポーン中心）
 	spawn_timer += delta
-	var current_interval := maxf(spawn_interval - run_time * 0.002, 0.4)
+	var stage_spawn: float = STAGE_SPAWN_MULT[current_stage - 1]
+	# 最後15秒: desperate push（スポーン加速 ×1.6）
+	if run_time >= DESPERATE_PUSH_TIME:
+		stage_spawn *= 1.6
+	var current_interval := maxf(spawn_interval - run_time * 0.002, 0.4) / stage_spawn
 	# ボス出現後は雑魚スポーンを25%に抑制（ボス戦に集中）
 	if boss_spawned:
 		current_interval *= 4.0
@@ -164,7 +185,6 @@ func _process(delta: float) -> void:
 		_spawn_enemy()
 
 	# スポーンフロア: t=15s以降、最低4体を維持（後半の敵圧崩壊対策）
-	# spawn_timerが50%以上溜まっている場合のみ前倒しスポーン（毎フレーム防止）
 	if run_time >= 15.0 and enemies_alive < 4 and not boss_spawned and spawn_timer >= current_interval * 0.5:
 		spawn_timer = 0.0
 		_spawn_enemy()
@@ -1006,16 +1026,18 @@ func _spawn_enemy() -> void:
 	# 距離＋時間でスケーリング
 	var distance_m: float = float(tower.distance_traveled) / 10.0
 	var progress_scale := 1.0 + distance_m / 50.0 + run_time / 120.0
-	var hp_val := 35.0 * progress_scale  # v0.3.1: HP+40%（敵がタワーに到達する前に全滅する問題対策）
-	var speed_val := 75.0 + distance_m * 0.12 + run_time * 0.12  # v0.3.1: 速度+15%/スケール+50%
-	var dmg_val := 10.0 + distance_m * 0.03  # v0.3.1: 敵圧+67%
+	var stage_hp: float = STAGE_HP_MULT[current_stage - 1]
+	var hp_val: float = 35.0 * progress_scale * stage_hp  # v0.3.2: ステージ別HP倍率
+	var speed_val := 75.0 + distance_m * 0.12 + run_time * 0.12
+	var dmg_val := 10.0 + distance_m * 0.03
 
-	# 敵タイプ選択: 60% normal, 25% swarmer, 15% tank（tankは50m以降）
+	# 敵タイプ選択: ステージ別ゲーティング（v0.3.2）
+	# Stage 1: normal only / Stage 2: +swarmer / Stage 3: +tank
 	var type_roll := randf()
 	var etype := "normal"
-	if type_roll < 0.25:
+	if current_stage >= 2 and type_roll < 0.25:
 		etype = "swarmer"
-	elif type_roll < 0.40 and distance_m >= 50.0:
+	elif current_stage >= 3 and type_roll >= 0.25 and type_roll < 0.40:
 		etype = "tank"
 
 	enemy.init(tower, speed_val, hp_val, dmg_val, etype)
