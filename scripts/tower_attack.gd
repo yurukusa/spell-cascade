@@ -13,6 +13,10 @@ var build_system: Node
 # Skill chip state
 var pending_on_kill := false  # on_kill チップ: キル後に発動待ち
 
+# テレメトリ（自動テスト用）
+var fire_count := 0
+var last_fire_time := 0.0
+
 func setup(idx: int, calculated_stats: Dictionary) -> void:
 	slot_index = idx
 	stats = calculated_stats
@@ -102,6 +106,12 @@ func _fire() -> void:
 		return
 
 	SFX.play_shot()
+	fire_count += 1
+	last_fire_time = Time.get_ticks_msec() / 1000.0
+	if fire_count <= 3 or fire_count % 10 == 0:
+		var skill_name: String = stats.get("name", "?")
+		var tags: Array = stats.get("tags", [])
+		print("[TELEMETRY] slot=%d skill=%s tags=%s fire_count=%d" % [slot_index, skill_name, str(tags), fire_count])
 
 	# spread挙動: 全方向に撃つ
 	for behavior in stats.get("behaviors", []):
