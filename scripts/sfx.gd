@@ -9,6 +9,11 @@ var _hit_players: Array[AudioStreamPlayer] = []
 var _kill_player: AudioStreamPlayer
 var _ui_select_player: AudioStreamPlayer
 var _low_hp_player: AudioStreamPlayer
+var _level_up_player: AudioStreamPlayer
+var _xp_pickup_players: Array[AudioStreamPlayer] = []
+const XP_PICKUP_POOL_SIZE := 4
+var _xp_pickup_idx := 0
+var _xp_pitch_streak := 0.0  # 連続回収でピッチが上がる（Mario coin効果）
 
 const SHOT_POOL_SIZE := 4
 const HIT_POOL_SIZE := 6
@@ -52,9 +57,25 @@ func _ready() -> void:
 	_low_hp_player.volume_db = -4.0
 	add_child(_low_hp_player)
 
+	_level_up_player = AudioStreamPlayer.new()
+	_level_up_player.stream = _gen_level_up()
+	_level_up_player.volume_db = -2.0
+	add_child(_level_up_player)
+
+	var xp_stream := _gen_xp_pickup()
+	for i in XP_PICKUP_POOL_SIZE:
+		var p := AudioStreamPlayer.new()
+		p.stream = xp_stream
+		p.volume_db = -10.0
+		add_child(p)
+		_xp_pickup_players.append(p)
+
 func _process(delta: float) -> void:
 	if _low_hp_cooldown > 0.0:
 		_low_hp_cooldown -= delta
+	# XP回収ストリークのピッチは時間で減衰（0.5s何も拾わないとリセット）
+	if _xp_pitch_streak > 0.0:
+		_xp_pitch_streak = maxf(_xp_pitch_streak - delta * 0.8, 0.0)
 
 func play_shot() -> void:
 	var p := _shot_players[_shot_idx]
@@ -75,6 +96,19 @@ func play_kill() -> void:
 
 func play_ui_select() -> void:
 	_ui_select_player.play()
+
+func play_xp_pickup() -> void:
+	var p := _xp_pickup_players[_xp_pickup_idx]
+	# 連続回収でピッチが上がる（0.05ずつ、最大+0.5 = 半音4つ分上昇）
+	_xp_pitch_streak = minf(_xp_pitch_streak + 0.05, 0.5)
+	p.pitch_scale = 1.0 + _xp_pitch_streak + randf_range(-0.02, 0.02)
+	p.play()
+	_xp_pickup_idx = (_xp_pickup_idx + 1) % XP_PICKUP_POOL_SIZE
+
+func play_level_up() -> void:
+	_level_up_player.pitch_scale = randf_range(0.95, 1.05)
+	_level_up_player.play()
+	_xp_pitch_streak = 0.0  # レベルアップでリセット
 
 func play_low_hp_warning() -> void:
 	if _low_hp_cooldown <= 0.0:
@@ -187,5 +221,60 @@ func _gen_low_hp() -> AudioStreamWAV:
 			env = (dur - t) / 0.1
 		var s := env * pulse * 0.5 * sin(TAU * 200.0 * t)
 		s += env * pulse * 0.3 * sin(TAU * 100.0 * t)
+		samples[i] = s
+	return _make_stream(samples)
+
+## Level Up: 上昇アルペジオ C5→E5→G5→C6 (0.35s)
+## 「報酬が来た」と即座に脳が認識するファンファーレパターン
+func _gen_level_up() -> AudioStreamWAV:
+	var dur := 0.35
+	var count := int(SAMPLE_RATE * dur)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	# 4音アルペジオ: 各ノート約0.08s、最後の音は余韻付き
+	var notes := [523.25, 659.25, 783.99, 1046.50]  # C5, E5, G5, C6
+	var note_dur := 0.08
+	for i in count:
+		var t := float(i) / SAMPLE_RATE
+		var note_idx := mini(int(t / note_dur), 3)
+		var note_t := t - note_idx * note_dur
+		var freq: float = notes[note_idx]
+		# 各ノートのアタック+サステイン
+		var note_env := 1.0
+		if note_t < 0.005:
+			note_env = note_t / 0.005
+		# 最後のノート以外は短くカット
+		if note_idx < 3 and note_t > note_dur - 0.01:
+			note_env = (note_dur - note_t) / 0.01
+		# 最後のノートは長い余韻
+		if note_idx == 3:
+			note_env *= exp(-note_t * 6.0)
+		# 全体フェードアウト
+		var global_env := 1.0
+		if t > dur - 0.05:
+			global_env = (dur - t) / 0.05
+		var s := global_env * note_env * 0.4 * sin(TAU * freq * t)
+		# オクターブ上のハーモニクスで明るさ追加
+		s += global_env * note_env * 0.15 * sin(TAU * freq * 2.0 * t)
+		samples[i] = s
+	return _make_stream(samples)
+
+## XP Pickup: 短い高音ブリップ (0.05s)
+## pitch_scaleで連続回収時に上昇させて「報酬チェーン」を演出
+func _gen_xp_pickup() -> AudioStreamWAV:
+	var dur := 0.05
+	var count := int(SAMPLE_RATE * dur)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	for i in count:
+		var t := float(i) / SAMPLE_RATE
+		var freq := 1200.0
+		var env := 1.0
+		if t < 0.003:
+			env = t / 0.003
+		elif t > dur - 0.015:
+			env = (dur - t) / 0.015
+		var s := env * 0.3 * sin(TAU * freq * t)
+		s += env * 0.1 * sin(TAU * freq * 1.5 * t)
 		samples[i] = s
 	return _make_stream(samples)

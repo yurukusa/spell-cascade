@@ -108,6 +108,7 @@ func _on_collected() -> void:
 			target.heal(heal_amount)
 	elif is_instance_valid(target) and target.has_method("add_xp"):
 		target.add_xp(xp_value)
+		SFX.play_xp_pickup()
 
 	# 回収エフェクト
 	var flash := Polygon2D.new()

@@ -1257,6 +1257,7 @@ var levelup_pool: Array[Dictionary] = [
 ]
 
 func _on_level_up(new_level: int) -> void:
+	SFX.play_level_up()
 	# 3つランダムに選んで表示
 	var pool := levelup_pool.duplicate()
 	pool.shuffle()
