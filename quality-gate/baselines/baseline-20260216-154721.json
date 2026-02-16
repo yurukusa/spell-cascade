@@ -1,0 +1,154 @@
+{
+	"checks": {
+		"level_ups_occurred": true,
+		"player_level": 5,
+		"projectile_bonus": 2,
+		"skills_fired": true
+	},
+	"errors": [],
+	"feel_scorecard": {
+		"action_density": 2.2,
+		"action_density_rating": "GOOD",
+		"dead_time": 5.8,
+		"dead_time_rating": "WARN",
+		"event_count": 88,
+		"final_hp_pct": 1,
+		"kill_count": 39,
+		"reward_frequency": 41,
+		"reward_frequency_rating": "GOOD",
+		"run_desire": 0.25,
+		"run_desire_rating": "FAIL",
+		"run_survived": true,
+		"total_events": 132,
+		"xp_pickup_count": 41
+	},
+	"pass": true,
+	"quality_metrics": {
+		"avg_levelup_interval": 7.1,
+		"damage_taken_count": 8,
+		"difficulty_rating": "CHALLENGING",
+		"enemy_count_samples": [
+			{
+				"count": 2,
+				"t": 5
+			},
+			{
+				"count": 4,
+				"t": 10
+			},
+			{
+				"count": 6,
+				"t": 15.1
+			},
+			{
+				"count": 7,
+				"t": 20.1
+			},
+			{
+				"count": 7,
+				"t": 25.1
+			},
+			{
+				"count": 10,
+				"t": 30.2
+			},
+			{
+				"count": 12,
+				"t": 35.2
+			},
+			{
+				"count": 13,
+				"t": 40.3
+			},
+			{
+				"count": 10,
+				"t": 45.3
+			},
+			{
+				"count": 21,
+				"t": 50.4
+			},
+			{
+				"count": 29,
+				"t": 55.4
+			}
+		],
+		"fatigue_rating": "TOO_FREQUENT",
+		"hp_samples": [
+			{
+				"hp": 500,
+				"hp_pct": 1,
+				"t": 5
+			},
+			{
+				"hp": 500,
+				"hp_pct": 1,
+				"t": 10
+			},
+			{
+				"hp": 500,
+				"hp_pct": 1,
+				"t": 15.1
+			},
+			{
+				"hp": 500,
+				"hp_pct": 1,
+				"t": 20.1
+			},
+			{
+				"hp": 500,
+				"hp_pct": 1,
+				"t": 25.1
+			},
+			{
+				"hp": 500,
+				"hp_pct": 1,
+				"t": 30.2
+			},
+			{
+				"hp": 500,
+				"hp_pct": 1,
+				"t": 35.2
+			},
+			{
+				"hp": 500,
+				"hp_pct": 1,
+				"t": 40.3
+			},
+			{
+				"hp": 600,
+				"hp_pct": 1,
+				"t": 45.3
+			},
+			{
+				"hp": 600,
+				"hp_pct": 1,
+				"t": 50.4
+			},
+			{
+				"hp": 600,
+				"hp_pct": 1,
+				"t": 55.4
+			}
+		],
+		"levelup_timestamps": [
+			22.6,
+			34.3,
+			40.7,
+			43.9
+		],
+		"lowest_hp_pct": 0.908805555555556,
+		"upgrade_menu_total_time": 2.006
+	},
+	"screenshots": [],
+	"telemetry": {
+		"enemies_killed": 0,
+		"level_ups": 4,
+		"player_level": 5,
+		"projectile_bonus": 2,
+		"skills_fired": {
+			"Fireball": 48
+		},
+		"total_fires": 48
+	}
+}

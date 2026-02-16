@@ -7,25 +7,25 @@
 	},
 	"errors": [],
 	"feel_scorecard": {
-		"action_density": 1.6,
+		"action_density": 1.5,
 		"action_density_rating": "GOOD",
-		"dead_time": 11.3,
-		"dead_time_rating": "FAIL",
-		"event_count": 55,
-		"final_hp_pct": 0.96,
-		"kill_count": 15,
-		"reward_frequency": 27,
+		"dead_time": 6.6,
+		"dead_time_rating": "WARN",
+		"event_count": 47,
+		"final_hp_pct": 0.98,
+		"kill_count": 13,
+		"reward_frequency": 22,
 		"reward_frequency_rating": "GOOD",
-		"run_desire": 0.31,
+		"run_desire": 0.28,
 		"run_desire_rating": "FAIL",
 		"run_survived": true,
-		"total_events": 93,
-		"xp_pickup_count": 27
+		"total_events": 90,
+		"xp_pickup_count": 22
 	},
 	"pass": true,
 	"quality_metrics": {
-		"avg_levelup_interval": 7.8,
-		"damage_taken_count": 13,
+		"avg_levelup_interval": 23.1,
+		"damage_taken_count": 12,
 		"difficulty_rating": "CHALLENGING",
 		"enemy_count_samples": [
 			{
@@ -34,46 +34,46 @@
 			},
 			{
 				"count": 4,
-				"t": 10.1
+				"t": 10
 			},
 			{
 				"count": 6,
 				"t": 15.1
 			},
 			{
-				"count": 8,
-				"t": 20.1
+				"count": 7,
+				"t": 20.2
 			},
 			{
-				"count": 10,
-				"t": 25.1
+				"count": 7,
+				"t": 25.2
 			},
 			{
-				"count": 13,
+				"count": 11,
 				"t": 30.2
 			},
 			{
-				"count": 12,
-				"t": 35.3
+				"count": 14,
+				"t": 35.2
 			},
 			{
-				"count": 15,
+				"count": 16,
 				"t": 40.3
 			},
 			{
-				"count": 17,
-				"t": 45.3
+				"count": 16,
+				"t": 45.4
 			},
 			{
-				"count": 26,
-				"t": 50.3
+				"count": 23,
+				"t": 50.4
 			},
 			{
-				"count": 30,
+				"count": 32,
 				"t": 55.4
 			}
 		],
-		"fatigue_rating": "TOO_FREQUENT",
+		"fatigue_rating": "OK",
 		"hp_samples": [
 			{
 				"hp": 500,
@@ -83,7 +83,7 @@
 			{
 				"hp": 500,
 				"hp_pct": 1,
-				"t": 10.1
+				"t": 10
 			},
 			{
 				"hp": 500,
@@ -93,50 +93,50 @@
 			{
 				"hp": 500,
 				"hp_pct": 1,
-				"t": 20.1
+				"t": 20.2
 			},
 			{
 				"hp": 500,
 				"hp_pct": 1,
-				"t": 25.1
+				"t": 25.2
 			},
 			{
-				"hp": 491.36,
-				"hp_pct": 0.98,
+				"hp": 500,
+				"hp_pct": 1,
 				"t": 30.2
 			},
 			{
-				"hp": 486.05,
+				"hp": 482.743333333333,
 				"hp_pct": 0.97,
-				"t": 35.3
+				"t": 35.2
 			},
 			{
-				"hp": 500,
-				"hp_pct": 1,
+				"hp": 470.743333333333,
+				"hp_pct": 0.94,
 				"t": 40.3
 			},
 			{
+				"hp": 470.743333333333,
+				"hp_pct": 0.94,
+				"t": 45.4
+			},
+			{
 				"hp": 500,
 				"hp_pct": 1,
-				"t": 45.3
+				"t": 50.4
 			},
 			{
-				"hp": 438.253333333333,
-				"hp_pct": 0.88,
-				"t": 50.3
-			},
-			{
-				"hp": 481.416666666667,
-				"hp_pct": 0.96,
+				"hp": 488.933333333333,
+				"hp_pct": 0.98,
 				"t": 55.4
 			}
 		],
 		"levelup_timestamps": [
-			27.9,
-			35.7
+			16.4,
+			39.5
 		],
-		"lowest_hp_pct": 0.662833333333333,
-		"upgrade_menu_total_time": 0.980999999999995
+		"lowest_hp_pct": 0.941486666666667,
+		"upgrade_menu_total_time": 1.007
 	},
 	"screenshots": [
 		"/tmp/godot_auto_test/sc_game_start_000.png",
@@ -152,8 +152,8 @@
 		"player_level": 3,
 		"projectile_bonus": 0,
 		"skills_fired": {
-			"Fireball": 49
+			"Fireball": 53
 		},
-		"total_fires": 49
+		"total_fires": 53
 	}
 }

@@ -1,0 +1,11 @@
+[Soak 15:46:33] ============================================
+[Soak 15:46:33] Pipeline Orchestrator Soak Test v1
+[Soak 15:46:33] ============================================
+[Soak 15:46:33] Iterations: 10
+[Soak 15:46:33] With autotest: true
+[Soak 15:46:33] Results path: /tmp/godot_auto_test/results.json
+[Soak 15:46:33] 
+[Soak 15:46:33] Initial state: gate-log=290 lines, reports=7 files
+[Soak 15:46:33] 
+[Soak 15:46:33] --- Test 1: --help flag ---
+[Soak 15:46:33]   PASS: --help exits 0
