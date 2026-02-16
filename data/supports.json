@@ -10,7 +10,7 @@
       "behavior": {
         "type": "chain",
         "chain_count": 2,
-        "chain_range": 150,
+        "chain_range": 450,
         "damage_falloff": 0.7
       }
     },

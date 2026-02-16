@@ -166,18 +166,24 @@ func _physics_process(delta: float) -> void:
 
 	var enemies := get_tree().get_nodes_in_group("enemies")
 
-	match move_id:
-		"manual", "":
-			# デフォルト: WASD手動操作
-			move_dir = _get_manual_input()
-		"kite":
-			move_dir = _ai_kite(enemies, move_chip.get("params", {}))
-		"orbit":
-			move_dir = _ai_orbit(enemies, move_chip.get("params", {}), delta)
-		"greedy":
-			move_dir = _ai_greedy(enemies, move_chip.get("params", {}))
-		_:
-			move_dir = _get_manual_input()
+	# v0.2.6: 手入力は常時優先（AutoMove中でもWASDで即オーバーライド）
+	var manual_dir := _get_manual_input()
+	if manual_dir != Vector2.ZERO:
+		# 手入力あり → AI無視、手入力を使う
+		move_dir = manual_dir
+	else:
+		# 手入力なし → AI移動を使う
+		match move_id:
+			"manual", "":
+				move_dir = Vector2.ZERO  # 手入力なし＆手動モード＝停止
+			"kite":
+				move_dir = _ai_kite(enemies, move_chip.get("params", {}))
+			"orbit":
+				move_dir = _ai_orbit(enemies, move_chip.get("params", {}), delta)
+			"greedy":
+				move_dir = _ai_greedy(enemies, move_chip.get("params", {}))
+			_:
+				move_dir = Vector2.ZERO
 
 	# Aim: mouse position overrides movement direction
 	var mouse_pos := get_global_mouse_position()

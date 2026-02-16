@@ -66,12 +66,9 @@ var onboarding_panel: PanelContainer = null
 var onboarding_timer := 0.0
 const ONBOARDING_DURATION := 10.0
 
-# 判断イベント管理
+# 判断イベント管理（v0.2.6: 距離ベース完全削除、XP levelupのみ）
+# なぜ: 距離だけで敵倒してないのにupgrade乱発→違和感（ぐらす最終判断）
 var upgrade_events_given := 0
-var next_upgrade_time := 0.0
-# 縦スクロール: 距離ベースのアップグレード（メートル単位）
-# 旧: [10, 25, 45, 70, 100, 140, 190, 250, 320, 400] — 後半到達不可
-var upgrade_schedule: Array[float] = [10.0, 25.0, 40.0, 55.0, 75.0, 95.0, 120.0, 150.0, 180.0, 220.0]
 
 # 敵スポーン
 var enemy_scene: PackedScene
@@ -134,9 +131,7 @@ func _ready() -> void:
 	# Onboarding overlay（操作説明 + 目的）
 	_show_onboarding()
 
-	# 最初の判断イベントタイミング（距離ベース）
-	if not upgrade_schedule.is_empty():
-		next_upgrade_time = upgrade_schedule[0]
+	# v0.2.6: 距離ベースupgrade完全削除。XP levelupのみ
 
 func _process(delta: float) -> void:
 	if game_over or not game_started:
@@ -189,15 +184,8 @@ func _process(delta: float) -> void:
 		spawn_timer = 0.0
 		_spawn_enemy()
 
-	# 判断イベント（距離ベース: メートル単位）
+	# v0.2.6: 距離ベースupgrade完全削除（XP levelupのみ）
 	var distance_m: float = float(tower.distance_traveled) / 10.0  # 10px = 1m
-	if distance_m >= next_upgrade_time and upgrade_events_given < upgrade_schedule.size():
-		upgrade_events_given += 1
-		if upgrade_events_given < upgrade_schedule.size():
-			next_upgrade_time = upgrade_schedule[upgrade_events_given]
-		else:
-			next_upgrade_time = INF
-		_show_upgrade_choice()
 
 	# Shrine（150sで中盤イベント: quiet zone対策）
 	if not shrine_shown and run_time >= SHRINE_TIME:
@@ -376,12 +364,28 @@ func _update_build_display() -> void:
 		skill_chip_name,
 	])
 
-	# Projectile bonus（+1 Projectile取得時に表示）
-	if tower.projectile_bonus > 0:
-		lines.append("+%d Projectile" % tower.projectile_bonus)
+	# v0.2.6: Projectile count + trigger条件を明示的に表示
+	# 弾数表示（常時、0でも表示して「増える」ことを意識させる）
+	var total_proj: int = 1 + tower.projectile_bonus
+	lines.append("Bullets: x%d" % total_proj)
+
+	# Skill trigger条件の表示（skill_chipは上で取得済み）
+	var skill_trigger_id: String = skill_chip.get("id", "auto_cast")
+	var trigger_desc := ""
+	match skill_trigger_id:
+		"auto_cast":
+			trigger_desc = "AUTO: fires on cooldown"
+		"on_kill":
+			trigger_desc = "ON KILL: burst after kill"
+		"panic":
+			var threshold: float = skill_chip.get("params", {}).get("hp_threshold", 0.3)
+			trigger_desc = "PANIC: 2x speed below %d%% HP" % int(threshold * 100)
+		_:
+			trigger_desc = "AUTO: fires on cooldown"
+	lines.append("Trigger: %s" % trigger_desc)
 	lines.append("")
 
-	# スキルスロット（トリガー情報付き）
+	# スキルスロット（CD + 弾数 + 効果の1行サマリー）
 	for i in range(tower.max_slots):
 		var module: Variant = tower.get_module(i)
 		if module == null:
@@ -572,8 +576,8 @@ func _show_upgrade_choice() -> void:
 		upgrade_ui.show_support_choice(guaranteed_supports)
 		return
 
-	# 3番目のアップグレード（40m）: まだ手動移動ならMove AIチップを提示
-	if upgrade_events_given == 3:
+	# 2番目のアップグレード（40m）: まだ手動移動ならMove AIチップを提示
+	if upgrade_events_given == 2:
 		var move_chip: Dictionary = build_system.get_equipped_chip("move")
 		var move_id: String = move_chip.get("id", "manual")
 		if move_id == "manual" or move_id == "":

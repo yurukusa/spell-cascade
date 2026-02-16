@@ -101,9 +101,9 @@ func _fire() -> void:
 		if randf() < stats["misfire_chance"]:
 			return  # 不発
 
+	# v0.2.6: 敵不在でも発射する（facing方向に撃つ）
+	# なぜ: 敵がいないと何も起きない→退屈。最低1挙動を保証（ぐらすFB）
 	var enemies := get_tree().get_nodes_in_group("enemies")
-	if enemies.is_empty():
-		return
 
 	SFX.play_shot()
 	fire_count += 1
@@ -125,10 +125,14 @@ func _fire() -> void:
 		_fire_spread(8)
 		return
 
-	# Attack chipで方向決定
+	# Attack chipで方向決定（v0.2.6: 敵不在時はfacing方向にフォールバック）
 	var direction := _get_aim_direction(enemies)
 	if direction == Vector2.ZERO:
-		return
+		var tower_ref2 := get_parent()
+		if tower_ref2 and "facing_dir" in tower_ref2:
+			direction = tower_ref2.facing_dir
+		else:
+			direction = Vector2.UP
 	var proj_count: int = stats.get("projectile_count", 1)
 	# レベルアップの追加弾数
 	var tower_ref := get_parent()
