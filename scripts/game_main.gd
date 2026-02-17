@@ -64,10 +64,10 @@ var shrine_shown := false
 var shrine_ui: Control = null
 var shrine_timer := 0.0
 
-# Onboarding overlay（初回ガイド: 10秒 or 初回アップグレードで消える）
+# Onboarding overlay（初回ガイド: 5秒 or 初回アップグレードで消える）
 var onboarding_panel: PanelContainer = null
 var onboarding_timer := 0.0
-const ONBOARDING_DURATION := 10.0
+const ONBOARDING_DURATION := 5.0
 
 # 判断イベント管理（v0.2.6: 距離ベース完全削除、XP levelupのみ）
 # なぜ: 距離だけで敵倒してないのにupgrade乱発→違和感（ぐらす最終判断）
