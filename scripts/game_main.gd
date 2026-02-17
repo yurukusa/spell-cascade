@@ -76,13 +76,13 @@ var upgrade_events_given := 0
 # 敵スポーン
 var enemy_scene: PackedScene
 var spawn_timer := 0.0
-var spawn_interval := 1.5  # 縦スクロール: 少しゆったり（手動操作のため）
+var spawn_interval := 1.2  # v0.3: Dead Time改善のため密度UP（旧1.5）
 
 # ステージランプ（v0.3.2: 3-Act構造）
 var current_stage := 1  # 1=vulnerability, 2=growth, 3=crisis
 const STAGE_2_TIME := 20.0  # Stage 2 開始時間
 const STAGE_3_TIME := 40.0  # Stage 3 開始時間
-const STAGE_SPAWN_MULT = [0.8, 1.2, 1.6]  # ステージ別スポーン速度倍率
+const STAGE_SPAWN_MULT = [1.0, 1.2, 1.6]  # v0.3: Stage1を0.8→1.0（序盤の空白削減）
 const STAGE_HP_MULT = [1.0, 1.3, 1.8]  # ステージ別敵HP倍率
 const DESPERATE_PUSH_TIME = 45.0  # 最後15秒のスポーン加速開始
 
@@ -810,7 +810,7 @@ func _spawn_boss() -> void:
 	var progress_scale := 1.0 + distance_m / 50.0 + run_time / 120.0
 	var hp_val := 35.0 * progress_scale  # v0.3.1: HP+40%
 	var speed_val := 75.0 + distance_m * 0.12 + run_time * 0.12  # v0.3.1: 速度+15%
-	var dmg_val := 10.0 + distance_m * 0.03  # v0.3.1: 敵圧+67%
+	var dmg_val := 14.0 + distance_m * 0.03  # v0.3: 10→14（緊張感UP）
 
 	boss.init(tower, speed_val, hp_val, dmg_val, "boss")
 	boss.add_to_group("enemies")
@@ -1036,7 +1036,7 @@ func _spawn_enemy() -> void:
 	var stage_hp: float = STAGE_HP_MULT[current_stage - 1]
 	var hp_val: float = 35.0 * progress_scale * stage_hp  # v0.3.2: ステージ別HP倍率
 	var speed_val := 75.0 + distance_m * 0.12 + run_time * 0.12
-	var dmg_val := 10.0 + distance_m * 0.03
+	var dmg_val := 14.0 + distance_m * 0.03  # v0.3: 10→14（HP500に対して体感できるダメージ）
 
 	# 敵タイプ選択: ステージ別ゲーティング（v0.3.2）
 	# Stage 1: normal only / Stage 2: +swarmer / Stage 3: +tank
