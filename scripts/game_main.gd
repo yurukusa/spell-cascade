@@ -182,8 +182,8 @@ func _process(delta: float) -> void:
 		spawn_timer = 0.0
 		_spawn_enemy()
 
-	# スポーンフロア: t=15s以降、最低4体を維持（後半の敵圧崩壊対策）
-	if run_time >= 15.0 and enemies_alive < 4 and not boss_spawned and spawn_timer >= current_interval * 0.5:
+	# スポーンフロア: t=5s以降、最低4体を維持（v0.3: Dead Time対策で15s→5sに前倒し）
+	if run_time >= 5.0 and enemies_alive < 4 and not boss_spawned and spawn_timer >= current_interval * 0.5:
 		spawn_timer = 0.0
 		_spawn_enemy()
 
