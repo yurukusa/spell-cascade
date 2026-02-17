@@ -35,9 +35,45 @@ func take_damage(amount: float) -> void:
 	hp -= amount
 	hp_changed.emit(hp, max_hp)
 
+	# 被弾フィードバック: 画面フラッシュ + ヒットフリーズ + シェイク
+	_hit_feedback(amount)
+
 	if hp <= 0:
 		hp = 0
 		died.emit()
+
+func _hit_feedback(amount: float) -> void:
+	# 画面赤フラッシュ（ダメージ量でα強度変化）
+	var flash_alpha := clampf(amount / max_hp * 3.0, 0.1, 0.4)
+	var flash := ColorRect.new()
+	flash.color = Color(1.0, 0.1, 0.05, flash_alpha)
+	flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flash.z_index = 200
+	# CanvasLayerに追加して確実にUIの上に表示
+	var ui_layer := get_tree().current_scene.get_node_or_null("UI")
+	if ui_layer:
+		ui_layer.add_child(flash)
+	else:
+		get_tree().current_scene.add_child(flash)
+	var tween := flash.create_tween()
+	tween.tween_property(flash, "color:a", 0.0, 0.15)
+	tween.tween_callback(flash.queue_free)
+
+	# ヒットフリーズ（50ms）— 大ダメージほど長い
+	var freeze_ms := 30 if amount < 15.0 else 50
+	Engine.time_scale = 0.05
+	await get_tree().create_timer(freeze_ms * 0.001 * 0.05).timeout  # real time
+	Engine.time_scale = 1.0
+
+	# スクリーンシェイク（Tower経由）
+	var tower := get_node_or_null("../Tower")
+	if tower and tower.has_method("shake"):
+		var intensity := clampf(amount / 5.0, 2.0, 8.0)
+		tower.shake(intensity)
+
+	# 被弾SE
+	SFX.play_damage()
 
 func add_orb(orb_type: String) -> void:
 	orbs.append(orb_type)

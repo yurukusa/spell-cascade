@@ -42,6 +42,9 @@ var crush_warning_label: Label = null  # pre-crush "DANGER" 表示
 
 # Boss HP bar
 var boss_hp_bar: ProgressBar = null
+
+# Hitstop リエントラント管理（複数同時呼び出しで早期復帰を防止）
+var _hitstop_depth := 0
 var boss_hp_label: Label = null
 var boss_phase_label: Label = null
 
@@ -1337,23 +1340,73 @@ func _apply_levelup_stat(stat_id: String) -> void:
 			tower.attract_range_bonus += 100.0
 
 func _spawn_levelup_vfx() -> void:
-	# 金色の拡散リングで「レベルアップ感」
-	var ring := Polygon2D.new()
-	var pts: PackedVector2Array = []
-	for i in range(16):
-		var a := i * TAU / 16
-		pts.append(Vector2(cos(a), sin(a)) * 20.0)
-	ring.polygon = pts
-	ring.color = Color(1.0, 0.9, 0.4, 0.6)
-	ring.global_position = tower.global_position
-	ring.z_index = 150
-	add_child(ring)
+	# ヒットフリーズ（80ms）— レベルアップの「重み」を演出
+	_do_hitstop(0.08)
 
-	var tween := ring.create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(ring, "scale", Vector2(4.0, 4.0), 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tween.tween_property(ring, "modulate:a", 0.0, 0.4)
-	tween.chain().tween_callback(ring.queue_free)
+	var pos := tower.global_position
+
+	# 金色の拡散リング（2重）
+	for ring_i in range(2):
+		var ring := Polygon2D.new()
+		var pts: PackedVector2Array = []
+		for i in range(16):
+			var a := i * TAU / 16
+			pts.append(Vector2(cos(a), sin(a)) * 20.0)
+		ring.polygon = pts
+		ring.color = Color(1.0, 0.9, 0.4, 0.6 - ring_i * 0.2)
+		ring.global_position = pos
+		ring.z_index = 150
+		add_child(ring)
+
+		var target_scale := 4.0 + ring_i * 2.0
+		var duration := 0.4 + ring_i * 0.15
+		var tween := ring.create_tween()
+		tween.set_parallel(true)
+		tween.tween_property(ring, "scale", Vector2(target_scale, target_scale), duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tween.tween_property(ring, "modulate:a", 0.0, duration)
+		tween.chain().tween_callback(ring.queue_free)
+
+	# パーティクル爆散（12個の金色破片）
+	for i in range(12):
+		var frag := Polygon2D.new()
+		var angle := randf() * TAU
+		var size := randf_range(3.0, 6.0)
+		frag.polygon = PackedVector2Array([
+			Vector2(-size, -size * 0.4),
+			Vector2(size, 0),
+			Vector2(-size, size * 0.4),
+		])
+		frag.color = Color(1.0, 0.85 + randf() * 0.15, 0.3 + randf() * 0.3, 0.9)
+		frag.global_position = pos
+		frag.rotation = angle
+		frag.z_index = 151
+		add_child(frag)
+
+		var dist := randf_range(40.0, 100.0)
+		var target_pos := pos + Vector2(cos(angle), sin(angle)) * dist
+		var frag_tween := frag.create_tween()
+		frag_tween.set_parallel(true)
+		frag_tween.tween_property(frag, "global_position", target_pos, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		frag_tween.tween_property(frag, "modulate:a", 0.0, 0.35).set_delay(0.1)
+		frag_tween.tween_property(frag, "scale", Vector2(0.2, 0.2), 0.35)
+		frag_tween.chain().tween_callback(frag.queue_free)
+
+	# 画面フラッシュ（金色、レベルアップの喜び）
+	var flash := ColorRect.new()
+	flash.color = Color(1.0, 0.9, 0.4, 0.2)
+	flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var ui := get_node_or_null("UI")
+	if ui:
+		ui.add_child(flash)
+	else:
+		add_child(flash)
+	var flash_tween := flash.create_tween()
+	flash_tween.tween_property(flash, "color:a", 0.0, 0.2)
+	flash_tween.tween_callback(flash.queue_free)
+
+	# スクリーンシェイク
+	tower.shake(4.0)
 
 func _update_offscreen_indicators() -> void:
 	## 画面外の敵に対して画面端に赤い矢印を表示
@@ -1484,11 +1537,13 @@ func _show_milestone(meters: int) -> void:
 
 func _on_tower_destroyed() -> void:
 	game_over = true
+	_reset_time_scale()
 	SFX.stop_bgm()
 	_show_result_screen(false)
 
 func _win_game() -> void:
 	game_over = true
+	_reset_time_scale()
 	SFX.stop_bgm()
 	_show_result_screen(true)
 
@@ -1653,11 +1708,26 @@ func _save_unlocked_chips() -> void:
 
 func _do_hitstop(duration: float) -> void:
 	## 一瞬のタイムスケール低下で「重い手応え」を演出
+	## リエントラント安全: 複数同時呼び出しでも最後の1つが復帰するまで凍結維持
+	_hitstop_depth += 1
 	Engine.time_scale = 0.05
-	# 復帰にはSceneTreeTimerを使う（time_scaleの影響を受けない）
+	# process_always=true タイマーで time_scale の影響を受けない
 	get_tree().create_timer(duration, true, false, true).timeout.connect(func():
-		Engine.time_scale = 1.0
+		_hitstop_depth -= 1
+		if _hitstop_depth <= 0:
+			_hitstop_depth = 0
+			Engine.time_scale = 1.0
 	)
+
+func _reset_time_scale() -> void:
+	## game over / scene遷移時の安全弁: hitstop状態を強制解除
+	_hitstop_depth = 0
+	Engine.time_scale = 1.0
+
+func _exit_tree() -> void:
+	## シーン破棄時にtime_scaleが残留しないよう強制リセット
+	Engine.time_scale = 1.0
+	_hitstop_depth = 0
 
 func _flash_tower_kill_glow() -> void:
 	## キル時にタワーがシアンに一瞬光る（報酬フィードバック）
@@ -1671,9 +1741,11 @@ func _flash_tower_kill_glow() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed:
 		if event.keycode == KEY_R and game_over:
+			_reset_time_scale()
 			get_tree().paused = false
 			get_tree().reload_current_scene()
 		elif event.keycode == KEY_T and game_over:
+			_reset_time_scale()
 			get_tree().paused = false
 			get_tree().change_scene_to_file("res://scenes/title.tscn")
 		elif event.keycode == KEY_ESCAPE and not game_over:
