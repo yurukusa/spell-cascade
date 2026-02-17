@@ -23,7 +23,10 @@ const HIT_POOL_SIZE := 6
 var _shot_idx := 0
 var _hit_idx := 0
 
-var _bgm_player: AudioStreamPlayer
+var _bgm_player: AudioStreamPlayer       # Battle BGM (Wave 1-15)
+var _bgm_intense_player: AudioStreamPlayer  # Intense BGM (Wave 16+)
+var _bgm_boss_player: AudioStreamPlayer     # Boss BGM
+var _current_bgm: String = ""  # "battle", "intense", "boss"
 var _wave_clear_player: AudioStreamPlayer
 var _boss_entrance_player: AudioStreamPlayer
 var _ui_cancel_player: AudioStreamPlayer
@@ -119,6 +122,16 @@ func _ready() -> void:
 	_bgm_player.volume_db = -12.0  # BGMは控えめに（SE優先）
 	add_child(_bgm_player)
 
+	_bgm_intense_player = AudioStreamPlayer.new()
+	_bgm_intense_player.stream = _gen_bgm_intense()
+	_bgm_intense_player.volume_db = -10.0
+	add_child(_bgm_intense_player)
+
+	_bgm_boss_player = AudioStreamPlayer.new()
+	_bgm_boss_player.stream = _gen_bgm_boss()
+	_bgm_boss_player.volume_db = -8.0
+	add_child(_bgm_boss_player)
+
 	# Wave Clear: pyfxr WAV (combo_tierup) があればそれ、なければ procedural
 	var wc_stream: AudioStream = _try_load_wav("combo_tierup.wav")
 	if wc_stream == null:
@@ -199,13 +212,33 @@ func play_level_up() -> void:
 	_xp_pitch_streak = 0.0  # レベルアップでリセット
 
 func play_bgm() -> void:
-	if not _bgm_playing:
-		_bgm_player.play()
-		_bgm_playing = true
+	switch_bgm("battle")
 
 func stop_bgm() -> void:
 	_bgm_player.stop()
+	_bgm_intense_player.stop()
+	_bgm_boss_player.stop()
 	_bgm_playing = false
+	_current_bgm = ""
+
+## 状況に応じたBGM切替
+func switch_bgm(track: String) -> void:
+	if _current_bgm == track:
+		return
+	# 全トラック停止
+	_bgm_player.stop()
+	_bgm_intense_player.stop()
+	_bgm_boss_player.stop()
+	# 該当トラック再生
+	match track:
+		"battle":
+			_bgm_player.play()
+		"intense":
+			_bgm_intense_player.play()
+		"boss":
+			_bgm_boss_player.play()
+	_current_bgm = track
+	_bgm_playing = true
 
 func play_wave_clear() -> void:
 	_wave_clear_player.pitch_scale = randf_range(0.95, 1.05)
@@ -549,3 +582,93 @@ func _gen_ui_cancel() -> AudioStreamWAV:
 		var s := env * 0.35 * sin(TAU * freq * t)
 		samples[i] = s
 	return _make_stream(samples)
+
+## Intense BGM: テンポアップ版ダークアンビエント (8s)
+## Wave 16+で切り替え。Dm調、速いアルペジオ + パルスベース + ハイハット風
+func _gen_bgm_intense() -> AudioStreamWAV:
+	var dur := 8.0
+	var count := int(SAMPLE_RATE * dur)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var bass_freq := 73.42  # D2 ドローン
+	var arp_notes := [293.66, 349.23, 440.0, 587.33]  # D4, F4, A4, D5
+	var arp_speed := 0.25
+	var pulse_interval := 0.125
+	for i in count:
+		var t := float(i) / SAMPLE_RATE
+		var s := 0.0
+		# パルスベース
+		var pulse_t := fmod(t, pulse_interval)
+		var pulse_env := exp(-pulse_t * 40.0)
+		s += 0.3 * pulse_env * sin(TAU * bass_freq * t)
+		s += 0.12 * pulse_env * sin(TAU * bass_freq * 2.0 * t)
+		# 高速アルペジオ
+		var arp_idx := int(t / arp_speed) % 4
+		var arp_t := fmod(t, arp_speed)
+		var arp_freq: float = arp_notes[arp_idx]
+		var arp_env := 0.0
+		if arp_t < 0.01:
+			arp_env = arp_t / 0.01
+		else:
+			arp_env = exp(-(arp_t - 0.01) * 6.0)
+		s += 0.15 * arp_env * sin(TAU * arp_freq * t)
+		s += 0.05 * arp_env * sin(TAU * arp_freq * 2.0 * t)
+		# ハイハット風ノイズ
+		var hh_t := fmod(t, 0.25)
+		if hh_t < 0.02:
+			var noise_val := sin(TAU * 7919.0 * t) * sin(TAU * 5101.0 * t)
+			s += 0.08 * noise_val * (1.0 - hh_t / 0.02)
+		# テンションパッド
+		var pad_lfo := sin(TAU * 0.2 * t)
+		s += 0.05 * sin(TAU * (174.61 + pad_lfo * 3.0) * t)
+		s += 0.04 * sin(TAU * (220.0 + pad_lfo * 2.0) * t)
+		var breath := 0.9 + 0.1 * sin(TAU * 0.25 * t)
+		samples[i] = s * breath * 0.55
+	var stream := _make_stream(samples)
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_begin = 0
+	stream.loop_end = count
+	return stream
+
+## Boss BGM: 威圧的な低音ドローン + 緊張感 (8s)
+func _gen_bgm_boss() -> AudioStreamWAV:
+	var dur := 8.0
+	var count := int(SAMPLE_RATE * dur)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var drone_freq := 41.2  # E1
+	for i in count:
+		var t := float(i) / SAMPLE_RATE
+		var s := 0.0
+		# 超低音ドローン: E1 + 5度 B1
+		var drone_lfo := 1.0 + 0.03 * sin(TAU * 0.15 * t)
+		s += 0.35 * sin(TAU * drone_freq * drone_lfo * t)
+		s += 0.2 * sin(TAU * 61.74 * t)
+		# 心拍パルス
+		var heartbeat_t := fmod(t, 0.8)
+		var hb_env := 0.0
+		if heartbeat_t < 0.05:
+			hb_env = heartbeat_t / 0.05
+		elif heartbeat_t < 0.15:
+			hb_env = exp(-(heartbeat_t - 0.05) * 20.0)
+		var hb2_t := heartbeat_t - 0.2
+		if hb2_t > 0.0 and hb2_t < 0.1:
+			hb_env += exp(-hb2_t * 25.0) * 0.6
+		s += 0.25 * hb_env * sin(TAU * 82.41 * t)
+		# 不協和パッド: トライトーン
+		var dissonance_lfo := sin(TAU * 0.08 * t)
+		s += 0.06 * sin(TAU * (116.54 + dissonance_lfo * 2.0) * t)
+		s += 0.04 * sin(TAU * (155.56 + dissonance_lfo * 1.5) * t)
+		# サイレン的上昇
+		var siren_phase := fmod(t, 4.0) / 4.0
+		var siren_freq := 200.0 + siren_phase * 400.0
+		s += 0.08 * siren_phase * sin(TAU * siren_freq * t)
+		# 金属的リバーブ風
+		s += 0.03 * sin(TAU * 1500.0 * t) * exp(-fmod(t, 2.0) * 3.0)
+		var breath := 0.85 + 0.15 * sin(TAU * 0.125 * t)
+		samples[i] = s * breath * 0.5
+	var stream := _make_stream(samples)
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_begin = 0
+	stream.loop_end = count
+	return stream

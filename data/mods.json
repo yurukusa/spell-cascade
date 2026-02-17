@@ -45,6 +45,96 @@
       "bonus": {"crit_chance": 0.2, "crit_mult": 3.0},
       "penalty": {"misfire_chance": 0.1},
       "weight": 60
+    },
+    {
+      "id": "thundering",
+      "name": "Thundering",
+      "description": "20% chance on hit: lightning chains to a nearby enemy (60px, 50% dmg). -10% damage.",
+      "tags": ["lightning"],
+      "bonus": {"lightning_chain_chance": 0.2, "lightning_chain_range": 60.0, "lightning_chain_dmg_pct": 0.5},
+      "penalty": {"damage_mult": 0.9},
+      "weight": 70
+    },
+    {
+      "id": "vampiric",
+      "name": "Vampiric",
+      "description": "Heal 5 HP on kill but -20% damage.",
+      "tags": ["life"],
+      "bonus": {"hp_on_kill": 5},
+      "penalty": {"damage_mult": 0.8},
+      "weight": 75
+    },
+    {
+      "id": "piercing",
+      "name": "Piercing",
+      "description": "+1 pierce but -10% projectile speed.",
+      "tags": ["projectile"],
+      "bonus": {"bonus_pierce": 1},
+      "penalty": {"speed_mult": 0.9},
+      "weight": 80
+    },
+    {
+      "id": "explosive",
+      "name": "Explosive",
+      "description": "On kill: 60px explosion dealing 30% of damage to nearby enemies.",
+      "tags": ["fire", "area"],
+      "bonus": {"on_kill_explode_radius": 60.0, "on_kill_explode_dmg_pct": 0.3},
+      "penalty": {},
+      "weight": 65
+    },
+    {
+      "id": "toxic",
+      "name": "Toxic",
+      "description": "Poison DoT (2 dmg/s, 5s stacking). -5% attack speed.",
+      "tags": ["chaos"],
+      "bonus": {"add_dot": {"damage": 2, "duration": 5.0, "element": "poison"}},
+      "penalty": {"cooldown_mult": 1.05},
+      "weight": 75
+    },
+    {
+      "id": "arcane",
+      "name": "Arcane",
+      "description": "+30% cooldown reduction but -20% max HP.",
+      "tags": ["arcane"],
+      "bonus": {"cooldown_mult": 0.7},
+      "penalty": {"max_hp_mult": 0.8},
+      "weight": 60
+    },
+    {
+      "id": "berserker",
+      "name": "Berserker",
+      "description": "+80% damage when HP below 50%.",
+      "tags": ["damage"],
+      "bonus": {"berserker_threshold": 0.5, "berserker_dmg_mult": 1.8},
+      "penalty": {},
+      "weight": 55
+    },
+    {
+      "id": "splitting",
+      "name": "Splitting",
+      "description": "On hit: 2 split projectiles (50% dmg). -15% damage.",
+      "tags": ["projectile"],
+      "bonus": {"split_count": 2, "split_dmg_pct": 0.5},
+      "penalty": {"damage_mult": 0.85},
+      "weight": 50
+    },
+    {
+      "id": "gravitational",
+      "name": "Gravitational",
+      "description": "Projectiles pull enemies inward (40px/s). -10% range.",
+      "tags": ["area"],
+      "bonus": {"gravity_pull": 40.0},
+      "penalty": {"range_mult": 0.9},
+      "weight": 55
+    },
+    {
+      "id": "lucky",
+      "name": "Lucky",
+      "description": "+50% drop rate but -10% damage.",
+      "tags": ["fortune"],
+      "bonus": {"drop_rate_mult": 1.5},
+      "penalty": {"damage_mult": 0.9},
+      "weight": 70
     }
   ],
   "suffixes": [
@@ -92,6 +182,96 @@
       "bonus": {"add_dot": {"damage": 3, "duration": 3.0, "element": "poison"}},
       "penalty": {"self_damage_per_attack": 1},
       "weight": 60
+    },
+    {
+      "id": "of_vampirism",
+      "name": "of Vampirism",
+      "description": "Heal 3% of damage dealt as HP.",
+      "tags": ["life"],
+      "bonus": {"life_steal_pct": 0.03},
+      "penalty": {},
+      "weight": 65
+    },
+    {
+      "id": "of_explosion",
+      "name": "of Explosion",
+      "description": "On hit: 30px AoE dealing 40% damage.",
+      "tags": ["fire", "area"],
+      "bonus": {"on_hit_explode_radius": 30.0, "on_hit_explode_dmg_pct": 0.4},
+      "penalty": {},
+      "weight": 55
+    },
+    {
+      "id": "of_seeking",
+      "name": "of Seeking",
+      "description": "Projectiles slightly home toward enemies.",
+      "tags": ["projectile"],
+      "bonus": {"homing_strength": 2.0},
+      "penalty": {},
+      "weight": 60
+    },
+    {
+      "id": "of_giants",
+      "name": "of Giants",
+      "description": "+40% projectile size but -5% speed.",
+      "tags": ["projectile"],
+      "bonus": {"projectile_size_mult": 1.4},
+      "penalty": {"speed_mult": 0.95},
+      "weight": 70
+    },
+    {
+      "id": "of_echoing",
+      "name": "of Echoing",
+      "description": "30% chance to fire an extra shot.",
+      "tags": ["spell"],
+      "bonus": {"echo_chance": 0.3},
+      "penalty": {},
+      "weight": 55
+    },
+    {
+      "id": "of_draining",
+      "name": "of Draining",
+      "description": "Hit enemies are slowed 30% for 2s.",
+      "tags": ["cold"],
+      "bonus": {"on_hit_slow": 0.3, "on_hit_slow_duration": 2.0},
+      "penalty": {},
+      "weight": 65
+    },
+    {
+      "id": "of_thorns",
+      "name": "of Thorns",
+      "description": "When hit, reflect 50% damage back to nearby enemies (80px).",
+      "tags": ["damage"],
+      "bonus": {"thorns_pct": 0.5, "thorns_radius": 80.0},
+      "penalty": {},
+      "weight": 50
+    },
+    {
+      "id": "of_fortune",
+      "name": "of Fortune",
+      "description": "5% chance on kill to gain a bonus upgrade.",
+      "tags": ["fortune"],
+      "bonus": {"upgrade_on_kill_chance": 0.05},
+      "penalty": {},
+      "weight": 45
+    },
+    {
+      "id": "of_shattering",
+      "name": "of Shattering",
+      "description": "Critical hits freeze enemies for 1.5s.",
+      "tags": ["cold"],
+      "bonus": {"crit_freeze_duration": 1.5},
+      "penalty": {},
+      "weight": 50
+    },
+    {
+      "id": "of_phantom",
+      "name": "of Phantom",
+      "description": "10% chance: ghost bullet that passes through walls.",
+      "tags": ["arcane"],
+      "bonus": {"ghost_chance": 0.1},
+      "penalty": {},
+      "weight": 55
     }
   ]
 }

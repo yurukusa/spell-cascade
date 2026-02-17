@@ -56,6 +56,30 @@
       "description": "Piercing beam of light. High damage, slow fire rate.",
       "visual": "line_white",
       "pierce": true
+    },
+    {
+      "id": "summon_wisp",
+      "name": "Summon Wisp",
+      "tags": ["arcane", "summon", "spell"],
+      "base_damage": 6,
+      "base_cooldown": 10.0,
+      "base_range": 250,
+      "description": "Summons a wisp that orbits and auto-attacks for 10s.",
+      "visual": "circle_cyan",
+      "summon_duration": 10.0,
+      "summon_attack_cd": 0.8
+    },
+    {
+      "id": "meteor",
+      "name": "Meteor",
+      "tags": ["fire", "area", "spell"],
+      "base_damage": 60,
+      "base_cooldown": 6.0,
+      "base_range": 400,
+      "description": "Calls down a meteor on the densest enemy cluster. Massive AoE.",
+      "visual": "circle_orange",
+      "area_radius": 80,
+      "meteor_delay": 0.8
     }
   ]
 }

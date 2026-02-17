@@ -130,6 +130,10 @@ func calculate_module_stats(module: TowerModule) -> Dictionary:
 		"spread_angle": skill_data.get("spread_angle", 0),
 		"area_radius": skill_data.get("area_radius", 0),
 		"pierce": skill_data.get("pierce", false),
+		# Summon/Meteor用フィールド（該当スキルのみ非ゼロ）
+		"summon_duration": skill_data.get("summon_duration", 0.0),
+		"summon_attack_cd": skill_data.get("summon_attack_cd", 0.0),
+		"meteor_delay": skill_data.get("meteor_delay", 0.0),
 		# Mod系デフォルト値（未定義参照防止）
 		"crit_chance": 0.0,
 		"crit_mult": 1.0,
@@ -142,6 +146,35 @@ func calculate_module_stats(module: TowerModule) -> Dictionary:
 		"misfire_chance": 0.0,
 		"self_damage_per_attack": 0.0,
 		"add_dot": {},
+		# v0.4 新Mod用デフォルト値
+		"lightning_chain_chance": 0.0,
+		"lightning_chain_range": 0.0,
+		"lightning_chain_dmg_pct": 0.0,
+		"hp_on_kill": 0,
+		"bonus_pierce": 0,
+		"speed_mult": 1.0,
+		"on_kill_explode_radius": 0.0,
+		"on_kill_explode_dmg_pct": 0.0,
+		"max_hp_mult": 1.0,
+		"berserker_threshold": 0.0,
+		"berserker_dmg_mult": 1.0,
+		"split_count": 0,
+		"split_dmg_pct": 0.0,
+		"gravity_pull": 0.0,
+		"drop_rate_mult": 1.0,
+		"life_steal_pct": 0.0,
+		"on_hit_explode_radius": 0.0,
+		"on_hit_explode_dmg_pct": 0.0,
+		"homing_strength": 0.0,
+		"projectile_size_mult": 1.0,
+		"echo_chance": 0.0,
+		"on_hit_slow": 0.0,
+		"on_hit_slow_duration": 0.0,
+		"thorns_pct": 0.0,
+		"thorns_radius": 0.0,
+		"upgrade_on_kill_chance": 0.0,
+		"crit_freeze_duration": 0.0,
+		"ghost_chance": 0.0,
 	}
 
 	# サポート適用（挙動変化）
@@ -201,6 +234,51 @@ func _apply_mod(stats: Dictionary, mod: Dictionary) -> void:
 		stats["first_strike_instant"] = true
 	if bonus.has("add_dot"):
 		stats["add_dot"] = bonus["add_dot"]
+	# v0.4 新bonus key
+	if bonus.has("lightning_chain_chance"):
+		stats["lightning_chain_chance"] = bonus["lightning_chain_chance"]
+		stats["lightning_chain_range"] = bonus.get("lightning_chain_range", 60.0)
+		stats["lightning_chain_dmg_pct"] = bonus.get("lightning_chain_dmg_pct", 0.5)
+	if bonus.has("hp_on_kill"):
+		stats["hp_on_kill"] = bonus["hp_on_kill"]
+	if bonus.has("bonus_pierce"):
+		stats["bonus_pierce"] = bonus["bonus_pierce"]
+	if bonus.has("on_kill_explode_radius"):
+		stats["on_kill_explode_radius"] = bonus["on_kill_explode_radius"]
+		stats["on_kill_explode_dmg_pct"] = bonus.get("on_kill_explode_dmg_pct", 0.3)
+	if bonus.has("berserker_threshold"):
+		stats["berserker_threshold"] = bonus["berserker_threshold"]
+		stats["berserker_dmg_mult"] = bonus.get("berserker_dmg_mult", 1.8)
+	if bonus.has("split_count"):
+		stats["split_count"] = bonus["split_count"]
+		stats["split_dmg_pct"] = bonus.get("split_dmg_pct", 0.5)
+	if bonus.has("gravity_pull"):
+		stats["gravity_pull"] = bonus["gravity_pull"]
+	if bonus.has("drop_rate_mult"):
+		stats["drop_rate_mult"] = bonus["drop_rate_mult"]
+	if bonus.has("life_steal_pct"):
+		stats["life_steal_pct"] = bonus["life_steal_pct"]
+	if bonus.has("on_hit_explode_radius"):
+		stats["on_hit_explode_radius"] = bonus["on_hit_explode_radius"]
+		stats["on_hit_explode_dmg_pct"] = bonus.get("on_hit_explode_dmg_pct", 0.4)
+	if bonus.has("homing_strength"):
+		stats["homing_strength"] = bonus["homing_strength"]
+	if bonus.has("projectile_size_mult"):
+		stats["projectile_size_mult"] = bonus["projectile_size_mult"]
+	if bonus.has("echo_chance"):
+		stats["echo_chance"] = bonus["echo_chance"]
+	if bonus.has("on_hit_slow"):
+		stats["on_hit_slow"] = bonus["on_hit_slow"]
+		stats["on_hit_slow_duration"] = bonus.get("on_hit_slow_duration", 2.0)
+	if bonus.has("thorns_pct"):
+		stats["thorns_pct"] = bonus["thorns_pct"]
+		stats["thorns_radius"] = bonus.get("thorns_radius", 80.0)
+	if bonus.has("upgrade_on_kill_chance"):
+		stats["upgrade_on_kill_chance"] = bonus["upgrade_on_kill_chance"]
+	if bonus.has("crit_freeze_duration"):
+		stats["crit_freeze_duration"] = bonus["crit_freeze_duration"]
+	if bonus.has("ghost_chance"):
+		stats["ghost_chance"] = bonus["ghost_chance"]
 
 	# ペナルティ適用
 	if penalty.has("damage_mult"):
@@ -213,6 +291,10 @@ func _apply_mod(stats: Dictionary, mod: Dictionary) -> void:
 		stats["misfire_chance"] = penalty["misfire_chance"]
 	if penalty.has("self_damage_per_attack"):
 		stats["self_damage_per_attack"] = penalty["self_damage_per_attack"]
+	if penalty.has("speed_mult"):
+		stats["speed_mult"] *= penalty["speed_mult"]
+	if penalty.has("max_hp_mult"):
+		stats["max_hp_mult"] *= penalty["max_hp_mult"]
 
 	# Modのタグも追加
 	for tag in mod.get("tags", []):
@@ -239,6 +321,17 @@ func check_active_synergies(modules: Array) -> Array[Dictionary]:
 			if tag not in all_tags:
 				all_tags.append(tag)
 
+	# 全モジュールのスキルIDとprefixを集約
+	var all_skill_ids: Array[String] = []
+	var all_prefix_ids: Array[String] = []
+	for module in modules:
+		if module.skill_id not in all_skill_ids:
+			all_skill_ids.append(module.skill_id)
+		if not module.prefix.is_empty():
+			var pid: String = module.prefix.get("id", "")
+			if pid != "" and pid not in all_prefix_ids:
+				all_prefix_ids.append(pid)
+
 	# シナジー条件チェック
 	for synergy in synergies:
 		var condition: Dictionary = synergy.get("condition", {})
@@ -263,6 +356,23 @@ func check_active_synergies(modules: Array) -> Array[Dictionary]:
 					if tag in all_tags:
 						count += 1
 				if count >= min_unique:
+					active.append(synergy)
+
+			"skill_support_combo":
+				var req_skill: String = condition.get("required_skill", "")
+				var req_sups: Array = condition.get("required_supports", [])
+				if req_skill in all_skill_ids:
+					var has_sups := true
+					for s in req_sups:
+						if s not in all_support_ids:
+							has_sups = false
+							break
+					if has_sups:
+						active.append(synergy)
+
+			"prefix_variety":
+				var min_prefixes: int = condition.get("min_unique_prefixes", 3)
+				if all_prefix_ids.size() >= min_prefixes:
 					active.append(synergy)
 
 	return active

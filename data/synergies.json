@@ -1,5 +1,5 @@
 {
-  "_comment": "ゲームチェンジシナジー。特定条件で「別ゲー」になる組み合わせ。Week1は3つだけ。",
+  "_comment": "ゲームチェンジシナジー。特定条件で「別ゲー」になる組み合わせ。v0.4: 8種。",
   "synergies": [
     {
       "id": "chain_reaction",
@@ -45,6 +45,88 @@
         "_game_change": "Enemies melt. The investment of diverse elements pays off massively."
       },
       "discovery_hint": "If you master all elements..."
+    },
+    {
+      "id": "frozen_storm",
+      "name": "Frozen Storm",
+      "description": "Ice Shard skill + Chain support: Chain bounces propagate freeze. Each bounced enemy is frozen for 1s.",
+      "condition": {
+        "type": "skill_support_combo",
+        "required_skill": "ice_shard",
+        "required_supports": ["chain"]
+      },
+      "effect": {
+        "chain_propagates_freeze": true,
+        "chain_freeze_duration": 1.0,
+        "_game_change": "One ice shard freezes an entire group. Chain of ice locks down the screen."
+      },
+      "discovery_hint": "A cold chain reaction... everything stops."
+    },
+    {
+      "id": "plague_bearer",
+      "name": "Plague Bearer",
+      "description": "Poison Nova skill + Spread support: Dead poisoned enemies leave toxic clouds (3s, 2 dmg/s, 40px).",
+      "condition": {
+        "type": "skill_support_combo",
+        "required_skill": "poison_nova",
+        "required_supports": ["spread"]
+      },
+      "effect": {
+        "poison_cloud_on_kill": true,
+        "cloud_radius": 40.0,
+        "cloud_duration": 3.0,
+        "cloud_dps": 2.0,
+        "_game_change": "Battlefield becomes a minefield of poison. Area denial + passive damage."
+      },
+      "discovery_hint": "When poison spreads beyond the host..."
+    },
+    {
+      "id": "thunder_god",
+      "name": "Thunder God",
+      "description": "Spark skill + Concentrate support: All projectiles merge into one AoE lightning bolt (+200% damage, 80px radius).",
+      "condition": {
+        "type": "skill_support_combo",
+        "required_skill": "spark",
+        "required_supports": ["concentrate"]
+      },
+      "effect": {
+        "merge_projectiles_aoe": true,
+        "aoe_damage_mult": 3.0,
+        "aoe_radius": 80.0,
+        "_game_change": "Instead of many weak sparks, one devastating lightning strike. Massive single-target burst."
+      },
+      "discovery_hint": "Focus all the lightning into a single point..."
+    },
+    {
+      "id": "soul_harvest",
+      "name": "Soul Harvest",
+      "description": "Holy Beam skill + Trigger support: Each kill heals tower for 10% max HP and emits a radial pulse.",
+      "condition": {
+        "type": "skill_support_combo",
+        "required_skill": "holy_beam",
+        "required_supports": ["trigger"]
+      },
+      "effect": {
+        "kill_heals_pct": 0.1,
+        "kill_pulse_radius": 60.0,
+        "kill_pulse_damage_pct": 0.5,
+        "_game_change": "Holy Beam becomes a sustain machine. Killing heals and damages nearby."
+      },
+      "discovery_hint": "The beam judges and the tower is restored..."
+    },
+    {
+      "id": "chaos_engine",
+      "name": "Chaos Engine",
+      "description": "3+ different prefix mods equipped across all modules: All prefix effects +50% stronger.",
+      "condition": {
+        "type": "prefix_variety",
+        "min_unique_prefixes": 3
+      },
+      "effect": {
+        "prefix_power_mult": 1.5,
+        "_game_change": "Mod diversity pays off. Freeze harder, burn longer, crit bigger. Jack of all trades becomes master of all."
+      },
+      "discovery_hint": "Embrace chaos. Mix everything."
     }
   ]
 }

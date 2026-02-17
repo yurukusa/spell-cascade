@@ -28,6 +28,18 @@ const BOSS_HIT_COOLDOWN_MS := 150  # 150ms以内の連続ヒットは減衰
 signal died(enemy: Node2D)
 signal boss_phase_changed(phase: int, hp_pct: float)  # game_mainがHPバー更新用
 signal boss_hp_changed(current: float, max_val: float)  # ボスHPバー更新用
+signal split_on_death(pos: Vector2)  # splitter死亡時にswarmer生成用
+
+# shooter用
+var shoot_timer := 0.0
+var shoot_cooldown := 2.0
+var preferred_distance := 200.0  # shooterが維持したい距離
+
+# healer用
+var heal_timer := 0.0
+var heal_cooldown := 1.0
+var heal_range := 100.0
+var heal_amount := 2.0  # HP/s
 
 func _ready() -> void:
 	hp = max_hp
@@ -52,6 +64,12 @@ func _install_stylized_visual() -> void:
 			_build_tank_visual(root)
 		"boss":
 			_build_boss_visual(root)
+		"shooter":
+			_build_shooter_visual(root)
+		"splitter":
+			_build_splitter_visual(root)
+		"healer":
+			_build_healer_visual(root)
 		_:
 			_build_normal_visual(root)
 
@@ -192,6 +210,106 @@ func _build_boss_visual(root: Node2D) -> void:
 	root.add_child(aura)
 	aura.z_index = -1
 
+func _build_shooter_visual(root: Node2D) -> void:
+	## シューター: 青紫の逆三角形（遠距離攻撃を示唆）
+	var outline := Polygon2D.new()
+	outline.color = Color(0.02, 0.02, 0.03, 1.0)
+	outline.polygon = PackedVector2Array([
+		Vector2(0, -28), Vector2(24, 18), Vector2(-24, 18),
+	])
+	root.add_child(outline)
+
+	var body := Polygon2D.new()
+	body.color = Color(0.3, 0.25, 0.75, 1.0)
+	body.polygon = PackedVector2Array([
+		Vector2(0, -24), Vector2(20, 14), Vector2(-20, 14),
+	])
+	root.add_child(body)
+
+	# 照準のような目（中央に赤い点）
+	var eye := Polygon2D.new()
+	eye.color = Color(1.0, 0.3, 0.2, 1.0)
+	eye.polygon = _make_ngon(6, 5.0)
+	eye.position = Vector2(0, -2)
+	root.add_child(eye)
+
+	# 弾道を暗示するライン
+	var line := Polygon2D.new()
+	line.color = Color(0.5, 0.3, 0.9, 0.15)
+	line.polygon = PackedVector2Array([
+		Vector2(-2, -28), Vector2(2, -28), Vector2(2, -50), Vector2(-2, -50),
+	])
+	root.add_child(line)
+
+func _build_splitter_visual(root: Node2D) -> void:
+	## スプリッター: 黄緑の不安定な五角形（割れそうな見た目）
+	var outline := Polygon2D.new()
+	outline.color = Color(0.02, 0.02, 0.03, 1.0)
+	outline.polygon = _make_ngon(5, 32.0)
+	root.add_child(outline)
+
+	var body := Polygon2D.new()
+	body.color = Color(0.7, 0.85, 0.2, 1.0)
+	body.polygon = _make_ngon(5, 27.0)
+	root.add_child(body)
+
+	# 割れ目のライン（中央に十字）
+	var crack_h := Polygon2D.new()
+	crack_h.color = Color(0.3, 0.4, 0.1, 0.6)
+	crack_h.polygon = PackedVector2Array([
+		Vector2(-18, -1), Vector2(18, -1), Vector2(18, 1), Vector2(-18, 1),
+	])
+	root.add_child(crack_h)
+
+	var crack_v := Polygon2D.new()
+	crack_v.color = Color(0.3, 0.4, 0.1, 0.6)
+	crack_v.polygon = PackedVector2Array([
+		Vector2(-1, -18), Vector2(1, -18), Vector2(1, 18), Vector2(-1, 18),
+	])
+	root.add_child(crack_v)
+
+	# 小さな目×2
+	for offset_x in [-7, 7]:
+		var eye := Polygon2D.new()
+		eye.color = Color(1.0, 1.0, 0.5, 1.0)
+		eye.polygon = _make_ngon(4, 3.0)
+		eye.position = Vector2(offset_x, -5)
+		root.add_child(eye)
+
+func _build_healer_visual(root: Node2D) -> void:
+	## ヒーラー: 白緑の十字形（回復役を明示）
+	var outline := Polygon2D.new()
+	outline.color = Color(0.02, 0.02, 0.03, 1.0)
+	outline.polygon = _make_ngon(8, 30.0)
+	root.add_child(outline)
+
+	var body := Polygon2D.new()
+	body.color = Color(0.3, 0.8, 0.5, 1.0)
+	body.polygon = _make_ngon(8, 25.0)
+	root.add_child(body)
+
+	# 十字マーク（回復シンボル）
+	var cross_h := Polygon2D.new()
+	cross_h.color = Color(1.0, 1.0, 0.9, 0.9)
+	cross_h.polygon = PackedVector2Array([
+		Vector2(-12, -3), Vector2(12, -3), Vector2(12, 3), Vector2(-12, 3),
+	])
+	root.add_child(cross_h)
+
+	var cross_v := Polygon2D.new()
+	cross_v.color = Color(1.0, 1.0, 0.9, 0.9)
+	cross_v.polygon = PackedVector2Array([
+		Vector2(-3, -12), Vector2(3, -12), Vector2(3, 12), Vector2(-3, 12),
+	])
+	root.add_child(cross_v)
+
+	# ヒーリングオーラ（緑、ぼんやり）
+	var aura := Polygon2D.new()
+	aura.color = Color(0.2, 0.9, 0.4, 0.1)
+	aura.polygon = _make_ngon(12, 45.0)
+	root.add_child(aura)
+	aura.z_index = -1
+
 func _make_diamond(radius: float) -> PackedVector2Array:
 	return PackedVector2Array([
 		Vector2(0, -radius),
@@ -233,6 +351,27 @@ func init(target: Node2D, spd: float = 80.0, health: float = 30.0, dmg: float = 
 			attack_cooldown = 2.0
 			is_boss = true
 			boss_attack_cd = 3.0
+		"shooter":
+			speed = spd * 0.8
+			max_hp = health * 0.7
+			damage = dmg * 0.8
+			xp_value = 2
+			attack_cooldown = 2.0
+			shoot_cooldown = 2.0
+			preferred_distance = 200.0
+		"splitter":
+			speed = spd * 0.9
+			max_hp = health * 1.5
+			damage = dmg * 0.8
+			xp_value = 2
+		"healer":
+			speed = spd * 0.7
+			max_hp = health * 0.6
+			damage = dmg * 0.3
+			xp_value = 2
+			heal_cooldown = 1.0
+			heal_range = 100.0
+			heal_amount = 2.0
 		_:  # normal
 			speed = spd
 			max_hp = health
@@ -260,21 +399,143 @@ func _physics_process(delta: float) -> void:
 		_boss_process(delta)
 		return
 
+	# タイプ別AI分岐
+	match enemy_type:
+		"shooter":
+			_shooter_process(delta)
+		"healer":
+			_healer_process(delta)
+		_:
+			_melee_process(delta)
+
+func _melee_process(delta: float) -> void:
+	## 通常/swarmer/tank/splitter共通: 接近→メレー
 	var dist := global_position.distance_to(player.global_position)
 
-	# メレー範囲外なら接近
 	if dist > 30.0:
 		var direction := (player.global_position - global_position).normalized()
 		velocity = direction * speed
 		move_and_slide()
 	else:
-		# メレー範囲内: 定期的にダメージ（DPS = damage / attack_cooldown）
 		velocity = Vector2.ZERO
 		attack_timer += delta
 		if attack_timer >= attack_cooldown:
 			attack_timer -= attack_cooldown
 			if player.has_method("take_damage"):
 				player.take_damage(damage)
+
+func _shooter_process(delta: float) -> void:
+	## シューター: preferred_distanceを維持しつつ遠距離弾を撃つ
+	var dist := global_position.distance_to(player.global_position)
+	var direction := (player.global_position - global_position).normalized()
+
+	if dist > preferred_distance + 30.0:
+		# 遠すぎる: 近づく
+		velocity = direction * speed
+	elif dist < preferred_distance - 30.0:
+		# 近すぎる: 離れる
+		velocity = -direction * speed
+	else:
+		# 適正距離: 横にゆっくり移動（回避感）
+		velocity = Vector2(-direction.y, direction.x) * speed * 0.3
+
+	move_and_slide()
+
+	# 射撃
+	shoot_timer += delta
+	if shoot_timer >= shoot_cooldown:
+		shoot_timer = 0.0
+		_fire_enemy_bullet(direction)
+
+func _fire_enemy_bullet(dir: Vector2) -> void:
+	## シューター用の敵弾を生成
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+
+	var bullet := Area2D.new()
+	bullet.name = "ShooterBullet"
+	bullet.global_position = global_position
+	bullet.collision_layer = 4  # enemy bullets
+	bullet.collision_mask = 1   # player layer
+
+	var col := CollisionShape2D.new()
+	var shape := CircleShape2D.new()
+	shape.radius = 6.0
+	col.shape = shape
+	bullet.add_child(col)
+
+	# 青紫の弾ビジュアル
+	var visual := Polygon2D.new()
+	visual.color = Color(0.4, 0.3, 0.9, 0.9)
+	visual.polygon = _make_ngon(5, 8.0)
+	bullet.add_child(visual)
+
+	scene_root.add_child(bullet)
+
+	var script := GDScript.new()
+	script.source_code = _boss_bullet_script()  # 同じシンプル弾スクリプトを流用
+	script.reload()
+	bullet.set_script(script)
+	bullet.set("direction", dir)
+	bullet.set("speed", 180.0)
+	bullet.set("damage", damage)
+
+func _healer_process(delta: float) -> void:
+	## ヒーラー: 味方の近くをうろつき、定期的に周囲の味方を回復
+	# 最寄りの味方（自分以外）に接近
+	var nearest_ally: Node2D = null
+	var nearest_dist := INF
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if not is_instance_valid(e) or e == self:
+			continue
+		var d := global_position.distance_to(e.global_position)
+		if d < nearest_dist:
+			nearest_dist = d
+			nearest_ally = e
+
+	if nearest_ally and nearest_dist > heal_range * 0.5:
+		var direction := (nearest_ally.global_position - global_position).normalized()
+		velocity = direction * speed
+	else:
+		# 味方の近くにいるならゆっくり円運動
+		velocity = Vector2(cos(Time.get_ticks_msec() * 0.002), sin(Time.get_ticks_msec() * 0.002)) * speed * 0.3
+
+	move_and_slide()
+
+	# 回復タイマー
+	heal_timer += delta
+	if heal_timer >= heal_cooldown:
+		heal_timer = 0.0
+		_heal_nearby_allies()
+
+func _heal_nearby_allies() -> void:
+	## heal_range内の味方のHPを回復 + 緑のヒールエフェクト
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if not is_instance_valid(e) or e == self:
+			continue
+		if global_position.distance_to(e.global_position) <= heal_range:
+			if "hp" in e and "max_hp" in e:
+				e.hp = minf(e.hp + heal_amount, e.max_hp)
+				# ヒールエフェクト（小さな緑+）
+				_spawn_heal_vfx(e.global_position)
+
+func _spawn_heal_vfx(pos: Vector2) -> void:
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+	var label := Label.new()
+	label.text = "+"
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.4, 1.0))
+	label.global_position = pos + Vector2(randf_range(-8, 8), -15)
+	label.z_index = 100
+	scene_root.add_child(label)
+	var tween := label.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(label, "global_position:y", label.global_position.y - 25.0, 0.4)
+	tween.tween_property(label, "modulate:a", 0.0, 0.4)
+	tween.chain().tween_callback(label.queue_free)
 
 func _check_boss_phase() -> void:
 	## HP割合でフェーズ移行を判定
@@ -611,6 +872,9 @@ func _spawn_damage_number(amount: float) -> void:
 	if hp <= 0:
 		_spawn_death_vfx()
 		_spawn_drops()
+		# splitter: 死亡時にswarmer×2分裂シグナルを発火
+		if enemy_type == "splitter":
+			split_on_death.emit(global_position)
 		died.emit(self)
 		queue_free()
 
@@ -712,6 +976,16 @@ func _spawn_death_vfx() -> void:
 			flash_radius = 30.0
 			flash_scale = 2.5
 			frag_color = Color(0.6, 0.15, 0.1, 0.9)
+		"shooter":
+			fragment_count = 6
+			frag_color = Color(0.3, 0.25, 0.75, 0.9)
+		"splitter":
+			fragment_count = 8
+			frag_color = Color(0.7, 0.85, 0.2, 0.9)
+			flash_scale = 2.5
+		"healer":
+			fragment_count = 5
+			frag_color = Color(0.3, 0.8, 0.5, 0.9)
 		"boss":
 			fragment_count = 16
 			frag_size_min = 5.0

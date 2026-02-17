@@ -1,6 +1,7 @@
 extends Node
 
 ## WaveManager - Wave制御。Wave 1-20、各Waveで敵数増加。
+## v0.4: 敵タイプ混合スポーン（swarmer/tank/shooter/splitter/healer）
 
 signal wave_started(wave_num: int)
 signal wave_cleared(wave_num: int)
@@ -50,10 +51,55 @@ func _next_wave() -> void:
 		enemy_count += (current_wave - 10) * 2
 	enemies_alive = enemy_count
 
-	for i in range(enemy_count):
-		_spawn_enemy()
+	# タイプ混合テーブル: waveに応じて出現タイプと割合を決定
+	var type_pool := _get_wave_type_pool()
 
-func _spawn_enemy() -> void:
+	for i in range(enemy_count):
+		var enemy_type := _pick_type(type_pool)
+		_spawn_enemy(enemy_type)
+
+## Wave毎の敵タイプ出現テーブル
+## [{"type": String, "weight": int}] の配列を返す
+func _get_wave_type_pool() -> Array[Dictionary]:
+	var pool: Array[Dictionary] = []
+	# normalは常に出現
+	pool.append({"type": "normal", "weight": 100})
+
+	# Wave 3+: swarmer（速くて弱い群体）
+	if current_wave >= 3:
+		pool.append({"type": "swarmer", "weight": 40 + current_wave * 3})
+
+	# Wave 5+: shooter（遠距離攻撃、距離を保つ）
+	if current_wave >= 5:
+		pool.append({"type": "shooter", "weight": 25 + current_wave * 2})
+
+	# Wave 8+: tank（硬くて遅い）
+	if current_wave >= 8:
+		pool.append({"type": "tank", "weight": 15 + current_wave})
+
+	# Wave 10+: splitter（死亡時にswarmer×2に分裂）
+	if current_wave >= 10:
+		pool.append({"type": "splitter", "weight": 15 + (current_wave - 10) * 3})
+
+	# Wave 12+: healer（近くの味方を回復）
+	if current_wave >= 12:
+		pool.append({"type": "healer", "weight": 10 + (current_wave - 12) * 2})
+
+	return pool
+
+func _pick_type(pool: Array[Dictionary]) -> String:
+	var total := 0
+	for entry in pool:
+		total += entry.get("weight", 0)
+	var roll := randi() % maxi(total, 1)
+	var cumulative := 0
+	for entry in pool:
+		cumulative += entry.get("weight", 0)
+		if roll < cumulative:
+			return entry["type"]
+	return "normal"
+
+func _spawn_enemy(type: String = "normal") -> void:
 	if enemy_scene == null:
 		return
 
@@ -82,7 +128,7 @@ func _spawn_enemy() -> void:
 		hp_scale += pow((current_wave - 5) * 0.15, 2)
 	var speed_scale := 1.0 + (current_wave - 1) * 0.05
 
-	enemy.init(player, 80.0 * speed_scale, 30.0 * hp_scale, 10.0)
+	enemy.init(player, 80.0 * speed_scale, 30.0 * hp_scale, 10.0, type)
 
 	# Wave段階に応じたテクスチャ割り当て
 	var tex_index := 0
@@ -95,6 +141,10 @@ func _spawn_enemy() -> void:
 
 	enemy.died.connect(_on_enemy_died)
 
+	# splitter死亡時にswarmerを生成するシグナル接続
+	if type == "splitter" and enemy.has_signal("split_on_death"):
+		enemy.split_on_death.connect(_on_splitter_died)
+
 	get_tree().current_scene.add_child(enemy)
 
 func _on_enemy_died(_enemy: Node2D) -> void:
@@ -106,3 +156,19 @@ func _on_enemy_died(_enemy: Node2D) -> void:
 		# 次のWaveまで少し待つ
 		await get_tree().create_timer(1.5).timeout
 		_next_wave()
+
+func _on_splitter_died(pos: Vector2) -> void:
+	# splitter死亡時: swarmer×2をスポーン（enemies_aliveに加算）
+	for i in range(2):
+		if enemy_scene == null:
+			return
+		var swarmer := enemy_scene.instantiate() as CharacterBody2D
+		swarmer.position = pos + Vector2(randf_range(-20, 20), randf_range(-20, 20))
+		var hp_scale := 1.0 + (current_wave - 1) * 0.2
+		if current_wave > 5:
+			hp_scale += pow((current_wave - 5) * 0.15, 2)
+		var speed_scale := 1.0 + (current_wave - 1) * 0.05
+		swarmer.init(player, 80.0 * speed_scale, 30.0 * hp_scale, 10.0, "swarmer")
+		swarmer.died.connect(_on_enemy_died)
+		enemies_alive += 1
+		get_tree().current_scene.add_child(swarmer)
