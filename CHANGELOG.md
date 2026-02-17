@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.3.3 (2026-02-17)
+
+### Dead Time Fix (11.2s → 4.4s)
+- Initial wave: ゲーム開始時に近距離(150-250px)に4体スポーン
+- spawn_interval: 1.2s → 1.0s
+- Spawn floor: t=5s/min4体 → t=3s/min6体
+- XP thresholds: +20%（pacing改善、TOO_FREQUENT→OK）
+
+### Quality Gate Results
+| 指標 | v0.3.2 | v0.3.3 |
+|------|--------|--------|
+| Dead Time | 11.2s (FAIL) | 4.4s (GOOD) |
+| Pacing | 5.4s (TOO_FREQUENT) | 10.8s (OK) |
+| Run Desire | 0.63 (GOOD) | 0.48 (WARN) |
+
 ## v0.3.2 (2026-02-17)
 
 ### Hitstop Safety

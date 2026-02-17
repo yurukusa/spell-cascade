@@ -76,7 +76,7 @@ var upgrade_events_given := 0
 # 敵スポーン
 var enemy_scene: PackedScene
 var spawn_timer := 0.0
-var spawn_interval := 1.2  # v0.3: Dead Time改善のため密度UP（旧1.5）
+var spawn_interval := 1.0  # v0.3.3: Dead Time<10s目標（旧1.2）
 
 # ステージランプ（v0.3.2: 3-Act構造）
 var current_stage := 1  # 1=vulnerability, 2=growth, 3=crisis
@@ -134,6 +134,9 @@ func _ready() -> void:
 	# Onboarding overlay（操作説明 + 目的）
 	_show_onboarding()
 
+	# v0.3.3: 初期波（近距離スポーンで序盤Dead Time削減）
+	_spawn_initial_wave()
+
 	# v0.2.6: 距離ベースupgrade完全削除。XP levelupのみ
 
 func _process(delta: float) -> void:
@@ -182,8 +185,8 @@ func _process(delta: float) -> void:
 		spawn_timer = 0.0
 		_spawn_enemy()
 
-	# スポーンフロア: t=5s以降、最低4体を維持（v0.3: Dead Time対策で15s→5sに前倒し）
-	if run_time >= 5.0 and enemies_alive < 4 and not boss_spawned and spawn_timer >= current_interval * 0.5:
+	# スポーンフロア: t=3s以降、最低6体を維持（v0.3.3: 序盤イベント密度UP）
+	if run_time >= 3.0 and enemies_alive < 6 and not boss_spawned and spawn_timer >= current_interval * 0.5:
 		spawn_timer = 0.0
 		_spawn_enemy()
 
@@ -993,6 +996,20 @@ func _on_boss_phase_changed(phase: int, _hp_pct: float) -> void:
 	text_tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1)
 	text_tween.tween_property(label, "modulate:a", 0.0, 0.8).set_delay(0.5)
 	text_tween.tween_callback(label.queue_free)
+
+## v0.3.3: 近距離初期波 — Dead Time序盤空白を潰す
+func _spawn_initial_wave() -> void:
+	if enemy_scene == null:
+		return
+	var cam_pos := tower.global_position
+	for i in 4:
+		var enemy := enemy_scene.instantiate() as CharacterBody2D
+		# 150-250px圏内にランダム配置（通常スポーンの400-550pxより大幅に近い）
+		var angle := randf() * TAU
+		var dist := randf_range(150.0, 250.0)
+		enemy.global_position = cam_pos + Vector2(cos(angle), sin(angle)) * dist
+		add_child(enemy)
+		enemies_alive += 1
 
 func _spawn_enemy() -> void:
 	if enemy_scene == null:
