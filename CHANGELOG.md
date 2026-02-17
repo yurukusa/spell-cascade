@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.3.4 (2026-02-17)
+
+### Run Desire Fix (0.48 → 0.79-0.94)
+- HP orb heal: 15% → 13%（ダメージが蓄積しやすくなり、緊張感UP）
+- 根本原因: 15%回復だと60s間に3,750+HP回復→常にほぼ全快→Run Desire低下
+- 13%により最終HP 46-64%（理想値50%付近）で安定
+
+### Quality Gate Results (2-run A/B)
+| 指標 | v0.3.3 | v0.3.4 Run A | v0.3.4 Run B |
+|------|--------|-------------|-------------|
+| Dead Time | 4.4s (GOOD) | 5.3s (WARN) | 9.7s (WARN) |
+| Pacing | 10.8s (OK) | 11.3s (OK) | 6.5s (OK) |
+| Run Desire | 0.48 (WARN) | 0.94 (EXCELLENT) | 0.79 (GOOD) |
+| Final HP | ~85% | 46% | 64% |
+
+### Rejected Approaches
+- enemy dmg 14→18: A/B分散大（desire 0.61 vs 0.25）、Pacing悪化
+- heal 10%: 過激（desire 0.87 vs 0.28、プレイヤー瀕死）
+- heal 12%: やや過激（Run Bでプレイヤー死亡）
+
 ## v0.3.3 (2026-02-17)
 
 ### Dead Time Fix (11.2s → 4.4s)

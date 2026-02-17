@@ -102,9 +102,9 @@ func _on_collected() -> void:
 	elif orb_type == "chip_move":
 		_equip_auto_move()
 	elif orb_type == "hp":
-		# HP回復: 最大HPの15%を回復
+		# HP回復: 最大HPの13%を回復（v0.3.4: 15%→13%、Run Desire改善）
 		if is_instance_valid(target) and target.has_method("heal"):
-			var heal_amount: float = target.max_hp * 0.15
+			var heal_amount: float = target.max_hp * 0.13
 			target.heal(heal_amount)
 	elif is_instance_valid(target) and target.has_method("add_xp"):
 		target.add_xp(xp_value)
