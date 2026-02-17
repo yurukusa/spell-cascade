@@ -923,7 +923,7 @@ func _process(delta):
 	if gravity_pull > 0.0:
 		for e in get_tree().get_nodes_in_group(\"enemies\"):
 			if is_instance_valid(e) and global_position.distance_to(e.global_position) < 100.0:
-				var pull_dir := (global_position - e.global_position).normalized()
+				var pull_dir: Vector2 = (global_position - e.global_position).normalized()
 				e.position += pull_dir * gravity_pull * delta
 
 	position += direction * speed * delta
@@ -946,7 +946,7 @@ func _find_nearest_alive() -> Node2D:
 	for e in get_tree().get_nodes_in_group(\"enemies\"):
 		if not is_instance_valid(e) or e in hit_enemies:
 			continue
-		var d := global_position.distance_to(e.global_position)
+		var d: float = global_position.distance_to(e.global_position)
 		if d < nearest_dist:
 			nearest_dist = d
 			nearest = e
@@ -1053,7 +1053,7 @@ func _find_chain_target(exclude_body) -> Node2D:
 	for enemy in enemies:
 		if not is_instance_valid(enemy) or enemy == exclude_body or enemy in hit_enemies:
 			continue
-		var dist := global_position.distance_to(enemy.global_position)
+		var dist: float = global_position.distance_to(enemy.global_position)
 		if dist < nearest_dist:
 			nearest_dist = dist
 			nearest = enemy
@@ -1089,7 +1089,7 @@ func _do_split(_hit_body):
 		s_bullet.set_script(s)
 		s_bullet.set(\"direction\", s_dir)
 		s_bullet.set(\"damage\", int(float(damage) * split_dmg_pct))
-		get_tree().current_scene.add_child(s_bullet)
+		get_tree().current_scene.call_deferred(\"add_child\", s_bullet)
 
 func _do_fork(_hit_body):
 	# Fork弾を生成（fork_countは0にして無限分裂を防止）
@@ -1125,7 +1125,7 @@ func _do_fork(_hit_body):
 		fork_bullet.set(\"direction\", fork_dir)
 		fork_bullet.set(\"damage\", int(damage * 0.6))
 
-		get_tree().current_scene.add_child(fork_bullet)
+		get_tree().current_scene.call_deferred(\"add_child\", fork_bullet)
 
 func _simple_bullet_script() -> String:
 	return \"extends Area2D\\nvar direction := Vector2.ZERO\\nvar speed := 350.0\\nvar damage := 5\\nvar lifetime := 1.5\\n\\nfunc _ready():\\n\\tbody_entered.connect(func(body):\\n\\t\\tif body.has_method(\\\\\\\"take_damage\\\\\\\"):\\n\\t\\t\\tbody.take_damage(damage)\\n\\t\\tset_deferred(\\\\\\\"monitoring\\\\\\\", false)\\n\\t\\tcall_deferred(\\\\\\\"queue_free\\\\\\\")\\n\\t)\\n\\tcollision_layer = 2\\n\\tcollision_mask = 4\\n\\nfunc _process(delta):\\n\\tposition += direction * speed * delta\\n\\tlifetime -= delta\\n\\tif lifetime <= 0:\\n\\t\\tset_deferred(\\\\\\\"monitoring\\\\\\\", false)\\n\\t\\tcall_deferred(\\\\\\\"queue_free\\\\\\\")\\n\"
