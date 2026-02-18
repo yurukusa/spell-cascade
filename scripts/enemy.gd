@@ -14,6 +14,7 @@ var attack_cooldown := 1.0  # メレー攻撃間隔
 var enemy_type := "normal"  # "normal", "swarmer", "tank", "boss"
 var is_elite := false  # エリート: 強化版（HP+50%, 速度+20%, 輪郭グロー）
 var _enemy_hp_bar: Polygon2D = null  # ミニHPバー（ゲームプレイ可読性向上）
+var _enemy_hp_bar_bg: Polygon2D = null  # HPバー背景（改善51: 全HP時は非表示）
 var _stagger_timer := 0.0  # ヒットスタッガー: ダメージ後の一時的速度低下（改善36）
 var _shoot_warned := false  # シューター: 射撃前警告済みフラグ（改善39）
 var _boss_core_poly: Polygon2D = null  # ボスコア: Phase 3の高速パルス用（改善50）
@@ -109,7 +110,9 @@ func _build_enemy_hp_bar() -> void:
 	bg.color = Color(0.06, 0.06, 0.08, 0.75)
 	bg.position = Vector2(-bar_w * 0.5, bar_y)
 	bg.z_index = 15
+	bg.visible = false  # 改善51: 初弾まで非表示
 	add_child(bg)
+	_enemy_hp_bar_bg = bg
 
 	# HPフィル（scale.xでHPを表現: スケール原点=左端→右から縮む）
 	var fill := Polygon2D.new()
@@ -121,6 +124,7 @@ func _build_enemy_hp_bar() -> void:
 	fill.color = Color(0.25, 0.85, 0.3, 0.9)  # 緑: 健康
 	fill.position = Vector2(-bar_w * 0.5, bar_y)
 	fill.z_index = 16
+	fill.visible = false  # 改善51: 初弾まで非表示
 	add_child(fill)
 	_enemy_hp_bar = fill
 
@@ -176,6 +180,11 @@ func _build_normal_visual(root: Node2D) -> void:
 	root.add_child(aura)
 	aura.z_index = -1
 
+	# 改善72: 通常敵ボディをゆっくり回転（生き物の動感。静止した図形より「生きている」印象）
+	var rot_tween := body.create_tween()
+	rot_tween.set_loops()
+	rot_tween.tween_method(func(v: float): body.rotation = v, 0.0, TAU, 3.5)
+
 func _build_swarmer_visual(root: Node2D) -> void:
 	## スウォーマー: 緑三角形（小さく速い）
 	var outline := Polygon2D.new()
@@ -195,6 +204,12 @@ func _build_swarmer_visual(root: Node2D) -> void:
 		Vector2(4, -2), Vector2(12, 0), Vector2(4, 2),
 	])
 	root.add_child(eye)
+
+	# 改善71: スウォーマーは高速パルス（速い生命感 — 危機感のある小敵の「忙しなさ」）
+	var sw_pulse := body.create_tween()
+	sw_pulse.set_loops()
+	sw_pulse.tween_property(body, "scale", Vector2(1.12, 1.12), 0.18).set_trans(Tween.TRANS_SINE)
+	sw_pulse.tween_property(body, "scale", Vector2(0.92, 0.92), 0.18).set_trans(Tween.TRANS_SINE)
 
 func _build_tank_visual(root: Node2D) -> void:
 	## タンク: 暗赤八角形（大きく遅い）
@@ -235,6 +250,11 @@ func _build_tank_visual(root: Node2D) -> void:
 	aura.polygon = _make_ngon(8, 58.0)
 	root.add_child(aura)
 	aura.z_index = -1
+	# 改善78: タンクオーラが低速パルス（重量感・威圧感を持続的に体感させる）
+	var tank_pulse := aura.create_tween()
+	tank_pulse.set_loops()
+	tank_pulse.tween_property(aura, "scale", Vector2(1.25, 1.25), 0.9).set_trans(Tween.TRANS_SINE)
+	tank_pulse.tween_property(aura, "scale", Vector2(1.0, 1.0), 0.9).set_trans(Tween.TRANS_SINE)
 
 func _build_boss_visual(root: Node2D) -> void:
 	## ボス: 紫/金の大型十二角形。威圧的、コアが脈動。
@@ -288,6 +308,10 @@ func _build_boss_visual(root: Node2D) -> void:
 	aura.polygon = _make_ngon(12, 85.0)
 	root.add_child(aura)
 	aura.z_index = -1
+	# 改善77: ボスオーラがゆっくり時計回りに回転（威圧感の演出、「只者ではない」を一瞬で知覚させる）
+	var boss_aura_rot := aura.create_tween()
+	boss_aura_rot.set_loops()
+	boss_aura_rot.tween_method(func(v: float): aura.rotation = v, 0.0, TAU, 6.0)
 
 func _build_shooter_visual(root: Node2D) -> void:
 	## シューター: 青紫の逆三角形（遠距離攻撃を示唆）
@@ -347,6 +371,15 @@ func _build_splitter_visual(root: Node2D) -> void:
 	])
 	root.add_child(crack_v)
 
+	# 改善79: スプリッターに回転する不安定内部リング（「割れる寸前」の緊張感を体感させる）
+	var spin_ring := Polygon2D.new()
+	spin_ring.color = Color(0.9, 0.95, 0.3, 0.25)
+	spin_ring.polygon = _make_ngon(5, 18.0)
+	root.add_child(spin_ring)
+	var spin_t := spin_ring.create_tween()
+	spin_t.set_loops()
+	spin_t.tween_method(func(v: float): spin_ring.rotation = v, 0.0, TAU, 1.5)
+
 	# 小さな目×2
 	for offset_x in [-7, 7]:
 		var eye := Polygon2D.new()
@@ -382,12 +415,24 @@ func _build_healer_visual(root: Node2D) -> void:
 	])
 	root.add_child(cross_v)
 
+	# 改善96: ヒーラー外側に大きな半透明グロー（治癒の存在感・「守ってくれる」という安心感）
+	var outer_glow := Polygon2D.new()
+	outer_glow.color = Color(0.15, 0.85, 0.3, 0.06)
+	outer_glow.polygon = _make_ngon(16, 65.0)
+	root.add_child(outer_glow)
+	outer_glow.z_index = -1
+
 	# ヒーリングオーラ（緑、ぼんやり）
 	var aura := Polygon2D.new()
 	aura.color = Color(0.2, 0.9, 0.4, 0.1)
 	aura.polygon = _make_ngon(12, 45.0)
 	root.add_child(aura)
 	aura.z_index = -1
+
+	# 改善74: ヒーラーはオーラを反時計回りに回転（魔法使いの印象、特殊役割の可視化）
+	var healer_rot := aura.create_tween()
+	healer_rot.set_loops()
+	healer_rot.tween_method(func(v: float): aura.rotation = v, 0.0, -TAU, 4.0)
 
 func _make_diamond(radius: float) -> PackedVector2Array:
 	return PackedVector2Array([
@@ -518,6 +563,10 @@ func _melee_process(delta: float) -> void:
 			if player.has_method("take_damage"):
 				player.take_damage(damage)
 
+	# スプリッター瀕死ウォブル（改善53: HP30%以下で分裂直前の視覚的緊張感）
+	if enemy_type == "splitter" and max_hp > 0 and hp / max_hp < 0.3:
+		rotation = sin(Time.get_ticks_msec() * 0.008) * 0.15
+
 func _shooter_process(delta: float) -> void:
 	## シューター: preferred_distanceを維持しつつ遠距離弾を撃つ
 	var dist := global_position.distance_to(player.global_position)
@@ -580,17 +629,21 @@ func _fire_enemy_bullet(dir: Vector2) -> void:
 	bullet.set("damage", damage)
 
 func _healer_process(delta: float) -> void:
-	## ヒーラー: 味方の近くをうろつき、定期的に周囲の味方を回復
-	# 最寄りの味方（自分以外）に接近
+	## ヒーラー: 最低HP割合の味方に向かう（改善52: 治癒優先度を正しくする）
+	# 最低HP割合の味方（自分以外）に接近 — 最近接ではなく最も傷ついた仲間を優先
 	var nearest_ally: Node2D = null
 	var nearest_dist := INF
+	var best_hp_pct := INF
 	for e in get_tree().get_nodes_in_group("enemies"):
 		if not is_instance_valid(e) or e == self:
 			continue
-		var d := global_position.distance_to(e.global_position)
-		if d < nearest_dist:
-			nearest_dist = d
+		var hp_pct: float = 1.0
+		if "hp" in e and "max_hp" in e and e.max_hp > 0:
+			hp_pct = e.hp / e.max_hp
+		if hp_pct < best_hp_pct:
+			best_hp_pct = hp_pct
 			nearest_ally = e
+			nearest_dist = global_position.distance_to(e.global_position)
 
 	if nearest_ally and nearest_dist > heal_range * 0.5:
 		var direction := (nearest_ally.global_position - global_position).normalized()
@@ -619,6 +672,11 @@ func _heal_nearby_allies() -> void:
 				_spawn_heal_vfx(e.global_position)
 				# ヒールビーム（ヒーラーから対象への視覚的な繋がり）
 				_show_heal_beam(e.global_position)
+				# 回復対象に緑フラッシュ（改善55: 「今HPが回復した」を即時知覚）
+				if "modulate" in e:
+					e.modulate = Color(0.2, 2.5, 0.5, 1.0)
+					var heal_flash := e.create_tween()
+					heal_flash.tween_property(e, "modulate", Color.WHITE, 0.3)
 
 func _spawn_heal_vfx(pos: Vector2) -> void:
 	var scene_root := get_tree().current_scene
@@ -759,8 +817,14 @@ func _boss_phase_transition() -> void:
 	tween.tween_property(ring, "modulate:a", 0.0, 0.4)
 	tween.chain().tween_callback(ring.queue_free)
 
-	# 本体フラッシュ
-	modulate = Color(2.0, 1.0, 3.0, 1.0)
+	# 本体フラッシュ（改善54: フェーズ別の色でPhase移行の「格」を表現）
+	# P1→P2: 金オレンジ（活性化）, P2→P3: 深紅（危機的状況）
+	var phase_flash := Color(2.0, 1.0, 3.0, 1.0)  # デフォルト: 紫
+	if boss_phase == 2:
+		phase_flash = Color(3.0, 1.5, 0.2, 1.0)  # 金オレンジ
+	elif boss_phase == 3:
+		phase_flash = Color(3.0, 0.4, 0.1, 1.0)  # 深紅
+	modulate = phase_flash
 	var body_tween := create_tween()
 	body_tween.tween_property(self, "modulate", Color.WHITE, 0.4)
 
@@ -975,6 +1039,11 @@ func take_damage(amount: float, is_crit: bool = false) -> void:
 	_stagger_timer = 0.28 if is_crit else 0.18
 
 	# ミニHPバー更新（scale.xでHPを幅として表現: G-10 + J-7）
+	# 改善51: 初弾で表示（全HP時は非表示にして「無傷」と「傷あり」を区別）
+	if _enemy_hp_bar != null and is_instance_valid(_enemy_hp_bar) and not _enemy_hp_bar.visible:
+		_enemy_hp_bar.visible = true
+		if _enemy_hp_bar_bg != null and is_instance_valid(_enemy_hp_bar_bg):
+			_enemy_hp_bar_bg.visible = true
 	if _enemy_hp_bar != null and is_instance_valid(_enemy_hp_bar):
 		var pct := clampf(hp / max_hp, 0.0, 1.0)
 		_enemy_hp_bar.scale.x = pct
@@ -1014,13 +1083,40 @@ func take_damage(amount: float, is_crit: bool = false) -> void:
 
 	# スケールスカッシュ: ヒット時に「潰れる」感触（H-6原則）
 	# ダメージ方向に潰れて元に戻る
+	# 改善56: タンクは質量感のため、より大きな圧縮（重い一撃の知覚）
 	var base_scale := scale
 	var squish_h := 1.25 if is_crit else 1.15
 	var squish_v := 0.75 if is_crit else 0.85
+	if enemy_type == "tank":
+		squish_h += 0.12  # タンクは横に強く広がる
+		squish_v -= 0.08  # タンクはより深く潰れる
 	scale = base_scale * Vector2(squish_h, squish_v)
 	var sq := create_tween()
 	sq.tween_property(self, "scale", base_scale * Vector2(0.9, 1.1), 0.06).set_trans(Tween.TRANS_QUAD)
 	sq.chain().tween_property(self, "scale", base_scale, 0.08).set_trans(Tween.TRANS_BACK)
+
+	# 改善95: エリート敵ヒット時にスパーク散布（強敵を攻撃している「手応え」を増幅）
+	if is_elite:
+		var sr := get_tree().current_scene
+		if sr:
+			for _si in range(4):
+				var spark := Polygon2D.new()
+				var sa := randf() * TAU
+				var ss := randf_range(1.5, 3.0)
+				spark.polygon = PackedVector2Array([
+					Vector2(-ss, -ss * 0.3), Vector2(ss, 0), Vector2(-ss, ss * 0.3),
+				])
+				spark.color = Color(1.0, 0.8, 0.1, 0.9)
+				spark.global_position = global_position
+				spark.rotation = sa
+				spark.z_index = 60
+				sr.add_child(spark)
+				var st := spark.create_tween()
+				st.set_parallel(true)
+				var sdist := randf_range(18.0, 35.0)
+				st.tween_property(spark, "global_position", global_position + Vector2(cos(sa), sin(sa)) * sdist, 0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+				st.tween_property(spark, "modulate:a", 0.0, 0.25)
+				st.chain().tween_callback(spark.queue_free)
 
 func _spawn_damage_number(amount: float, is_crit: bool = false) -> void:
 	var scene_root := get_tree().current_scene
@@ -1131,6 +1227,27 @@ func _spawn_drops() -> void:
 	if scene_root == null:
 		return
 
+	# 改善80: 死亡時の砂煙VFX（「倒した」感触を煙で演出、爆発エフェクトの後に余韻）
+	for _di in range(3):
+		var smoke := Polygon2D.new()
+		var smoke_pts: PackedVector2Array = []
+		var smoke_r := randf_range(6.0, 12.0)
+		for i in range(8):
+			var sa := float(i) * TAU / 8.0
+			smoke_pts.append(Vector2(cos(sa), sin(sa)) * smoke_r)
+		smoke.polygon = smoke_pts
+		smoke.color = Color(0.7, 0.65, 0.6, 0.35)
+		smoke.global_position = global_position + Vector2(randf_range(-12, 12), randf_range(-12, 12))
+		smoke.z_index = 3
+		scene_root.add_child(smoke)
+		var st := smoke.create_tween()
+		st.set_parallel(true)
+		var drift := Vector2(randf_range(-20, 20), randf_range(-30, -5))
+		st.tween_property(smoke, "global_position", smoke.global_position + drift, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		st.tween_property(smoke, "scale", Vector2(2.5, 2.5), 0.55).set_trans(Tween.TRANS_QUAD)
+		st.tween_property(smoke, "modulate:a", 0.0, 0.55)
+		st.chain().tween_callback(smoke.queue_free)
+
 	var drop_script := load("res://scripts/drop_orb.gd")
 
 	# XPオーブを1-3個ドロップ
@@ -1144,6 +1261,18 @@ func _spawn_drops() -> void:
 		orb.set("target", player)
 		orb.set("xp_value", xp_value)
 		scene_root.add_child(orb)
+
+	# 改善73: エリートは+2 XPオーブ追加（強敵を倒した報酬感を高める）
+	if is_elite:
+		for _ei in range(2):
+			var elite_orb := Area2D.new()
+			elite_orb.set_script(drop_script)
+			elite_orb.name = "EliteXPOrb"
+			elite_orb.add_to_group("pickups")
+			elite_orb.global_position = global_position + Vector2(randf_range(-20, 20), randf_range(-20, 20))
+			elite_orb.set("target", player)
+			elite_orb.set("xp_value", xp_value)
+			scene_root.add_child(elite_orb)
 
 	# HPオーブドロップ判定（通常10%、タンク20%）
 	var hp_drop_chance := 0.10

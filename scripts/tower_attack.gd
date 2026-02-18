@@ -155,6 +155,19 @@ func _fire() -> void:
 		mf_tween.tween_property(mf, "modulate:a", 0.0, 0.12)
 		mf_tween.chain().tween_callback(mf.queue_free)
 
+		# 改善81: fire/lightningタグは2ndリングで「エネルギー放出」を強調（J-7: タグ別視覚分化）
+		if "fire" in flash_tags or "lightning" in flash_tags:
+			var ring2 := Polygon2D.new()
+			ring2.polygon = _make_ngon(6, 5.0)
+			ring2.color = Color(mf.color.r, mf.color.g, mf.color.b, 0.45)
+			ring2.z_index = 198
+			tower_node.add_child(ring2)
+			var r2t := ring2.create_tween()
+			r2t.set_parallel(true)
+			r2t.tween_property(ring2, "scale", Vector2(4.0, 4.0), 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			r2t.tween_property(ring2, "modulate:a", 0.0, 0.18)
+			r2t.chain().tween_callback(ring2.queue_free)
+
 	# echo: 30%追加発動（再帰防止フラグ付き）
 	if not _echo_firing and stats.get("echo_chance", 0.0) > 0:
 		if randf() < stats["echo_chance"]:
@@ -1085,7 +1098,7 @@ func _process(delta):
 	# スパークトレイル（飛行中のジュース感: H-1 Make it Pop）
 	_trail_timer -= delta
 	if _trail_timer <= 0:
-		_trail_timer = 0.055  # ~18個/秒（パフォーマンス考慮）
+		_trail_timer = 0.038  # ~26個/秒（改善60: より密なトレイルで弾の軌跡を強調）
 		_emit_spark_trail()
 
 	# トレイル更新
@@ -1145,6 +1158,34 @@ func _on_body_entered(body):
 		rt.tween_property(ring, \"modulate:a\", 0.0, 0.18)
 		rt.chain().tween_callback(ring.queue_free)
 
+	# インパクトバースト: 3つの小粒子が飛散（改善57: 弾着点の「重さ」を強化）
+	if scene_root:
+		var burst_color := Color(1.0, 0.9, 0.4, 0.9) if is_crit else Color(1.0, 1.0, 0.8, 0.7)
+		for _bi in range(3):
+			var frag := Polygon2D.new()
+			frag.polygon = PackedVector2Array([
+				Vector2(-1.5, 0), Vector2(1.5, 0), Vector2(0, -3),
+			])
+			frag.color = burst_color
+			frag.global_position = global_position
+			frag.z_index = 88
+			scene_root.add_child(frag)
+			var fang := randf() * TAU
+			var fdist := randf_range(12.0, 28.0)
+			var ft := frag.create_tween()
+			ft.set_parallel(true)
+			ft.tween_property(frag, \"global_position\",
+				global_position + Vector2(cos(fang), sin(fang)) * fdist, 0.22
+			).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			ft.tween_property(frag, \"modulate:a\", 0.0, 0.22)
+			ft.chain().tween_callback(frag.queue_free)
+
+	# クリット時: タワーにシェイクフィードバック（改善59: クリの「重み」を体全体で感じる）
+	if is_crit:
+		var tower_node := get_tree().current_scene.get_node_or_null(\"Tower\")
+		if tower_node and tower_node.has_method(\"shake\"):
+			tower_node.shake(1.5)
+
 	# ライフスティール
 	if life_steal_pct > 0.0:
 		var tower2 := get_tree().current_scene.get_node_or_null(\"Tower\")
@@ -1195,6 +1236,18 @@ func _on_body_entered(body):
 		chain_remaining -= 1
 		var next := _find_chain_target(body)
 		if next:
+			# チェインVFX: 雷弧（改善58: チェイン発動の視覚的フィードバック）
+			var arc_root := get_tree().current_scene
+			if arc_root:
+				var arc := Line2D.new()
+				arc.default_color = Color(0.5, 0.85, 1.0, 0.9)
+				arc.width = 2.5
+				arc.points = PackedVector2Array([global_position, next.global_position])
+				arc.z_index = 95
+				arc_root.add_child(arc)
+				var arc_tw := arc.create_tween()
+				arc_tw.tween_property(arc, \"modulate:a\", 0.0, 0.25)
+				arc_tw.chain().tween_callback(arc.queue_free)
 			direction = (next.global_position - global_position).normalized()
 			return  # 弾は消えない
 

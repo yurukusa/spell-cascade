@@ -60,6 +60,16 @@ var boss_warning_shown := false
 # 画面ビネット（低HP時の周辺暗化: 改善35）
 var _vignette: ColorRect = null
 
+# ボスHP臨界パルス（改善86/98: <15%でラベルとバーが赤く点滅）
+var _boss_hp_crit_tween: Tween = null
+
+# コンボタイマーバー（改善100: コンボウィンドウの残り時間を視覚化）
+var _combo_timer_bar: ProgressBar = null
+
+# タイマー警告フラグ（改善68: 残り時間の重要節目でシェイク演出）
+var _timer_30s_warned := false
+var _timer_10s_warned := false
+
 # Shrine（中盤イベント: 120-225sのquiet zone対策）
 const SHRINE_TIME := 150.0  # 2:30で出現
 const SHRINE_AUTO_SELECT_TIME := 10.0  # 10秒で自動選択
@@ -181,6 +191,17 @@ func _process(delta: float) -> void:
 	# ステージ遷移告知（J-8: 重要な局面変化を大きく提示）
 	if current_stage != prev_stage:
 		_announce_stage(current_stage)
+		# 改善75: ステージ遷移で全画面フラッシュ（「ステージが変わった」衝撃を全身で感じる）
+		var stage_color := Color(0.9, 0.5, 0.05, 0.35) if current_stage == 2 else Color(0.8, 0.1, 0.05, 0.45)
+		var stg_flash := ColorRect.new()
+		stg_flash.color = stage_color
+		stg_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+		stg_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		stg_flash.z_index = 170
+		ui_layer.add_child(stg_flash)
+		var sf_tw := stg_flash.create_tween()
+		sf_tw.tween_property(stg_flash, "color:a", 0.0, 0.7).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		sf_tw.tween_callback(stg_flash.queue_free)
 
 	# 敵スポーン（縦スクロール: 上方スポーン中心）
 	spawn_timer += delta
@@ -245,6 +266,9 @@ func _process(delta: float) -> void:
 	# Kill combo タイマー減衰
 	if combo_count > 0:
 		combo_timer -= delta
+		# 改善100: コンボタイマーバーの更新（残り時間の視覚化）
+		if _combo_timer_bar != null and is_instance_valid(_combo_timer_bar):
+			_combo_timer_bar.value = combo_timer
 		if combo_timer <= 0:
 			var was_combo := combo_count
 			combo_count = 0
@@ -252,6 +276,10 @@ func _process(delta: float) -> void:
 			# コンボブレイク告知（5連続以上の場合のみ: 達成の余韻を示す）
 			if was_combo >= 5:
 				_show_combo_break(was_combo)
+	else:
+		# コンボなし: バーを非表示
+		if _combo_timer_bar != null and is_instance_valid(_combo_timer_bar):
+			_combo_timer_bar.visible = false
 
 func _update_timer_display() -> void:
 	var remaining := maxf(max_run_time - run_time, 0.0)
@@ -268,6 +296,14 @@ func _update_timer_display() -> void:
 		timer_label.add_theme_color_override("font_color", Color(0.95, 0.55, 0.2, 1.0))  # オレンジ
 	else:
 		timer_label.add_theme_color_override("font_color", Color(0.9, 0.88, 0.95, 1.0))  # デフォルト
+
+	# 改善68: 残り30秒・10秒の節目で一度だけシェイク（終盤の緊張感を身体で感じる）
+	if not _timer_30s_warned and remaining <= 30.0:
+		_timer_30s_warned = true
+		tower.shake(4.0)
+	if not _timer_10s_warned and remaining <= 10.0:
+		_timer_10s_warned = true
+		tower.shake(6.0)
 
 func _style_hud() -> void:
 	## Design Lock v1: semantic colors, min 16px text, 4.5:1 contrast
@@ -367,6 +403,26 @@ func _style_hud() -> void:
 	combo_label_node.z_index = 100
 	combo_label_node.visible = false
 	ui_layer.add_child(combo_label_node)
+
+	# 改善100: コンボタイマーバー（残りコンボウィンドウを細いバーで可視化）
+	_combo_timer_bar = ProgressBar.new()
+	_combo_timer_bar.name = "ComboTimerBar"
+	_combo_timer_bar.position = Vector2(1080, 70)
+	_combo_timer_bar.custom_minimum_size = Vector2(180, 5)
+	_combo_timer_bar.size = Vector2(180, 5)
+	_combo_timer_bar.max_value = COMBO_WINDOW
+	_combo_timer_bar.value = 0.0
+	_combo_timer_bar.show_percentage = false
+	_combo_timer_bar.visible = false
+	var ctb_fill := StyleBoxFlat.new()
+	ctb_fill.bg_color = Color(1.0, 0.6, 0.2, 0.85)
+	ctb_fill.set_corner_radius_all(1)
+	_combo_timer_bar.add_theme_stylebox_override("fill", ctb_fill)
+	var ctb_bg := StyleBoxFlat.new()
+	ctb_bg.bg_color = Color(0.15, 0.12, 0.2, 0.7)
+	_combo_timer_bar.add_theme_stylebox_override("background", ctb_bg)
+	_combo_timer_bar.z_index = 100
+	ui_layer.add_child(_combo_timer_bar)
 
 	# Kill counter label (画面左下、distanceの下: 連続感と達成感）
 	var kill_label := Label.new()
@@ -740,6 +796,17 @@ func _show_boss_warning() -> void:
 	tween.tween_property(label, "modulate:a", 0.0, 0.5).set_delay(0.5)
 	tween.tween_callback(label.queue_free)
 
+	# 改善89: ボス警告時に赤いビネットが点滅（「来るぞ！」の緊張感を全画面で演出）
+	var bw_flash := ColorRect.new()
+	bw_flash.color = Color(0.6, 0.0, 0.0, 0.28)
+	bw_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bw_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bw_flash.z_index = 150
+	ui_layer.add_child(bw_flash)
+	var bw_tween := bw_flash.create_tween()
+	bw_tween.tween_property(bw_flash, "color:a", 0.0, 1.5)
+	bw_tween.tween_callback(bw_flash.queue_free)
+
 ## --- Shrine（中盤イベント） ---
 
 func _show_shrine() -> void:
@@ -767,6 +834,23 @@ func _show_shrine() -> void:
 	title.position = Vector2(240, 505)
 	title.custom_minimum_size = Vector2(800, 0)
 	shrine_ui.add_child(title)
+
+	# 改善97: カウントダウン進捗バー（「残り時間」を直感的に伝える）
+	var countdown_bar := ProgressBar.new()
+	countdown_bar.position = Vector2(240, 492)
+	countdown_bar.custom_minimum_size = Vector2(800, 6)
+	countdown_bar.max_value = SHRINE_AUTO_SELECT_TIME
+	countdown_bar.value = SHRINE_AUTO_SELECT_TIME
+	countdown_bar.show_percentage = false
+	var cb_fill := StyleBoxFlat.new()
+	cb_fill.bg_color = Color(1.0, 0.85, 0.3, 0.8)
+	countdown_bar.add_theme_stylebox_override("fill", cb_fill)
+	var cb_bg := StyleBoxFlat.new()
+	cb_bg.bg_color = Color(0.15, 0.1, 0.25, 0.5)
+	countdown_bar.add_theme_stylebox_override("background", cb_bg)
+	shrine_ui.add_child(countdown_bar)
+	var cdb_tween := countdown_bar.create_tween()
+	cdb_tween.tween_property(countdown_bar, "value", 0.0, SHRINE_AUTO_SELECT_TIME).set_trans(Tween.TRANS_LINEAR)
 
 	# 3択ボタン（日英バイリンガル）
 	var choices := [
@@ -1153,6 +1237,19 @@ func _on_boss_hp_changed(current: float, max_val: float) -> void:
 			else:
 				boss_hp_label.add_theme_color_override("font_color", Color(0.8, 0.5, 1.0, 0.9))
 
+		# 改善86+98: HP15%以下でバーとラベルが赤く点滅（「あと少し！」の高揚感と緊張の融合）
+		if pct <= 0.15:
+			if _boss_hp_crit_tween == null or not _boss_hp_crit_tween.is_running():
+				_boss_hp_crit_tween = boss_hp_bar.create_tween()
+				_boss_hp_crit_tween.set_loops()
+				_boss_hp_crit_tween.tween_property(boss_hp_bar, "modulate", Color(2.0, 0.5, 0.5, 1.0), 0.22).set_trans(Tween.TRANS_SINE)
+				_boss_hp_crit_tween.tween_property(boss_hp_bar, "modulate", Color.WHITE, 0.22).set_trans(Tween.TRANS_SINE)
+		else:
+			if _boss_hp_crit_tween != null and _boss_hp_crit_tween.is_running():
+				_boss_hp_crit_tween.kill()
+				_boss_hp_crit_tween = null
+				boss_hp_bar.modulate = Color.WHITE
+
 func _on_boss_phase_changed(phase: int, _hp_pct: float) -> void:
 	if boss_phase_label:
 		boss_phase_label.text = "Phase %d" % phase
@@ -1304,10 +1401,24 @@ func _on_enemy_died(enemy: Node2D) -> void:
 	kill_count += 1
 	tower.enemy_killed.emit()
 	SFX.play_kill()
-	# キルカウンターHUD更新
+	# キルカウンターHUD更新（改善63: テキスト更新時にスケールポップで「積み上げ感」）
 	var kc_lbl := ui_layer.get_node_or_null("KillCountLabel") as Label
 	if kc_lbl:
 		kc_lbl.text = "Kills: %d" % kill_count
+		# 改善83: キル数で色が段階変化（灰→黄→赤→紫: 積み上げ感と「やばい数字」感を同時に演出）
+		var kc_color: Color
+		if kill_count >= 100:
+			kc_color = Color(1.0, 0.2, 0.85, 1.0)  # 紫/マゼンタ: 100+
+		elif kill_count >= 50:
+			kc_color = Color(1.0, 0.3, 0.15, 1.0)  # 赤: 50+
+		elif kill_count >= 10:
+			kc_color = Color(1.0, 0.75, 0.2, 1.0)  # 黄: 10+
+		else:
+			kc_color = Color(0.6, 0.6, 0.7, 0.85)  # 灰（デフォルト）
+		kc_lbl.add_theme_color_override("font_color", kc_color)
+		var kc_tween := kc_lbl.create_tween()
+		kc_tween.tween_property(kc_lbl, "scale", Vector2(1.2, 1.2), 0.06).set_trans(Tween.TRANS_BACK)
+		kc_tween.tween_property(kc_lbl, "scale", Vector2(1.0, 1.0), 0.09)
 	# 小さなシェイク（爽快感）
 	tower.shake(2.0)
 	# コンボカウント
@@ -1381,12 +1492,36 @@ func _show_area_cleared() -> void:
 	tween.chain().tween_callback(lbl.queue_free)
 	tower.shake(3.0)
 
+	# 改善65: タワー位置から放射状パーティクルバースト（「エリア制圧」の爽快感）
+	var pos := tower.global_position
+	for _ci in range(10):
+		var frag := Polygon2D.new()
+		var fangle := randf() * TAU
+		var fsize := randf_range(3.0, 6.0)
+		frag.polygon = PackedVector2Array([
+			Vector2(-fsize * 0.5, 0), Vector2(fsize * 0.5, 0), Vector2(0, -fsize),
+		])
+		frag.color = Color(0.4 + randf() * 0.3, 1.0, 0.5 + randf() * 0.3, 0.9)
+		frag.global_position = pos
+		frag.rotation = fangle
+		frag.z_index = 160
+		add_child(frag)
+		var fdist := randf_range(50.0, 120.0)
+		var ct := frag.create_tween()
+		ct.set_parallel(true)
+		ct.tween_property(frag, "global_position", pos + Vector2(cos(fangle), sin(fangle)) * fdist, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		ct.tween_property(frag, "modulate:a", 0.0, 0.5).set_delay(0.15)
+		ct.chain().tween_callback(frag.queue_free)
+
 func _announce_kill_milestone(count: int) -> void:
 	## キルマイルストーン告知（J-8: 達成を大きく演出）
 	var milestone_texts := {10: "10 KILLS!", 25: "25 KILLS!", 50: "MASSACRE x50!", 100: "SLAUGHTERER x100!", 200: "DESTROYER x200!"}
 	var milestone_colors := {10: Color(0.7, 0.9, 0.3, 1.0), 25: Color(1.0, 0.75, 0.2, 1.0), 50: Color(1.0, 0.5, 0.1, 1.0), 100: Color(1.0, 0.25, 0.8, 1.0), 200: Color(0.6, 0.2, 1.0, 1.0)}
 	var msg: String = milestone_texts.get(count, "%d KILLS!" % count)
 	var col: Color = milestone_colors.get(count, Color(1.0, 0.7, 0.2, 1.0))
+	# 改善94: 50キル以上のマイルストーンは大きなシェイク（節目の重みを体感させる）
+	var shake_intensity := 3.5 if count < 50 else (6.0 if count < 100 else 9.0)
+	tower.shake(shake_intensity)
 	var ann := Label.new()
 	ann.text = msg
 	ann.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1429,15 +1564,36 @@ func _update_combo_display() -> void:
 		tier_text = "COMBO"
 		tier_color = Color(1.0, 0.75, 0.3, 1.0)  # 黄色
 
+	# 改善61: ティアが上がるほどフォントが大きくなり「積み上げ感」を強調
+	var combo_font_size := 18
+	if combo_count >= 30:
+		combo_font_size = 32
+	elif combo_count >= 15:
+		combo_font_size = 26
+	elif combo_count >= 8:
+		combo_font_size = 22
+	combo_label_node.add_theme_font_size_override("font_size", combo_font_size)
 	combo_label_node.text = "%s x%d" % [tier_text, combo_count]
 	combo_label_node.add_theme_color_override("font_color", tier_color)
 	best_combo = maxi(best_combo, combo_count)
+
+	# 改善100: コンボタイマーバーをコンボ中は表示し、色もティアに合わせる
+	if _combo_timer_bar != null and is_instance_valid(_combo_timer_bar):
+		_combo_timer_bar.visible = true
+		_combo_timer_bar.value = combo_timer
+		var ctb_fill := _combo_timer_bar.get_theme_stylebox("fill") as StyleBoxFlat
+		if ctb_fill:
+			ctb_fill.bg_color = tier_color
 
 	# ティアが上がった瞬間のスケールパンチ（3, 8, 15, 30のタイミング）
 	if combo_count in [3, 8, 15, 30]:
 		var tween := combo_label_node.create_tween()
 		tween.tween_property(combo_label_node, "scale", Vector2(1.3, 1.3), 0.08).set_trans(Tween.TRANS_BACK)
 		tween.tween_property(combo_label_node, "scale", Vector2(1.0, 1.0), 0.12)
+		# 改善64: ティアアップ時はタワーにも振動（スクリーン全体で「昇格」を感じる）
+		var shake_lvl := 2.5 if combo_count == 8 else (3.5 if combo_count == 15 else 5.0)
+		if is_instance_valid(tower):
+			tower.shake(shake_lvl)
 
 func _announce_stage(stage: int) -> void:
 	## ステージ遷移告知: プレイヤーに新しい局面を知らせる（J-8: 重要情報を大きく）
@@ -1458,11 +1614,14 @@ func _announce_stage(stage: int) -> void:
 	ann.add_theme_constant_override("shadow_offset_y", 3)
 	ann.custom_minimum_size = Vector2(760, 0)
 	ann.position = Vector2(200, 240)
+	# 改善90: 大きくスケールインして存在感を強調（「ステージが変わった！」という驚きと緊張）
+	ann.scale = Vector2(2.0, 2.0)
 	ann.z_index = 200
 	ui_layer.add_child(ann)
 	var tween := ann.create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(ann, "position:y", 195.0, 0.38).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(ann, "scale", Vector2(1.0, 1.0), 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_property(ann, "modulate:a", 0.0, 2.5).set_delay(0.85)
 	tween.chain().tween_callback(ann.queue_free)
 	tower.shake(3.5)
@@ -1488,12 +1647,25 @@ func _announce_desperate_push() -> void:
 	tween.chain().tween_callback(ann.queue_free)
 	tower.shake(5.0)
 
+	# 改善87: FINAL PUSH時に赤いビネットがフラッシュ（「最終局面」の緊張感を全画面で演出）
+	var dp_flash := ColorRect.new()
+	dp_flash.color = Color(0.8, 0.0, 0.0, 0.35)
+	dp_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dp_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dp_flash.z_index = 150
+	ui_layer.add_child(dp_flash)
+	var dp_tween := dp_flash.create_tween()
+	dp_tween.tween_property(dp_flash, "color:a", 0.0, 0.8)
+	dp_tween.tween_callback(dp_flash.queue_free)
+
 func _show_combo_break(count: int) -> void:
 	## コンボ切れ告知: 「あそこでコンボが切れた」という記憶の刻印
 	if combo_label_node == null:
 		return
 	var br := Label.new()
-	br.text = "COMBO BREAK  x%d" % count
+	# 改善85: NEW RECORDなら特別表記（「更新した！」の達成感を強調）
+	var is_new_record := (count >= 8 and count == best_combo)
+	br.text = "COMBO BREAK  x%d%s" % [count, "  ★BEST!" if is_new_record else ""]
 	br.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	br.add_theme_font_size_override("font_size", 13)
 	br.add_theme_color_override("font_color", Color(0.55, 0.55, 0.65, 0.75))
@@ -1634,6 +1806,10 @@ func _on_xp_gained(total_xp: int, current_level: int) -> void:
 				xp_fill.bg_color = Color(0.5, 0.95, 0.5, 0.85)  # 明るい緑
 			else:
 				xp_fill.bg_color = Color(0.35, 0.85, 0.45, 0.8)  # 標準緑
+		# 改善84: XP取得ごとにバーが一瞬輝く（「集めている！」の即時フィードバック）
+		var xp_flash := xp_bar.create_tween()
+		xp_flash.tween_property(xp_bar, "modulate", Color(1.5, 2.0, 1.5, 1.0), 0.06)
+		xp_flash.tween_property(xp_bar, "modulate", Color.WHITE, 0.14)
 
 func _on_crush_changed(active: bool, count: int) -> void:
 	if active:
@@ -1644,6 +1820,16 @@ func _on_crush_changed(active: bool, count: int) -> void:
 		# Warning labelは非表示に（crushが上位表示）
 		if crush_warning_label:
 			crush_warning_label.visible = false
+		# 改善93: CRUSH開始時に画面が赤くフラッシュ（「包囲された！」の緊急性を全画面で伝える）
+		var crush_flash := ColorRect.new()
+		crush_flash.color = Color(0.8, 0.0, 0.0, 0.28)
+		crush_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+		crush_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		crush_flash.z_index = 160
+		ui_layer.add_child(crush_flash)
+		var cf_tween := crush_flash.create_tween()
+		cf_tween.tween_property(crush_flash, "color:a", 0.0, 0.6)
+		cf_tween.tween_callback(crush_flash.queue_free)
 	else:
 		crush_label.visible = false
 
@@ -1727,6 +1913,24 @@ func _on_crush_breakout() -> void:
 	tween.tween_property(ring, "modulate:a", 0.0, 0.35)
 	tween.chain().tween_callback(ring.queue_free)
 
+	# 改善67: 2本目シアンリング（やや遅れて展開 → 層状の衝撃波で迫力増幅）
+	var ring2 := Polygon2D.new()
+	var pts2: PackedVector2Array = []
+	for i in range(24):
+		var a := i * TAU / 24
+		pts2.append(Vector2(cos(a), sin(a)) * 15.0)
+	ring2.polygon = pts2
+	ring2.color = Color(0.3, 0.9, 1.0, 0.55)
+	ring2.global_position = tower.global_position
+	ring2.z_index = 138
+	add_child(ring2)
+	var tween2 := ring2.create_tween()
+	tween2.set_parallel(true)
+	var target_scale2: float = tower.CRUSH_BREAKOUT_RADIUS / 15.0 * 1.3
+	tween2.tween_property(ring2, "scale", Vector2(target_scale2, target_scale2), 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT).set_delay(0.08)
+	tween2.tween_property(ring2, "modulate:a", 0.0, 0.5).set_delay(0.08)
+	tween2.chain().tween_callback(ring2.queue_free)
+
 	# "BREAKOUT!" テキスト
 	var label := Label.new()
 	label.text = "BREAKOUT!"
@@ -1784,6 +1988,12 @@ func _on_level_up(new_level: int) -> void:
 			xp_fill.bg_color = Color(1.0, 1.0, 0.6, 1.0)
 			var bar_tween := xp_bar.create_tween()
 			bar_tween.tween_property(xp_fill, "bg_color", original_color, 0.3)
+
+	# 改善62: レベルアップ時タワーが金色フラッシュ（「強くなった！」瞬間の視覚的報酬）
+	if is_instance_valid(tower):
+		tower.modulate = Color(3.0, 2.5, 0.5, 1.0)
+		var lv_tween := tower.create_tween()
+		lv_tween.tween_property(tower, "modulate", Color.WHITE, 0.45)
 
 	# レベルアップフラッシュVFX
 	_spawn_levelup_vfx()
@@ -2116,6 +2326,23 @@ func _show_result_screen(is_victory: bool) -> void:
 	sep.modulate.a = 0.0
 	vbox.add_child(sep)
 
+	# 改善88: スター評価（キル数で1〜3段階。「また挑戦したい」動機付け）
+	var star_count := 1
+	if kill_count >= 75:
+		star_count = 3
+	elif kill_count >= 25:
+		star_count = 2
+	var star_lbl := Label.new()
+	star_lbl.text = "★".repeat(star_count) + "☆".repeat(3 - star_count)
+	star_lbl.add_theme_font_size_override("font_size", 36)
+	star_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2, 1.0))
+	star_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	star_lbl.add_theme_constant_override("shadow_offset_x", 2)
+	star_lbl.add_theme_constant_override("shadow_offset_y", 2)
+	star_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	star_lbl.modulate.a = 0.0
+	vbox.add_child(star_lbl)
+
 	# スタッツ
 	var distance_m: float = float(tower.distance_traveled) / 10.0
 	var time_sec := int(run_time)
@@ -2123,8 +2350,10 @@ func _show_result_screen(is_victory: bool) -> void:
 	var t_min := time_sec / 60
 	var t_sec := time_sec % 60
 
+	# 改善76: Stage Reached をリザルトに追加（ゲームの進行感を数値で示す）
 	var stats_data: Array[Array] = [
 		["Distance", "%dm" % int(distance_m)],
+		["Stage Reached", "Stage %d" % current_stage],
 		["Level", "%d" % tower.level],
 		["Kills", "%d" % kill_count],
 		["Best Combo", "x%d" % best_combo],
@@ -2138,7 +2367,14 @@ func _show_result_screen(is_victory: bool) -> void:
 		var lbl := Label.new()
 		lbl.text = "%s:  %s" % [stat[0], stat[1]]
 		lbl.add_theme_font_size_override("font_size", 24)
-		lbl.add_theme_color_override("font_color", stat_color)
+		# 改善99: Best Combo の数値を色分け（金=10+, ピンク=30+, 通常=灰）
+		var lbl_color := stat_color
+		if stat[0] == "Best Combo":
+			if best_combo >= 30:
+				lbl_color = Color(1.0, 0.3, 0.85, 1.0)  # ピンク: GODLIKE域
+			elif best_combo >= 10:
+				lbl_color = Color(1.0, 0.82, 0.2, 1.0)  # 金: 高コンボ達成
+		lbl.add_theme_color_override("font_color", lbl_color)
 		lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
 		lbl.add_theme_constant_override("shadow_offset_x", 1)
 		lbl.add_theme_constant_override("shadow_offset_y", 1)
@@ -2214,6 +2450,7 @@ func _show_result_screen(is_victory: bool) -> void:
 	var anim := create_tween()
 	anim.tween_property(title, "modulate:a", 1.0, 0.3).set_delay(0.5)
 	anim.tween_property(sep, "modulate:a", 0.4, 0.2)
+	anim.tween_property(star_lbl, "modulate:a", 1.0, 0.25)
 	for lbl in stat_labels:
 		anim.tween_property(lbl, "modulate:a", 1.0, 0.15)
 	anim.tween_property(retry, "modulate:a", 1.0, 0.3).set_delay(0.3)

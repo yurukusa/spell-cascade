@@ -488,7 +488,7 @@ func _spawn_heal_vfx(amount: float) -> void:
 		return
 	var label := Label.new()
 	label.text = "+%d HP" % int(amount)
-	label.add_theme_font_size_override("font_size", 20)
+	label.add_theme_font_size_override("font_size", 24)  # 改善66: 20→24、回復の視認性向上
 	label.add_theme_color_override("font_color", Color(0.3, 0.95, 0.4, 1.0))
 	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
 	label.add_theme_constant_override("shadow_offset_x", 1)
@@ -505,6 +505,23 @@ func _spawn_heal_vfx(amount: float) -> void:
 	modulate = Color(0.4, 2.2, 0.5, 1.0)
 	var flash := create_tween()
 	flash.tween_property(self, "modulate", Color.WHITE, 0.3)
+
+	# 改善92: 回復時に緑の拡散リング（「回復した！」瞬間を爽快に見せる）
+	var ring := Polygon2D.new()
+	var ring_pts: PackedVector2Array = []
+	for i in range(16):
+		var ra := float(i) * TAU / 16.0
+		ring_pts.append(Vector2(cos(ra), sin(ra)) * 18.0)
+	ring.polygon = ring_pts
+	ring.color = Color(0.3, 0.95, 0.4, 0.55)
+	ring.global_position = global_position
+	ring.z_index = 140
+	scene_root.add_child(ring)
+	var ring_tween := ring.create_tween()
+	ring_tween.set_parallel(true)
+	ring_tween.tween_property(ring, "scale", Vector2(3.5, 3.5), 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	ring_tween.tween_property(ring, "modulate:a", 0.0, 0.4)
+	ring_tween.chain().tween_callback(ring.queue_free)
 
 func _update_tower_core_color() -> void:
 	## コア色をHP割合でシアン→オレンジ→赤に変化（改善40: タワーの危機感を視覚化）
@@ -549,6 +566,8 @@ func _update_low_hp_glow() -> void:
 	## 低HP時の赤いパルスリング（危機感の持続的可視化: 死の瀬戸際を体感させる）
 	var pct := hp / max_hp
 	if pct <= 0.25 and hp > 0:
+		# 改善91: HP割合で脈動速度を可変。低HPほど速くパルスして「もうダメだ」感を増幅
+		var pulse_speed := lerpf(0.16, 0.35, pct / 0.25)  # 0% → 0.16s(高速), 25% → 0.35s(低速)
 		if _low_hp_glow == null or not is_instance_valid(_low_hp_glow):
 			_low_hp_glow = Polygon2D.new()
 			_low_hp_glow.name = "LowHPGlow"
@@ -560,10 +579,13 @@ func _update_low_hp_glow() -> void:
 			_low_hp_glow.color = Color(1.0, 0.08, 0.08, 0.2)
 			_low_hp_glow.z_index = -1
 			add_child(_low_hp_glow)
-			_low_hp_tween = _low_hp_glow.create_tween()
-			_low_hp_tween.set_loops()
-			_low_hp_tween.tween_property(_low_hp_glow, "scale", Vector2(1.4, 1.4), 0.32).set_trans(Tween.TRANS_SINE)
-			_low_hp_tween.tween_property(_low_hp_glow, "scale", Vector2(1.0, 1.0), 0.32).set_trans(Tween.TRANS_SINE)
+		# HP変化のたびに速度更新（改善91: 常に現在のHPに合ったパルス速度）
+		if _low_hp_tween != null:
+			_low_hp_tween.kill()
+		_low_hp_tween = _low_hp_glow.create_tween()
+		_low_hp_tween.set_loops()
+		_low_hp_tween.tween_property(_low_hp_glow, "scale", Vector2(1.4, 1.4), pulse_speed).set_trans(Tween.TRANS_SINE)
+		_low_hp_tween.tween_property(_low_hp_glow, "scale", Vector2(1.0, 1.0), pulse_speed).set_trans(Tween.TRANS_SINE)
 	else:
 		if _low_hp_glow != null and is_instance_valid(_low_hp_glow):
 			if _low_hp_tween != null:
