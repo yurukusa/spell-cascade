@@ -185,8 +185,10 @@ func _process(delta: float) -> void:
 		spawn_timer = 0.0
 		_spawn_enemy()
 
-	# スポーンフロア: t=3s以降、最低6体を維持（v0.3.3: 序盤イベント密度UP）
-	if run_time >= 3.0 and enemies_alive < 6 and not boss_spawned and spawn_timer >= current_interval * 0.5:
+	# スポーンフロア: t=3s以降、最低N体を維持（v0.7.0: 時間で増加 → 数の圧力で緊張維持）
+	# 6体(0s) → 8体(1分) → 10体(2分) → 最大15体。プレイヤーが強くなるほど敵も多くする。
+	var min_alive: int = mini(6 + int(run_time / 30), 15)
+	if run_time >= 3.0 and enemies_alive < min_alive and not boss_spawned and spawn_timer >= current_interval * 0.5:
 		spawn_timer = 0.0
 		_spawn_enemy()
 
@@ -719,7 +721,7 @@ func _show_shrine() -> void:
 
 	# タイトル
 	var title := Label.new()
-	title.text = "SHRINE DISCOVERED"
+	title.text = "SHRINE DISCOVERED — 神殿発見"
 	title.add_theme_font_size_override("font_size", 18)
 	title.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3, 1.0))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -727,11 +729,11 @@ func _show_shrine() -> void:
 	title.custom_minimum_size = Vector2(800, 0)
 	shrine_ui.add_child(title)
 
-	# 3択ボタン
+	# 3択ボタン（日英バイリンガル）
 	var choices := [
-		{"name": "OVERCHARGE", "desc": "Projectile +2\nCooldown +30% slower", "color": Color(1.0, 0.4, 0.2)},
-		{"name": "GREED", "desc": "Pickup range +200\nDamage -15%", "color": Color(0.3, 1.0, 0.3)},
-		{"name": "DISCIPLINE", "desc": "Damage +25%\nMove speed -20%", "color": Color(0.4, 0.6, 1.0)},
+		{"name": "OVERCHARGE\n過負荷", "desc": "弾数 +2\nクールダウン +30%遅", "color": Color(1.0, 0.4, 0.2)},
+		{"name": "GREED\n強欲", "desc": "取得範囲 +200\nダメージ -15%", "color": Color(0.3, 1.0, 0.3)},
+		{"name": "DISCIPLINE\n規律", "desc": "ダメージ +25%\n移動速度 -20%", "color": Color(0.4, 0.6, 1.0)},
 	]
 
 	for i in choices.size():
@@ -828,9 +830,11 @@ func _spawn_boss() -> void:
 	boss.position = Vector2(cam_pos.x, cam_pos.y - 500)
 
 	var distance_m: float = float(tower.distance_traveled) / 10.0
-	var progress_scale := 1.0 + distance_m / 50.0 + run_time / 120.0
-	var hp_val := 35.0 * progress_scale  # v0.3.1: HP+40%
-	var speed_val := 75.0 + distance_m * 0.12 + run_time * 0.12  # v0.3.1: 速度+15%
+	# v0.7.0: ボスも指数スケーリング（ただし雑魚より×2倍HP）
+	var time_factor := pow(1.0 + run_time / 90.0, 1.6)
+	var progress_scale := (1.0 + distance_m / 50.0) * time_factor
+	var hp_val := 35.0 * progress_scale * 2.0  # ボスは雑魚の2倍HP
+	var speed_val := 75.0 + distance_m * 0.15 + run_time * 0.25  # v0.7.0: 速度圧力UP
 	var dmg_val := 14.0 + distance_m * 0.03  # v0.3: 10→14（緊張感UP）
 
 	boss.init(tower, speed_val, hp_val, dmg_val, "boss")
@@ -878,12 +882,13 @@ func _on_boss_died(_enemy: Node2D) -> void:
 	combo_timer = COMBO_WINDOW
 	_update_combo_display()
 	# ボスキル: 長めのヒットストップ + タワーグロー
-	_do_hitstop(0.12)
+	# v0.7.0: 0.12→0.08（Design Lock: 最大80ms制限に準拠）
+	_do_hitstop(0.08)
 	_flash_tower_kill_glow()
 
 	# ボス撃破のお祝い表示
 	var label := Label.new()
-	label.text = "BOSS DEFEATED!"
+	label.text = "BOSS DEFEATED! / ボス撃破！"
 	label.add_theme_font_size_override("font_size", 36)
 	label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.4, 1.0))
 	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
@@ -901,6 +906,99 @@ func _on_boss_died(_enemy: Node2D) -> void:
 
 	# Boss HP bar除去
 	_remove_boss_hp_bar()
+
+	# v0.7.0: ボス撃破報酬 — HP回復 + 特別シュライン（強力な3択）
+	# 2秒後に表示（演出と重ならないよう遅延）
+	tower.hp = mini(tower.hp + 100, tower.max_hp)
+	await get_tree().create_timer(2.0).timeout
+	if is_inside_tree() and shrine_ui == null:  # 既存シュライン表示中は出さない
+		_show_boss_reward_shrine()
+
+func _show_boss_reward_shrine() -> void:
+	## ボス撃破時の特別報酬シュライン（強力 + HP回復演出）
+	SFX.play_ui_select()
+	shrine_timer = SHRINE_AUTO_SELECT_TIME
+
+	shrine_ui = Control.new()
+	shrine_ui.name = "ShrineUI"
+	shrine_ui.z_index = 190
+
+	# 背景（通常シュラインより派手な金色ボーダー）
+	var bg := ColorRect.new()
+	bg.color = Color(0.1, 0.06, 0.02, 0.9)
+	bg.position = Vector2(160, 470)
+	bg.size = Vector2(960, 190)
+	shrine_ui.add_child(bg)
+
+	# タイトル（日英バイリンガル）
+	var title := Label.new()
+	title.text = "BOSS DEFEATED — 報酬を選べ"
+	title.add_theme_font_size_override("font_size", 20)
+	title.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2, 1.0))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.position = Vector2(160, 476)
+	title.custom_minimum_size = Vector2(960, 0)
+	shrine_ui.add_child(title)
+
+	var choices := [
+		{
+			"name": "TRANSCENDENCE\n超越",
+			"desc": "全弾ダメージ +30%\n貫通 +1",
+			"color": Color(1.0, 0.6, 0.0),
+		},
+		{
+			"name": "PHOENIX\n不死鳥",
+			"desc": "HP全回復\n攻撃速度 +25%",
+			"color": Color(0.9, 0.2, 0.2),
+		},
+		{
+			"name": "RUIN\n崩壊",
+			"desc": "ダメージ +60%\nクールダウン +25%遅",
+			"color": Color(0.5, 0.0, 0.9),
+		},
+	]
+
+	for i in choices.size():
+		var btn := Button.new()
+		btn.text = choices[i]["name"] + "\n" + choices[i]["desc"]
+		btn.position = Vector2(185 + i * 310, 505)
+		btn.custom_minimum_size = Vector2(285, 135)
+		btn.add_theme_font_size_override("font_size", 14)
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(0.18, 0.1, 0.05, 0.92)
+		style.border_color = choices[i]["color"]
+		style.set_border_width_all(3)
+		style.set_corner_radius_all(8)
+		btn.add_theme_stylebox_override("normal", style)
+		var hover := style.duplicate() as StyleBoxFlat
+		hover.bg_color = Color(0.28, 0.16, 0.06, 0.96)
+		btn.add_theme_stylebox_override("hover", hover)
+		btn.add_theme_color_override("font_color", choices[i]["color"])
+		btn.pressed.connect(_on_boss_reward_chosen.bind(i))
+		shrine_ui.add_child(btn)
+
+	ui_layer.add_child(shrine_ui)
+
+	shrine_ui.modulate.a = 0.0
+	var tween := shrine_ui.create_tween()
+	tween.tween_property(shrine_ui, "modulate:a", 1.0, 0.4)
+
+func _on_boss_reward_chosen(idx: int) -> void:
+	## ボス撃破報酬の適用
+	if shrine_ui and is_instance_valid(shrine_ui):
+		shrine_ui.queue_free()
+		shrine_ui = null
+	shrine_timer = 0.0
+	match idx:
+		0:  # TRANSCENDENCE（超越）: ダメージ +30% + 追加弾 +1
+			tower.damage_mult *= 1.30
+			tower.projectile_bonus += 1
+		1:  # PHOENIX（不死鳥）: HP全回復 + 攻撃速度 +25%（cooldown短縮）
+			tower.hp = tower.max_hp
+			tower.cooldown_mult = maxf(tower.cooldown_mult * 0.80, 0.1)
+		2:  # RUIN（崩壊）: ダメージ +60% / クールダウン +25%遅
+			tower.damage_mult *= 1.60
+			tower.cooldown_mult *= 1.25
 
 func _create_boss_hp_bar(boss: Node2D) -> void:
 	## ボス専用HPバー（画面上部中央）
@@ -1071,10 +1169,14 @@ func _spawn_enemy() -> void:
 
 	# 距離＋時間でスケーリング
 	var distance_m: float = float(tower.distance_traveled) / 10.0
-	var progress_scale := 1.0 + distance_m / 50.0 + run_time / 120.0
+	# v0.7.0: 時間成分を指数関数化 — 線形スケールはプレイヤーの乗算的成長に追いつけない
+	# pow(1+t/90, 1.6): 序盤ゆるやか→中盤加速→後半高難度。放置プレイ抑止。
+	var time_factor := pow(1.0 + run_time / 90.0, 1.6)
+	var progress_scale := (1.0 + distance_m / 50.0) * time_factor
 	var stage_hp: float = STAGE_HP_MULT[current_stage - 1]
 	var hp_val: float = 35.0 * progress_scale * stage_hp  # v0.3.2: ステージ別HP倍率
-	var speed_val := 75.0 + distance_m * 0.12 + run_time * 0.12
+	# v0.7.0: 後半の速度圧力を高め、位置取りに意味を持たせる（桜井: 押し引き維持）
+	var speed_val := 75.0 + distance_m * 0.15 + run_time * 0.25
 	var dmg_val := 14.0 + distance_m * 0.03  # v0.3: 10→14（HP500に対して体感できるダメージ）
 
 	# 敵タイプ選択: ステージ別ゲーティング（v0.3.2）

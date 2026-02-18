@@ -58,7 +58,7 @@ func _ready() -> void:
 	for i in SHOT_POOL_SIZE:
 		var p := AudioStreamPlayer.new()
 		p.stream = shot_stream
-		p.volume_db = -6.0
+		p.volume_db = -8.0   # v0.7.0: -6→-8（SFX全体を2dB下げてBGMとのバランス改善）
 		add_child(p)
 		_shot_players.append(p)
 
@@ -66,7 +66,7 @@ func _ready() -> void:
 	for i in HIT_POOL_SIZE:
 		var p := AudioStreamPlayer.new()
 		p.stream = hit_stream
-		p.volume_db = -8.0
+		p.volume_db = -10.0  # v0.7.0: -8→-10
 		add_child(p)
 		_hit_players.append(p)
 
@@ -76,12 +76,12 @@ func _ready() -> void:
 		kill_stream = _gen_kill()
 	_kill_player = AudioStreamPlayer.new()
 	_kill_player.stream = kill_stream
-	_kill_player.volume_db = -3.0
+	_kill_player.volume_db = -5.0   # v0.7.0: -3→-5
 	add_child(_kill_player)
 
 	_ui_select_player = AudioStreamPlayer.new()
 	_ui_select_player.stream = _gen_ui_select()
-	_ui_select_player.volume_db = -2.0
+	_ui_select_player.volume_db = -4.0  # v0.7.0: -2→-4
 	add_child(_ui_select_player)
 
 	_low_hp_player = AudioStreamPlayer.new()
@@ -95,7 +95,7 @@ func _ready() -> void:
 		lvl_stream = _gen_level_up()
 	_level_up_player = AudioStreamPlayer.new()
 	_level_up_player.stream = lvl_stream
-	_level_up_player.volume_db = -2.0
+	_level_up_player.volume_db = -3.0   # v0.7.0: -2→-3（レベルアップは少し大きめを維持）
 	add_child(_level_up_player)
 
 	# XP Pickup: pyfxr WAV (xp_pickup_v1/v2) をプール、なければ procedural
@@ -117,19 +117,20 @@ func _ready() -> void:
 		add_child(p)
 		_xp_pickup_players.append(p)
 
+	# v0.7.0: BGMを+4dB引き上げ（SFXとのバランス改善: -12→-8, -10→-6, -8→-4）
 	_bgm_player = AudioStreamPlayer.new()
 	_bgm_player.stream = _gen_bgm()
-	_bgm_player.volume_db = -12.0  # BGMは控えめに（SE優先）
+	_bgm_player.volume_db = -8.0   # v0.7.0: -12→-8
 	add_child(_bgm_player)
 
 	_bgm_intense_player = AudioStreamPlayer.new()
 	_bgm_intense_player.stream = _gen_bgm_intense()
-	_bgm_intense_player.volume_db = -10.0
+	_bgm_intense_player.volume_db = -6.0  # v0.7.0: -10→-6
 	add_child(_bgm_intense_player)
 
 	_bgm_boss_player = AudioStreamPlayer.new()
 	_bgm_boss_player.stream = _gen_bgm_boss()
-	_bgm_boss_player.volume_db = -8.0
+	_bgm_boss_player.volume_db = -4.0   # v0.7.0: -8→-4（ボスBGMは最も前面に）
 	add_child(_bgm_boss_player)
 
 	# Wave Clear: pyfxr WAV (combo_tierup) があればそれ、なければ procedural
@@ -138,12 +139,12 @@ func _ready() -> void:
 		wc_stream = _gen_wave_clear()
 	_wave_clear_player = AudioStreamPlayer.new()
 	_wave_clear_player.stream = wc_stream
-	_wave_clear_player.volume_db = -3.0
+	_wave_clear_player.volume_db = -4.0  # v0.7.0: -3→-4
 	add_child(_wave_clear_player)
 
 	_boss_entrance_player = AudioStreamPlayer.new()
 	_boss_entrance_player.stream = _gen_boss_entrance()
-	_boss_entrance_player.volume_db = -2.0
+	_boss_entrance_player.volume_db = -3.0  # v0.7.0: -2→-3
 	add_child(_boss_entrance_player)
 
 	_ui_cancel_player = AudioStreamPlayer.new()
@@ -165,7 +166,7 @@ func _ready() -> void:
 			p.stream = dmg_wavs[i % dmg_wavs.size()]
 		else:
 			p.stream = dmg_fallback
-		p.volume_db = -2.0  # 被弾は高優先: 他SEより大きめ
+		p.volume_db = -3.0  # v0.7.0: -2→-3（被弾は依然として高優先だが少し下げる）
 		add_child(p)
 		_damage_taken_players.append(p)
 

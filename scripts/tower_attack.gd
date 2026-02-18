@@ -10,6 +10,12 @@ var timer := 0.0
 var is_first_strike := true
 var build_system: Node
 
+# v0.7.0: GDScriptキャッシュ — 毎弾コンパイルによる7-8分フリーズを防ぐ
+# 動的GDScript生成は高コスト。同じスクリプトを使い回す。
+var _bullet_gdscript: GDScript = null
+var _wisp_gdscript: GDScript = null
+var _simple_bullet_gdscript: GDScript = null
+
 # Skill chip state
 var pending_on_kill := false  # on_kill チップ: キル後に発動待ち
 var _echo_firing := false     # echo再帰防止
@@ -30,6 +36,30 @@ func setup(idx: int, calculated_stats: Dictionary) -> void:
 	if tower_node and tower_node.has_signal("enemy_killed"):
 		if not tower_node.enemy_killed.is_connected(_on_enemy_killed):
 			tower_node.enemy_killed.connect(_on_enemy_killed)
+
+## --- GDScriptキャッシュゲッター ---
+## GDScript.new() + reload() は高コスト。初回のみコンパイルし以降は再利用。
+
+func _get_bullet_gdscript() -> GDScript:
+	if _bullet_gdscript == null:
+		_bullet_gdscript = GDScript.new()
+		_bullet_gdscript.source_code = _build_bullet_script()
+		_bullet_gdscript.reload()
+	return _bullet_gdscript
+
+func _get_wisp_gdscript() -> GDScript:
+	if _wisp_gdscript == null:
+		_wisp_gdscript = GDScript.new()
+		_wisp_gdscript.source_code = _build_wisp_script()
+		_wisp_gdscript.reload()
+	return _wisp_gdscript
+
+func _get_simple_bullet_gdscript() -> GDScript:
+	if _simple_bullet_gdscript == null:
+		_simple_bullet_gdscript = GDScript.new()
+		_simple_bullet_gdscript.source_code = _simple_bullet_script()
+		_simple_bullet_gdscript.reload()
+	return _simple_bullet_gdscript
 
 func _process(delta: float) -> void:
 	if stats.is_empty():
@@ -212,10 +242,7 @@ func _summon_wisp() -> void:
 	var duration: float = stats.get("summon_duration", 10.0)
 	var atk_range: float = stats.get("range", 250)
 
-	var script := GDScript.new()
-	script.source_code = _build_wisp_script()
-	script.reload()
-	wisp.set_script(script)
+	wisp.set_script(_get_wisp_gdscript())  # v0.7.0: キャッシュ利用
 	wisp.set("damage", int(base_dmg))
 	wisp.set("attack_cooldown", attack_cd)
 	wisp.set("duration", duration)
@@ -573,11 +600,7 @@ func _create_projectile(direction: Vector2) -> void:
 	# スキル別ビジュアル（タグで分岐）
 	_build_skill_visual(bullet, direction)
 
-	# 弾スクリプト
-	var script := GDScript.new()
-	script.source_code = _build_bullet_script()
-	script.reload()
-	bullet.set_script(script)
+	bullet.set_script(_get_bullet_gdscript())  # v0.7.0: キャッシュ利用
 	bullet.set("direction", direction)
 	bullet.set("speed", 350.0 * stats.get("speed_mult", 1.0))
 	var base_damage: float = stats.get("damage", 10)
