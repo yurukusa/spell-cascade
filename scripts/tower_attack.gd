@@ -14,7 +14,6 @@ var build_system: Node
 # 動的GDScript生成は高コスト。同じスクリプトを使い回す。
 var _bullet_gdscript: GDScript = null
 var _wisp_gdscript: GDScript = null
-var _simple_bullet_gdscript: GDScript = null
 
 # Skill chip state
 var pending_on_kill := false  # on_kill チップ: キル後に発動待ち
@@ -54,12 +53,6 @@ func _get_wisp_gdscript() -> GDScript:
 		_wisp_gdscript.reload()
 	return _wisp_gdscript
 
-func _get_simple_bullet_gdscript() -> GDScript:
-	if _simple_bullet_gdscript == null:
-		_simple_bullet_gdscript = GDScript.new()
-		_simple_bullet_gdscript.source_code = _simple_bullet_script()
-		_simple_bullet_gdscript.reload()
-	return _simple_bullet_gdscript
 
 func _process(delta: float) -> void:
 	if stats.is_empty():
