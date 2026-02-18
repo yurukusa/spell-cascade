@@ -870,13 +870,22 @@ func _spawn_damage_number(amount: float) -> void:
 	float_tween.chain().tween_callback(label.queue_free)
 
 	if hp <= 0:
+		# physics callback中のarea_set_shape_disabledエラー防止:
+		# 即座にコリジョンを無効化して他の弾との重複判定を止める
+		var hitbox := get_node_or_null("Hitbox")
+		if hitbox:
+			hitbox.set_deferred("monitoring", false)
+			hitbox.set_deferred("monitorable", false)
+		var col := get_node_or_null("CollisionShape2D")
+		if col:
+			col.set_deferred("disabled", true)
 		_spawn_death_vfx()
 		_spawn_drops()
 		# splitter: 死亡時にswarmer×2分裂シグナルを発火
 		if enemy_type == "splitter":
 			split_on_death.emit(global_position)
 		died.emit(self)
-		queue_free()
+		call_deferred("queue_free")
 
 func _spawn_drops() -> void:
 	var scene_root := get_tree().current_scene

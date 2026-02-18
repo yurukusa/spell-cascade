@@ -576,14 +576,32 @@ func _dismiss_onboarding() -> void:
 # --- アップグレード選択（ラン中）---
 
 func _show_upgrade_choice() -> void:
-	# 最初のアップグレード（10m）は強力サポートを保証
+	# 1回目: 2ndスキル（空スロットに新スキル追加）
+	# なぜ最初にスキル: セカンドスキルが遅すぎる→即新スキルで戦術の幅を広げる
 	if upgrade_events_given == 1:
+		var empty_slot := -1
+		for i in range(tower.max_slots):
+			if tower.get_module(i) == null:
+				empty_slot = i
+				break
+		if empty_slot >= 0:
+			var equipped: Array[String] = []
+			for i in range(tower.max_slots):
+				var m: Variant = tower.get_module(i)
+				if m != null:
+					equipped.append(m.skill_id)
+			var skill_ids: Array = build_system.get_random_skill_ids(3, equipped)
+			upgrade_ui.show_skill_choice(empty_slot, skill_ids)
+			return
+
+	# 2回目: 強力サポート保証（chain/fork/pierce）
+	if upgrade_events_given == 2:
 		var guaranteed_supports: Array = ["chain", "fork", "pierce"]
 		upgrade_ui.show_support_choice(guaranteed_supports)
 		return
 
-	# 2番目のアップグレード（40m）: まだ手動移動ならMove AIチップを提示
-	if upgrade_events_given == 2:
+	# 3回目: まだ手動移動ならMove AIチップを提示
+	if upgrade_events_given == 3:
 		var move_chip: Dictionary = build_system.get_equipped_chip("move")
 		var move_id: String = move_chip.get("id", "manual")
 		if move_id == "manual" or move_id == "":
@@ -592,7 +610,7 @@ func _show_upgrade_choice() -> void:
 				upgrade_ui.show_chip_choice("Move AI Unlock", move_chips)
 				return
 
-	# 空スロットがあればスキル追加
+	# 4回目以降: 空スロットがあればスキル追加
 	var empty_slot := -1
 	for i in range(tower.max_slots):
 		if tower.get_module(i) == null:
@@ -1316,13 +1334,19 @@ var levelup_pool: Array[Dictionary] = [
 
 func _on_level_up(new_level: int) -> void:
 	SFX.play_level_up()
-	# 3つランダムに選んで表示
-	var pool := levelup_pool.duplicate()
-	pool.shuffle()
-	var choices: Array[Dictionary] = []
-	for i in range(mini(3, pool.size())):
-		choices.append(pool[i])
-	upgrade_ui.show_levelup_choice(new_level, choices)
+	# 奇数レベル(3,5,7...): ビルドアップグレード（スキル/サポート/Mod）
+	# 偶数レベル(2,4,6...): ステータスアップグレード
+	# なぜ: _show_upgrade_choiceが未接続で2nd skillが取得不可能だった
+	if new_level >= 3 and new_level % 2 == 1:
+		upgrade_events_given += 1
+		_show_upgrade_choice()
+	else:
+		var pool := levelup_pool.duplicate()
+		pool.shuffle()
+		var choices: Array[Dictionary] = []
+		for i in range(mini(3, pool.size())):
+			choices.append(pool[i])
+		upgrade_ui.show_levelup_choice(new_level, choices)
 
 	# XPバーリセット（次のレベルの目標に合わせる）
 	if xp_bar:
