@@ -57,6 +57,8 @@ const CRUSH_BREAKOUT_DAMAGE := 30.0
 const CRUSH_BREAKOUT_RADIUS := 120.0
 const CRUSH_BREAKOUT_KNOCKBACK := 80.0
 
+var _tower_core_poly: Polygon2D = null  # HPで色変化するコア（改善40）
+
 func _ready() -> void:
 	hp = max_hp
 	start_y = position.y
@@ -121,6 +123,7 @@ func _install_stylized_visual() -> void:
 	core.color = accent
 	core.polygon = _make_ngon(8, 12.0)
 	root.add_child(core)
+	_tower_core_poly = core  # HP色変化用に参照を保持（改善40）
 
 	# Direction hint (front notch) so "where is facing" is readable even in chaos
 	var notch := Polygon2D.new()
@@ -462,13 +465,59 @@ func take_damage(amount: float) -> void:
 	if hp > 0 and hp / max_hp <= 0.3:
 		SFX.play_low_hp_warning()
 
+	_update_low_hp_glow()
+	_update_tower_core_color()
+
 	if hp <= 0:
 		hp = 0
 		tower_destroyed.emit()
 
 func heal(amount: float) -> void:
+	var healed := minf(amount, max_hp - hp)  # 実際に回復した量
 	hp = minf(hp + amount, max_hp)
 	tower_damaged.emit(hp, max_hp)
+	_update_low_hp_glow()
+	_update_tower_core_color()
+	if healed > 0.5:
+		_spawn_heal_vfx(healed)
+
+func _spawn_heal_vfx(amount: float) -> void:
+	## 回復時の緑フラッシュ + "+N HP" テキスト（G-10: ダメージモーション回復版）
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+	var label := Label.new()
+	label.text = "+%d HP" % int(amount)
+	label.add_theme_font_size_override("font_size", 20)
+	label.add_theme_color_override("font_color", Color(0.3, 0.95, 0.4, 1.0))
+	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+	label.add_theme_constant_override("shadow_offset_x", 1)
+	label.add_theme_constant_override("shadow_offset_y", 1)
+	label.z_index = 150
+	label.global_position = global_position + Vector2(randf_range(-15, 15), -40)
+	scene_root.add_child(label)
+	var tween := label.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(label, "global_position:y", label.global_position.y - 55.0, 0.9).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "modulate:a", 0.0, 0.9).set_delay(0.3)
+	tween.chain().tween_callback(label.queue_free)
+	# タワー緑フラッシュ（回復の知覚）
+	modulate = Color(0.4, 2.2, 0.5, 1.0)
+	var flash := create_tween()
+	flash.tween_property(self, "modulate", Color.WHITE, 0.3)
+
+func _update_tower_core_color() -> void:
+	## コア色をHP割合でシアン→オレンジ→赤に変化（改善40: タワーの危機感を視覚化）
+	if _tower_core_poly == null or not is_instance_valid(_tower_core_poly):
+		return
+	var pct := clampf(hp / max_hp, 0.0, 1.0)
+	var cyan   := Color(0.35, 0.75, 1.0, 1.0)
+	var orange := Color(1.0, 0.65, 0.15, 1.0)
+	var red    := Color(1.0, 0.22, 0.12, 1.0)
+	if pct > 0.5:
+		_tower_core_poly.color = cyan.lerp(orange, (1.0 - pct) * 2.0)
+	else:
+		_tower_core_poly.color = orange.lerp(red, (0.5 - pct) * 2.0)
 
 func add_xp(amount: int) -> void:
 	xp += amount
@@ -491,6 +540,37 @@ func get_xp_for_next_level() -> int:
 
 var shake_intensity := 0.0
 var shake_decay := 8.0  # 減衰速度
+
+# 低HP持続グロー（25%以下で赤いパルスリング）
+var _low_hp_glow: Polygon2D = null
+var _low_hp_tween: Tween = null
+
+func _update_low_hp_glow() -> void:
+	## 低HP時の赤いパルスリング（危機感の持続的可視化: 死の瀬戸際を体感させる）
+	var pct := hp / max_hp
+	if pct <= 0.25 and hp > 0:
+		if _low_hp_glow == null or not is_instance_valid(_low_hp_glow):
+			_low_hp_glow = Polygon2D.new()
+			_low_hp_glow.name = "LowHPGlow"
+			var pts: PackedVector2Array = []
+			for i in range(16):
+				var a := float(i) * TAU / 16.0
+				pts.append(Vector2(cos(a), sin(a)) * 42.0)
+			_low_hp_glow.polygon = pts
+			_low_hp_glow.color = Color(1.0, 0.08, 0.08, 0.2)
+			_low_hp_glow.z_index = -1
+			add_child(_low_hp_glow)
+			_low_hp_tween = _low_hp_glow.create_tween()
+			_low_hp_tween.set_loops()
+			_low_hp_tween.tween_property(_low_hp_glow, "scale", Vector2(1.4, 1.4), 0.32).set_trans(Tween.TRANS_SINE)
+			_low_hp_tween.tween_property(_low_hp_glow, "scale", Vector2(1.0, 1.0), 0.32).set_trans(Tween.TRANS_SINE)
+	else:
+		if _low_hp_glow != null and is_instance_valid(_low_hp_glow):
+			if _low_hp_tween != null:
+				_low_hp_tween.kill()
+				_low_hp_tween = null
+			_low_hp_glow.queue_free()
+			_low_hp_glow = null
 
 func shake(intensity: float = 3.0) -> void:
 	# 累積ではなく、より強い方を採用（連続ヒットで揺れすぎない）

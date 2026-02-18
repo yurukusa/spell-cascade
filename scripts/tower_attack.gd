@@ -130,6 +130,31 @@ func _fire() -> void:
 
 	SFX.play_shot()
 
+	# マズルフラッシュ（発射の視覚的確認: H-1原則 Make It Pop）
+	var tower_node := get_parent()
+	if tower_node and is_instance_valid(tower_node):
+		var mf := Polygon2D.new()
+		mf.polygon = _make_ngon(6, 8.0)
+		# チップのタグに応じて色を変える（J-7: 色による区分）
+		var flash_tags: Array = stats.get("tags", [])
+		if "fire" in flash_tags:
+			mf.color = Color(1.0, 0.6, 0.2, 0.85)
+		elif "holy" in flash_tags or "light" in flash_tags:
+			mf.color = Color(1.0, 0.95, 0.6, 0.85)
+		elif "cold" in flash_tags:
+			mf.color = Color(0.4, 0.8, 1.0, 0.85)
+		elif "lightning" in flash_tags:
+			mf.color = Color(0.9, 0.9, 1.0, 0.9)
+		else:
+			mf.color = Color(0.5, 0.9, 1.0, 0.8)  # シアン（デフォルト）
+		mf.z_index = 200
+		tower_node.add_child(mf)
+		var mf_tween := mf.create_tween()
+		mf_tween.set_parallel(true)
+		mf_tween.tween_property(mf, "scale", Vector2(2.5, 2.5), 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		mf_tween.tween_property(mf, "modulate:a", 0.0, 0.12)
+		mf_tween.chain().tween_callback(mf.queue_free)
+
 	# echo: 30%追加発動（再帰防止フラグ付き）
 	if not _echo_firing and stats.get("echo_chance", 0.0) > 0:
 		if randf() < stats["echo_chance"]:
@@ -625,6 +650,9 @@ func _create_projectile(direction: Vector2) -> void:
 	bullet.set("crit_freeze_duration", stats.get("crit_freeze_duration", 0.0))
 	bullet.set("crit_chance", stats.get("crit_chance", 0.0))
 	bullet.set("crit_mult", stats.get("crit_mult", 1.0))
+	# トレイル色を弾タイプに合わせる（スキル識別性向上: J-7 色による区分）
+	var tc := _get_bullet_color()
+	bullet.set("trail_color", Color(tc.r, tc.g, tc.b, 0.55))
 
 	bullet.collision_layer = 2
 	bullet.collision_mask = 4
@@ -1024,6 +1052,8 @@ var ghost_bullet := false
 var crit_freeze_duration := 0.0
 var crit_chance := 0.0
 var crit_mult := 1.0
+var trail_color := Color(0.9, 0.9, 1.0, 0.65)  # 弾のトレイル色（外部からset可）
+var _trail_timer := 0.0  # トレイル間隔タイマー
 
 func _ready():
 	body_entered.connect(_on_body_entered)
@@ -1051,6 +1081,12 @@ func _process(delta):
 		set_deferred(\"monitoring\", false)
 		call_deferred(\"queue_free\")
 		return
+
+	# スパークトレイル（飛行中のジュース感: H-1 Make it Pop）
+	_trail_timer -= delta
+	if _trail_timer <= 0:
+		_trail_timer = 0.055  # ~18個/秒（パフォーマンス考慮）
+		_emit_spark_trail()
 
 	# トレイル更新
 	var trail := get_node_or_null(\"Trail\")
@@ -1271,6 +1307,26 @@ func _do_fork(_hit_body):
 		fork_bullet.set(\"damage\", int(damage * 0.6))
 
 		get_tree().current_scene.call_deferred(\"add_child\", fork_bullet)
+
+func _emit_spark_trail() -> void:
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+	var dot := Polygon2D.new()
+	var pts := PackedVector2Array()
+	for i in range(4):
+		var a := float(i) * TAU / 4.0
+		pts.append(Vector2(cos(a), sin(a)) * 2.2)
+	dot.polygon = pts
+	dot.global_position = global_position + Vector2(randf_range(-1.5, 1.5), randf_range(-1.5, 1.5))
+	dot.color = trail_color
+	dot.z_index = 1
+	scene_root.add_child(dot)
+	var t := dot.create_tween()
+	t.set_parallel(true)
+	t.tween_property(dot, \"scale\", Vector2(0.1, 0.1), 0.14).set_trans(Tween.TRANS_QUAD)
+	t.tween_property(dot, \"modulate:a\", 0.0, 0.14)
+	t.chain().tween_callback(dot.queue_free)
 
 func _simple_bullet_script() -> String:
 	return \"extends Area2D\\nvar direction := Vector2.ZERO\\nvar speed := 350.0\\nvar damage := 5\\nvar lifetime := 1.5\\n\\nfunc _ready():\\n\\tbody_entered.connect(func(body):\\n\\t\\tif body.has_method(\\\\\\\"take_damage\\\\\\\"):\\n\\t\\t\\tbody.take_damage(damage)\\n\\t\\tset_deferred(\\\\\\\"monitoring\\\\\\\", false)\\n\\t\\tcall_deferred(\\\\\\\"queue_free\\\\\\\")\\n\\t)\\n\\tcollision_layer = 2\\n\\tcollision_mask = 4\\n\\nfunc _process(delta):\\n\\tposition += direction * speed * delta\\n\\tlifetime -= delta\\n\\tif lifetime <= 0:\\n\\t\\tset_deferred(\\\\\\\"monitoring\\\\\\\", false)\\n\\t\\tcall_deferred(\\\\\\\"queue_free\\\\\\\")\\n\"

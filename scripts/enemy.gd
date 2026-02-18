@@ -13,6 +13,10 @@ var attack_timer := 0.0
 var attack_cooldown := 1.0  # メレー攻撃間隔
 var enemy_type := "normal"  # "normal", "swarmer", "tank", "boss"
 var is_elite := false  # エリート: 強化版（HP+50%, 速度+20%, 輪郭グロー）
+var _enemy_hp_bar: Polygon2D = null  # ミニHPバー（ゲームプレイ可読性向上）
+var _stagger_timer := 0.0  # ヒットスタッガー: ダメージ後の一時的速度低下（改善36）
+var _shoot_warned := false  # シューター: 射撃前警告済みフラグ（改善39）
+var _boss_core_poly: Polygon2D = null  # ボスコア: Phase 3の高速パルス用（改善50）
 
 # Boss用
 var is_boss := false
@@ -84,6 +88,41 @@ func _install_stylized_visual() -> void:
 	# エリートなら金色のオーラリングを追加（F-19: キャラを立てるデザイン）
 	if is_elite and not is_boss:
 		_build_elite_aura(root)
+
+	# ミニHPバー（ボスは独自HUDがあるため除外）
+	if not is_boss:
+		_build_enemy_hp_bar()
+
+func _build_enemy_hp_bar() -> void:
+	## ミニHPバー: 敵の残HP可視化（G-10 + J-7: ダメージ応答・色情報）
+	## ボスは専用HUDがあるため除外済み
+	var bar_w := 40.0 if enemy_type == "tank" else 30.0
+	var bar_h := 3.0
+	var bar_y := -52.0  # エネミー上方にオフセット
+
+	# 背景（暗いフレーム）
+	var bg := Polygon2D.new()
+	bg.polygon = PackedVector2Array([
+		Vector2(0, 0), Vector2(bar_w, 0),
+		Vector2(bar_w, bar_h), Vector2(0, bar_h),
+	])
+	bg.color = Color(0.06, 0.06, 0.08, 0.75)
+	bg.position = Vector2(-bar_w * 0.5, bar_y)
+	bg.z_index = 15
+	add_child(bg)
+
+	# HPフィル（scale.xでHPを表現: スケール原点=左端→右から縮む）
+	var fill := Polygon2D.new()
+	fill.name = "EnemyHPFill"
+	fill.polygon = PackedVector2Array([
+		Vector2(0, 0), Vector2(bar_w, 0),
+		Vector2(bar_w, bar_h), Vector2(0, bar_h),
+	])
+	fill.color = Color(0.25, 0.85, 0.3, 0.9)  # 緑: 健康
+	fill.position = Vector2(-bar_w * 0.5, bar_y)
+	fill.z_index = 16
+	add_child(fill)
+	_enemy_hp_bar = fill
 
 func _build_elite_aura(root: Node2D) -> void:
 	## エリート専用: 金色の脈動するオーラリング（G-2: やりすぎが情報損失を補う）
@@ -223,8 +262,9 @@ func _build_boss_visual(root: Node2D) -> void:
 	core.color = Color(1.0, 0.85, 0.3, 1.0)
 	core.polygon = _make_ngon(6, 20.0)
 	root.add_child(core)
+	_boss_core_poly = core  # Phase 3高速化用に参照を保持（改善50）
 
-	# コア脈動アニメーション
+	# コア脈動アニメーション（Phase移行時に速度変更可能）
 	var tween := create_tween()
 	tween.set_loops()
 	tween.tween_property(core, "scale", Vector2(1.3, 1.3), 0.5).set_trans(Tween.TRANS_SINE)
@@ -457,6 +497,11 @@ func _physics_process(delta: float) -> void:
 		_:
 			_melee_process(delta)
 
+	# ヒットスタッガー速度減衰（改善36: ダメージ後の一時的移動抑制でヒット感向上）
+	if _stagger_timer > 0:
+		_stagger_timer -= delta
+		velocity *= 0.25
+
 func _melee_process(delta: float) -> void:
 	## 通常/swarmer/tank/splitter共通: 接近→メレー
 	var dist := global_position.distance_to(player.global_position)
@@ -490,10 +535,14 @@ func _shooter_process(delta: float) -> void:
 
 	move_and_slide()
 
-	# 射撃
+	# 射撃 + 事前警告演出（改善39: チャージアップで「次に撃つ」を予告）
 	shoot_timer += delta
+	if shoot_timer >= shoot_cooldown * 0.75 and not _shoot_warned:
+		_shoot_warned = true
+		_show_shoot_warning()
 	if shoot_timer >= shoot_cooldown:
 		shoot_timer = 0.0
+		_shoot_warned = false
 		_fire_enemy_bullet(direction)
 
 func _fire_enemy_bullet(dir: Vector2) -> void:
@@ -559,7 +608,7 @@ func _healer_process(delta: float) -> void:
 		_heal_nearby_allies()
 
 func _heal_nearby_allies() -> void:
-	## heal_range内の味方のHPを回復 + 緑のヒールエフェクト
+	## heal_range内の味方のHPを回復 + 緑のヒールエフェクト + ビーム演出（改善37）
 	for e in get_tree().get_nodes_in_group("enemies"):
 		if not is_instance_valid(e) or e == self:
 			continue
@@ -568,6 +617,8 @@ func _heal_nearby_allies() -> void:
 				e.hp = minf(e.hp + heal_amount, e.max_hp)
 				# ヒールエフェクト（小さな緑+）
 				_spawn_heal_vfx(e.global_position)
+				# ヒールビーム（ヒーラーから対象への視覚的な繋がり）
+				_show_heal_beam(e.global_position)
 
 func _spawn_heal_vfx(pos: Vector2) -> void:
 	var scene_root := get_tree().current_scene
@@ -585,6 +636,64 @@ func _spawn_heal_vfx(pos: Vector2) -> void:
 	tween.tween_property(label, "global_position:y", label.global_position.y - 25.0, 0.4)
 	tween.tween_property(label, "modulate:a", 0.0, 0.4)
 	tween.chain().tween_callback(label.queue_free)
+
+func _spawn_dying_ring() -> void:
+	## HP20%以下の瞬間に一度だけ表示する赤い波紋（改善44: 「もうすぐ倒せる」の合図）
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+	var ring := Polygon2D.new()
+	var pts: PackedVector2Array = []
+	for i in range(12):
+		var a: float = float(i) * TAU / 12.0
+		pts.append(Vector2(cos(a), sin(a)) * 10.0)
+	ring.polygon = pts
+	ring.color = Color(1.0, 0.2, 0.1, 0.7)
+	ring.global_position = global_position
+	ring.z_index = 90
+	scene_root.add_child(ring)
+	var tween := ring.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(ring, "scale", Vector2(4.0, 4.0), 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(ring, "modulate:a", 0.0, 0.4)
+	tween.chain().tween_callback(ring.queue_free)
+
+func _show_heal_beam(target_pos: Vector2) -> void:
+	## ヒーラーから対象へのビーム（改善37: 回復の視覚的な繋がり）
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+	var beam := Line2D.new()
+	beam.default_color = Color(0.3, 1.0, 0.5, 0.6)
+	beam.width = 3.0
+	beam.points = PackedVector2Array([global_position, target_pos])
+	beam.z_index = 50
+	scene_root.add_child(beam)
+	var tween := beam.create_tween()
+	tween.tween_property(beam, "modulate:a", 0.0, 0.35)
+	tween.chain().tween_callback(beam.queue_free)
+
+func _show_shoot_warning() -> void:
+	## シューター射撃前の充電警告（改善39: 「次に撃つ」を0.5s前予告）
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+	var ring := Polygon2D.new()
+	var pts: PackedVector2Array = []
+	for i in range(8):
+		var a: float = float(i) * TAU / 8.0
+		pts.append(Vector2(cos(a), sin(a)) * 15.0)
+	ring.polygon = pts
+	ring.color = Color(0.5, 0.3, 1.0, 0.0)
+	ring.global_position = global_position
+	ring.z_index = 80
+	scene_root.add_child(ring)
+	var tween := ring.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(ring, "modulate:a", 1.0, 0.15)
+	tween.tween_property(ring, "scale", Vector2(2.5, 2.5), 0.5).set_trans(Tween.TRANS_QUAD)
+	tween.tween_property(ring, "modulate:a", 0.0, 0.5).set_delay(0.1)
+	tween.chain().tween_callback(ring.queue_free)
 
 func _check_boss_phase() -> void:
 	## HP割合でフェーズ移行を判定
@@ -621,6 +730,13 @@ func _boss_phase_transition() -> void:
 			# 0.3s後に2回目のバースト（微妙にずれた角度）
 			var timer := get_tree().create_timer(0.3)
 			timer.timeout.connect(_boss_fire_burst)
+			# コア高速脈動（危機感演出: 改善50）
+			if is_instance_valid(_boss_core_poly):
+				var core_tween := create_tween()
+				core_tween.set_loops()
+				core_tween.tween_property(_boss_core_poly, "scale", Vector2(1.5, 1.5), 0.18).set_trans(Tween.TRANS_SINE)
+				core_tween.tween_property(_boss_core_poly, "scale", Vector2(0.9, 0.9), 0.18).set_trans(Tween.TRANS_SINE)
+				_boss_core_poly.color = Color(1.0, 0.4, 0.1, 1.0)  # 金→赤橙（危機感）
 
 	# 視覚: 紫のパルスリング
 	var scene_root := get_tree().current_scene
@@ -855,10 +971,30 @@ func take_damage(amount: float, is_crit: bool = false) -> void:
 	_spawn_damage_number(amount, is_crit)
 	SFX.play_hit()
 
+	# ヒットスタッガー: 大ダメージほど長く（改善36）
+	_stagger_timer = 0.28 if is_crit else 0.18
+
+	# ミニHPバー更新（scale.xでHPを幅として表現: G-10 + J-7）
+	if _enemy_hp_bar != null and is_instance_valid(_enemy_hp_bar):
+		var pct := clampf(hp / max_hp, 0.0, 1.0)
+		_enemy_hp_bar.scale.x = pct
+		if pct > 0.5:
+			_enemy_hp_bar.color = Color(0.25, 0.85, 0.3, 0.9)   # 緑: 健康
+		elif pct > 0.25:
+			_enemy_hp_bar.color = Color(0.9, 0.75, 0.2, 0.9)    # 黄: 注意
+		else:
+			_enemy_hp_bar.color = Color(0.9, 0.18, 0.12, 0.9)   # 赤: 瀕死
+
 	# ボスHPバー更新
 	if is_boss:
 		boss_hp_changed.emit(hp, max_hp)
 		_check_boss_phase()
+
+	# 瀕死インジケータ: HP20%を下回る瞬間に一度だけ赤リングを表示（改善44）
+	var prev_pct := (hp + amount) / max_hp
+	var curr_pct := hp / max_hp
+	if prev_pct > 0.2 and curr_pct <= 0.2 and hp > 0:
+		_spawn_dying_ring()
 
 	# ヒットフラッシュ: ダメージ量とクリットで色分け（H-10原則）
 	# クリット: 明るい黄金 / 大ダメージ: オレンジ / 通常: 白
@@ -939,16 +1075,38 @@ func _spawn_damage_number(amount: float, is_crit: bool = false) -> void:
 	float_tween.tween_property(label, "global_position:y", label.global_position.y - float_height, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	float_tween.tween_property(label, "modulate:a", 0.0, duration).set_delay(duration * 0.35)
 
-	# クリット・大ダメージはスケールバウンスで「重い一撃」を演出
+	# クリット・大ダメージはスケールバウンスで「重い一撃」を演出（改善48: バウンス強化）
 	if is_crit:
-		# クリットは大きく膨らんでから縮む
-		float_tween.tween_property(label, "scale", Vector2(1.5, 1.5), 0.1).set_trans(Tween.TRANS_BACK)
-		float_tween.chain().tween_property(label, "scale", Vector2(1.0, 1.0), 0.12)
+		# クリット: 2段バウンス（強打感 × ジュース感）
+		label.scale = Vector2(0.3, 0.3)
+		float_tween.tween_property(label, "scale", Vector2(2.0, 2.0), 0.08).set_trans(Tween.TRANS_BACK)
+		float_tween.chain().tween_property(label, "scale", Vector2(1.3, 1.3), 0.06)
+		float_tween.chain().tween_property(label, "scale", Vector2(1.6, 1.6), 0.05)
+		float_tween.chain().tween_property(label, "scale", Vector2(1.0, 1.0), 0.1).set_trans(Tween.TRANS_QUAD)
 	elif amount >= 50.0:
-		float_tween.tween_property(label, "scale", Vector2(1.3, 1.3), 0.08).set_trans(Tween.TRANS_BACK)
+		label.scale = Vector2(0.5, 0.5)
+		float_tween.tween_property(label, "scale", Vector2(1.6, 1.6), 0.08).set_trans(Tween.TRANS_BACK)
 		float_tween.chain().tween_property(label, "scale", Vector2(1.0, 1.0), 0.1)
 
 	float_tween.chain().tween_callback(label.queue_free)
+
+	# 大クリット（50以上）: "CRITICAL!" テキストを数値の上に追加（J-8: 重要情報を大きく）
+	if is_crit and amount >= 50.0:
+		var crit_label := Label.new()
+		crit_label.text = "CRITICAL!"
+		crit_label.add_theme_font_size_override("font_size", 16)
+		crit_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.1, 1.0))
+		crit_label.add_theme_color_override("font_shadow_color", Color(0.6, 0.0, 0.0, 0.9))
+		crit_label.add_theme_constant_override("shadow_offset_x", 2)
+		crit_label.add_theme_constant_override("shadow_offset_y", 2)
+		crit_label.global_position = global_position + Vector2(randf_range(-20, 20), -45)
+		crit_label.z_index = 102
+		scene_root.add_child(crit_label)
+		var ct := crit_label.create_tween()
+		ct.set_parallel(true)
+		ct.tween_property(crit_label, "global_position:y", crit_label.global_position.y - 30.0, 0.7).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		ct.tween_property(crit_label, "modulate:a", 0.0, 0.7).set_delay(0.3)
+		ct.chain().tween_callback(crit_label.queue_free)
 
 	if hp <= 0:
 		# physics callback中のarea_set_shape_disabledエラー防止:
@@ -1086,6 +1244,11 @@ func _spawn_death_vfx() -> void:
 			flash_scale = 3.5
 			frag_color = Color(0.7, 0.3, 1.0, 0.9)
 
+	# エリート: 追加破片 + 大きなフラッシュ（改善41: 倒した達成感を強化）
+	if is_elite:
+		fragment_count += 4
+		flash_scale *= 1.4
+
 	# 破片
 	for i in range(fragment_count):
 		var frag := Polygon2D.new()
@@ -1137,7 +1300,16 @@ func _spawn_death_vfx() -> void:
 		)
 
 func _spawn_flash_ring(scene_root: Node, radius: float, target_scale: float, duration: float) -> void:
-	_spawn_flash_ring_at(scene_root, global_position, radius, target_scale, duration, Color(1.0, 0.8, 0.6, 0.6))
+	# タイプ別フラッシュカラー（改善42: 死亡エフェクトに個性を）
+	var ring_color := Color(1.0, 0.8, 0.6, 0.6)  # normal: 暖色
+	match enemy_type:
+		"swarmer":  ring_color = Color(0.3, 1.0, 0.4, 0.6)   # 緑
+		"tank":     ring_color = Color(0.9, 0.15, 0.1, 0.6)  # 暗赤
+		"shooter":  ring_color = Color(0.4, 0.3, 1.0, 0.6)   # 青紫
+		"splitter": ring_color = Color(0.8, 1.0, 0.2, 0.6)   # 黄緑
+		"healer":   ring_color = Color(0.3, 0.9, 0.5, 0.6)   # 緑白
+		"boss":     ring_color = Color(0.7, 0.3, 1.0, 0.7)   # 紫（上書きされるが念のため）
+	_spawn_flash_ring_at(scene_root, global_position, radius, target_scale, duration, ring_color)
 
 func _spawn_flash_ring_at(scene_root: Node, pos: Vector2, radius: float, target_scale: float, duration: float, color: Color) -> void:
 	var flash := Polygon2D.new()

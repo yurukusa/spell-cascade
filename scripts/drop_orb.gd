@@ -12,6 +12,7 @@ var attract_range := 200.0  # この距離以内で吸い寄せ開始
 var lifetime := 6.0  # 短めにして早めにauto-attract
 var xp_value := 1
 var orb_type := "xp"  # "xp", "chip", "item"
+var _trail_timer := 0.0  # トレイル発生タイマー
 
 func _ready() -> void:
 	# コリジョン設定
@@ -29,6 +30,11 @@ func _ready() -> void:
 	# ビジュアル: 小さな輝くオーブ
 	_create_visual()
 
+	# スポーンポップ演出（H-1: Make it Pop — 「拾えるものが出た」を一瞬で知覚させる）
+	scale = Vector2(0.1, 0.1)
+	var spawn_tween := create_tween()
+	spawn_tween.tween_property(self, "scale", Vector2(1.0, 1.0), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
 func _create_visual() -> void:
 	var color := Color(0.3, 0.9, 0.4, 0.9)  # 緑XPオーブ
 	if orb_type == "chip":
@@ -39,12 +45,15 @@ func _create_visual() -> void:
 		color = Color(1.0, 0.25, 0.3, 0.9)  # 赤のHP回復オーブ
 
 	# 外側グロー（HPオーブは4角ダイヤ、その他は6角）
+	# HPオーブは大きめ（改善46: 「回復チャンス」を見逃さないよう視認性向上）
 	var sides := 4 if orb_type == "hp" else 6
+	var glow_radius := 14.0 if orb_type == "hp" else 10.0
+	var core_radius := 7.0 if orb_type == "hp" else 5.0
 	var glow := Polygon2D.new()
 	var glow_pts: PackedVector2Array = []
 	for i in range(sides):
 		var a := i * TAU / sides
-		glow_pts.append(Vector2(cos(a), sin(a)) * 10.0)
+		glow_pts.append(Vector2(cos(a), sin(a)) * glow_radius)
 	glow.polygon = glow_pts
 	glow.color = Color(color.r, color.g, color.b, 0.25)
 	add_child(glow)
@@ -54,7 +63,7 @@ func _create_visual() -> void:
 	var core_pts: PackedVector2Array = []
 	for i in range(sides):
 		var a := i * TAU / sides
-		core_pts.append(Vector2(cos(a), sin(a)) * 5.0)
+		core_pts.append(Vector2(cos(a), sin(a)) * core_radius)
 	core.polygon = core_pts
 	core.color = color
 	add_child(core)
@@ -88,9 +97,42 @@ func _process(delta: float) -> void:
 		speed = minf(speed + acceleration * delta, max_speed)
 		var dir := (target.global_position - global_position).normalized()
 		position += dir * speed * delta
+		# スピードが一定以上のとき: トレイルスパーク（ジュース感 H-1）
+		if speed > 120.0:
+			_trail_timer -= delta
+			if _trail_timer <= 0:
+				_trail_timer = 0.06  # 最大16/秒
+				_emit_trail_dot()
 	else:
 		# 範囲外: ゆっくり浮遊
 		position.y += sin(lifetime * 3.0) * 0.3
+
+func _emit_trail_dot() -> void:
+	## 吸引中のトレイル点（オーブが飛ぶ感触を強化: H-1 Make it Pop）
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+	var dot := Polygon2D.new()
+	var sides := 4 if orb_type == "hp" else 6
+	var dot_pts: PackedVector2Array = []
+	for i in range(sides):
+		var a := float(i) * TAU / sides
+		dot_pts.append(Vector2(cos(a), sin(a)) * 2.5)
+	dot.polygon = dot_pts
+	dot.global_position = global_position
+	var dot_color := Color(0.3, 0.9, 0.4, 0.55)  # XP: 緑
+	if orb_type == "hp":
+		dot_color = Color(1.0, 0.28, 0.3, 0.55)  # HP: 赤
+	elif orb_type in ["chip", "chip_move"]:
+		dot_color = Color(1.0, 0.85, 0.3, 0.55)  # Chip: 金
+	dot.color = dot_color
+	dot.z_index = 5
+	scene_root.add_child(dot)
+	var tween := dot.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(dot, "scale", Vector2(2.5, 2.5), 0.18)
+	tween.tween_property(dot, "modulate:a", 0.0, 0.18)
+	tween.chain().tween_callback(dot.queue_free)
 
 func _on_body_entered(body: Node2D) -> void:
 	if body == target:
