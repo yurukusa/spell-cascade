@@ -27,7 +27,7 @@ var start_y := 0.0  # 開始Y位置
 var xp := 0
 var level := 1
 # レベルアップに必要な累計XP（Lv2=10, Lv3=25, ...）
-var level_thresholds: Array[int] = [10, 22, 40, 65, 100, 145, 210, 290, 400, 540, 720, 930, 1180]  # v0.3.3: +20%（Dead Time改善済み、levelup頻度を適度に保つ）
+var level_thresholds: Array[int] = [10, 22, 40, 65, 100, 145, 210, 290, 400, 540, 720, 930, 1180, 1500, 1900, 2400, 3000, 3750, 4700, 5900]  # Lv2-21。v0.5.1: Lv14キャップを撤廃（10分ランで到達可能なLv20+まで拡張）
 signal xp_gained(total_xp: int, level: int)
 signal level_up(new_level: int)
 
@@ -468,7 +468,10 @@ func add_xp(amount: int) -> void:
 func get_xp_for_next_level() -> int:
 	if level - 1 < level_thresholds.size():
 		return level_thresholds[level - 1]
-	return 9999  # 上限到達
+	# 配列超過: 最後の閾値から25%ずつ増加（天井なし、減速あり）
+	var last := level_thresholds[level_thresholds.size() - 1]
+	var extra_levels := level - 1 - level_thresholds.size()
+	return int(float(last) * pow(1.25, extra_levels + 1))
 
 # --- Screen Shake ---
 # Camera2D.offset を揺らして即座に減衰するシンプルなシェイク

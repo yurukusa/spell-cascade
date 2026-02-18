@@ -1026,6 +1026,10 @@ func _spawn_initial_wave() -> void:
 		var angle := randf() * TAU
 		var dist := randf_range(150.0, 250.0)
 		enemy.global_position = cam_pos + Vector2(cos(angle), sin(angle)) * dist
+		# v0.5.1 bugfix: init()未呼出 → player=null → 敵が動かない、XPも出ないバグ
+		enemy.init(tower, 75.0, 25.0, 10.0, "normal")
+		enemy.add_to_group("enemies")
+		enemy.died.connect(_on_enemy_died)
 		add_child(enemy)
 		enemies_alive += 1
 
