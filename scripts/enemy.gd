@@ -344,13 +344,14 @@ func init(target: Node2D, spd: float = 80.0, health: float = 30.0, dmg: float = 
 			xp_value = 3
 			attack_cooldown = 1.5
 		"boss":
-			speed = spd * 0.6
+			# v0.5.2: 0.6→0.95（プレイヤー200px/sに対して逃げ切られないよう追尾力強化）
+			speed = spd * 0.95
 			max_hp = health * 8.0
 			damage = dmg * 1.5
 			xp_value = 10
-			attack_cooldown = 2.0
+			attack_cooldown = 1.5  # 2.0→1.5（近接攻撃をより脅威に）
 			is_boss = true
-			boss_attack_cd = 3.0
+			boss_attack_cd = 2.0  # 3.0→2.0（攻撃パターン発動を早く）
 		"shooter":
 			speed = spd * 0.8
 			max_hp = health * 0.7
@@ -560,13 +561,13 @@ func _boss_phase_transition() -> void:
 	# フェーズ移行でパラメータ強化
 	match boss_phase:
 		2:
-			boss_attack_cd = maxf(boss_attack_cd * 0.7, 1.5)
-			speed *= 1.2
+			boss_attack_cd = maxf(boss_attack_cd * 0.65, 1.0)  # 0.7→0.65, 1.5→1.0（Phase2でさらに速く）
+			speed *= 1.3  # 1.2→1.3
 			# Phase2移行: 全方位バーストで距離を取らせる
 			_boss_fire_burst()
 		3:
-			boss_attack_cd = maxf(boss_attack_cd * 0.5, 0.8)
-			speed *= 1.4
+			boss_attack_cd = maxf(boss_attack_cd * 0.45, 0.6)  # 0.5→0.45, 0.8→0.6（Phase3は圧倒的に速い）
+			speed *= 1.5  # 1.4→1.5
 			# Phase3移行: 二重バーストで圧をかける
 			_boss_fire_burst()
 			# 0.3s後に2回目のバースト（微妙にずれた角度）

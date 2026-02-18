@@ -639,30 +639,46 @@ func _build_skill_visual(bullet: Area2D, direction: Vector2) -> void:
 
 func _visual_fireball(bullet: Area2D, color: Color, direction: Vector2) -> void:
 	## 火球: 前方に尖った涙滴形 + 揺らめくグロー
+	## v0.5.2: projectile_bonusに応じてサイズ拡大（+1弾ごとに+20%、最大2倍）
 	var rot := direction.angle()
 
-	# 外側グロー（暖色の大きなぼかし）
+	# projectile_bonusを取得してスケール倍率を決定
+	var bonus := 0
+	var tower_ref := get_parent()
+	if tower_ref and "projectile_bonus" in tower_ref:
+		bonus = tower_ref.projectile_bonus
+	var s := 1.0 + minf(float(bonus) * 0.20, 1.0)  # +1→1.2x, +2→1.4x, +5→2.0x上限
+
+	# 外側グロー（bonusで大きく輝く）
 	var glow := Polygon2D.new()
-	glow.polygon = _make_ngon(10, 22.0)
-	glow.color = Color(1.0, 0.6, 0.1, 0.2)
+	glow.polygon = _make_ngon(10, 22.0 * s)
+	glow.color = Color(1.0, 0.6, 0.1, 0.15 + minf(float(bonus) * 0.05, 0.25))
 	glow.rotation = rot
 	bullet.add_child(glow)
 
-	# 涙滴（前方に尖った弾頭）
+	# bonusがあれば外側に追加リング（弾数が増えた視覚的サイン）
+	if bonus >= 1:
+		var ring := Polygon2D.new()
+		ring.polygon = _make_ngon(8, 30.0 * s)
+		ring.color = Color(1.0, 0.4, 0.05, 0.12)
+		ring.rotation = rot
+		bullet.add_child(ring)
+
+	# 涙滴（前方に尖った弾頭）サイズ連動
 	var body := Polygon2D.new()
 	body.polygon = PackedVector2Array([
-		Vector2(14, 0),    # 先端
-		Vector2(-4, -8),   # 左後方
-		Vector2(-10, 0),   # 後端
-		Vector2(-4, 8),    # 右後方
+		Vector2(14.0 * s, 0),
+		Vector2(-4.0 * s, -8.0 * s),
+		Vector2(-10.0 * s, 0),
+		Vector2(-4.0 * s, 8.0 * s),
 	])
 	body.color = color
 	body.rotation = rot
 	bullet.add_child(body)
 
-	# 内部の明るいコア
+	# 内部の明るいコア（bonusで輝度アップ）
 	var core := Polygon2D.new()
-	core.polygon = _make_ngon(5, 5.0)
+	core.polygon = _make_ngon(5, (5.0 + float(bonus) * 2.0) * minf(s, 1.5))
 	core.color = Color(1.0, 0.9, 0.5, 0.9)
 	bullet.add_child(core)
 
