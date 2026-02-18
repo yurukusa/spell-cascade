@@ -242,6 +242,14 @@ func _update_timer_display() -> void:
 	var minutes: int = total_sec / 60
 	var seconds: int = total_sec % 60
 	timer_label.text = "%d:%02d" % [minutes, seconds]
+	# カウントダウン演出: 残り60秒以下で赤く、30秒以下でパルス（J-7: 色による区分）
+	if remaining <= 30.0:
+		var pulse := abs(sin(run_time * 3.0))  # 毎秒3回点滅
+		timer_label.add_theme_color_override("font_color", Color(1.0, 0.3 + pulse * 0.4, 0.2, 1.0))
+	elif remaining <= 60.0:
+		timer_label.add_theme_color_override("font_color", Color(0.95, 0.55, 0.2, 1.0))  # オレンジ
+	else:
+		timer_label.add_theme_color_override("font_color", Color(0.9, 0.88, 0.95, 1.0))  # デフォルト
 
 func _style_hud() -> void:
 	## Design Lock v1: semantic colors, min 16px text, 4.5:1 contrast
@@ -341,6 +349,19 @@ func _style_hud() -> void:
 	combo_label_node.z_index = 100
 	combo_label_node.visible = false
 	ui_layer.add_child(combo_label_node)
+
+	# Kill counter label (画面左下、distanceの下: 連続感と達成感）
+	var kill_label := Label.new()
+	kill_label.name = "KillCountLabel"
+	kill_label.position = Vector2(10, 85)
+	kill_label.add_theme_font_size_override("font_size", 13)
+	kill_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7, 0.85))
+	kill_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	kill_label.add_theme_constant_override("shadow_offset_x", 1)
+	kill_label.add_theme_constant_override("shadow_offset_y", 1)
+	kill_label.text = "Kills: 0"
+	kill_label.z_index = 90
+	ui_layer.add_child(kill_label)
 
 	# Restart label: large and clear
 	restart_label.add_theme_font_size_override("font_size", 28)
@@ -1079,6 +1100,17 @@ func _on_boss_hp_changed(current: float, max_val: float) -> void:
 				fill.bg_color = Color(0.9, 0.5, 0.2, 1.0)
 			else:
 				fill.bg_color = Color(0.9, 0.15, 0.1, 1.0)
+		# HP%テキスト更新（J-8: 重要情報は大きく表示）
+		if boss_hp_label:
+			var hp_pct_int := int(pct * 100)
+			boss_hp_label.text = "BOSS  %d%%" % hp_pct_int
+			# 低HP時にラベルも赤に
+			if pct <= 0.33:
+				boss_hp_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.2, 1.0))
+			elif pct <= 0.66:
+				boss_hp_label.add_theme_color_override("font_color", Color(1.0, 0.6, 0.2, 1.0))
+			else:
+				boss_hp_label.add_theme_color_override("font_color", Color(0.8, 0.5, 1.0, 0.9))
 
 func _on_boss_phase_changed(phase: int, _hp_pct: float) -> void:
 	if boss_phase_label:
@@ -1087,6 +1119,38 @@ func _on_boss_phase_changed(phase: int, _hp_pct: float) -> void:
 		boss_phase_label.add_theme_color_override("font_color", Color(1.0, 0.8, 0.3, 1.0))
 		var tween := boss_phase_label.create_tween()
 		tween.tween_property(boss_phase_label, "theme_override_colors/font_color", Color(0.5, 0.3, 0.8, 0.7), 0.5)
+	# フェーズ移行: 画面フラッシュ + 大きなシェイク（無敵中なので迫力ある演出OK）
+	_do_hitstop(0.12)
+	tower.shake(8.0)
+	var phase_flash := ColorRect.new()
+	phase_flash.color = Color(0.6, 0.2, 0.9, 0.35)
+	phase_flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	phase_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	phase_flash.z_index = 200
+	var ui := get_node_or_null("UI")
+	if ui:
+		ui.add_child(phase_flash)
+	else:
+		add_child(phase_flash)
+	var flash_tween := phase_flash.create_tween()
+	flash_tween.tween_property(phase_flash, "color:a", 0.0, 0.4)
+	flash_tween.tween_callback(phase_flash.queue_free)
+	# フェーズテキスト表示
+	var phase_txt := Label.new()
+	phase_txt.text = "PHASE %d" % phase
+	phase_txt.add_theme_font_size_override("font_size", 40)
+	phase_txt.add_theme_color_override("font_color", Color(1.0, 0.4, 1.0, 1.0))
+	phase_txt.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	phase_txt.add_theme_constant_override("shadow_offset_x", 2)
+	phase_txt.add_theme_constant_override("shadow_offset_y", 2)
+	phase_txt.z_index = 201
+	phase_txt.global_position = tower.global_position + Vector2(-60, -120)
+	add_child(phase_txt)
+	var pt_tween := phase_txt.create_tween()
+	pt_tween.set_parallel(true)
+	pt_tween.tween_property(phase_txt, "global_position:y", phase_txt.global_position.y - 50, 1.0).set_trans(Tween.TRANS_QUAD)
+	pt_tween.tween_property(phase_txt, "modulate:a", 0.0, 1.0).set_delay(0.5)
+	pt_tween.chain().tween_callback(phase_txt.queue_free)
 
 	# フェーズ移行: 中シェイク
 	tower.shake(5.0)
@@ -1194,21 +1258,57 @@ func _spawn_enemy() -> void:
 	enemies_alive += 1
 	add_child(enemy)
 
-func _on_enemy_died(_enemy: Node2D) -> void:
+func _on_enemy_died(enemy: Node2D) -> void:
 	enemies_alive -= 1
 	kill_count += 1
 	tower.enemy_killed.emit()
 	SFX.play_kill()
+	# キルカウンターHUD更新
+	var kc_lbl := ui_layer.get_node_or_null("KillCountLabel") as Label
+	if kc_lbl:
+		kc_lbl.text = "Kills: %d" % kill_count
 	# 小さなシェイク（爽快感）
 	tower.shake(2.0)
 	# コンボカウント
 	combo_count += 1
 	combo_timer = COMBO_WINDOW
 	_update_combo_display()
-	# ヒットストップ（キル時の一瞬の停止 = 重い手応え）
-	_do_hitstop(0.03)
+	# ヒットストップ（キル時の一瞬の停止 = 重い手応え、コンボ段階で強化）
+	var hitstop_dur := 0.03
+	if combo_count >= 15:
+		hitstop_dur = 0.06  # 高コンボ: より重い停止感
+	elif combo_count >= 8:
+		hitstop_dur = 0.045
+	_do_hitstop(hitstop_dur)
 	# タワーキルグロー（シアンの瞬間パルス）
 	_flash_tower_kill_glow()
+	# キル位置にフローティングキルテキスト（コンボ段階に応じてスタイル変化）
+	if is_instance_valid(enemy):
+		var kill_pos := enemy.global_position
+		var ktext := Label.new()
+		if combo_count >= 15:
+			ktext.text = "KILL! x%d" % combo_count
+			ktext.add_theme_font_size_override("font_size", 18)
+			ktext.add_theme_color_override("font_color", Color(1.0, 0.3, 0.9, 0.95))
+		elif combo_count >= 8:
+			ktext.text = "+KILL!"
+			ktext.add_theme_font_size_override("font_size", 16)
+			ktext.add_theme_color_override("font_color", Color(1.0, 0.5, 0.1, 0.9))
+		else:
+			ktext.text = "+%d" % kill_count
+			ktext.add_theme_font_size_override("font_size", 13)
+			ktext.add_theme_color_override("font_color", Color(0.4, 0.9, 0.5, 0.8))
+		ktext.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+		ktext.add_theme_constant_override("shadow_offset_x", 1)
+		ktext.add_theme_constant_override("shadow_offset_y", 1)
+		ktext.z_index = 95
+		ktext.global_position = kill_pos + Vector2(randf_range(-20, 20), -15)
+		add_child(ktext)
+		var kt := ktext.create_tween()
+		kt.set_parallel(true)
+		kt.tween_property(ktext, "global_position:y", ktext.global_position.y - 35, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		kt.tween_property(ktext, "modulate:a", 0.0, 0.55).set_delay(0.2)
+		kt.chain().tween_callback(ktext.queue_free)
 
 func _update_combo_display() -> void:
 	if combo_label_node == null:
@@ -1247,14 +1347,16 @@ func _update_combo_display() -> void:
 # --- タワーイベント ---
 
 var hp_bar_last_value := -1.0  # heal flash検出用
+var _hp_danger_tween: Tween = null  # 低HP時のパルスtween（重複防止）
 
 func _on_tower_damaged(current: float, max_val: float) -> void:
 	# Heal flash（HP増加を検出）
 	if hp_bar_last_value >= 0 and current > hp_bar_last_value:
 		_flash_hp_bar_heal()
-	# 被弾SE（HP減少時のみ）
+	# 被弾: SE + ダメージフラッシュ（白く光る）
 	elif hp_bar_last_value >= 0 and current < hp_bar_last_value:
 		SFX.play_damage_taken()
+		_flash_hp_bar_damage()
 	hp_bar_last_value = current
 
 	hp_bar.value = current
@@ -1283,13 +1385,19 @@ func _on_tower_damaged(current: float, max_val: float) -> void:
 	# HP label色もバーに連動
 	hp_label.add_theme_color_override("font_color", hp_color.lightened(0.3))
 
-	# Low HP pulse（25%以下でバーの境界線が脈動）
+	# Low HP pulse（25%以下でバーの境界線が脈動 + ループアニメ起動）
 	var bar_bg := hp_bar.get_theme_stylebox("background") as StyleBoxFlat
 	if bar_bg:
 		if pct <= 0.25 and pct > 0:
 			# 危険: 赤い境界線
 			bar_bg.border_color = Color(0.9, 0.2, 0.15, 0.9)
 			bar_bg.set_border_width_all(2)
+			# ループするパルスアニメ（重複防止: 既存のtwenが動いていれば再起動しない）
+			if _hp_danger_tween == null or not _hp_danger_tween.is_running():
+				_hp_danger_tween = hp_bar.create_tween()
+				_hp_danger_tween.set_loops()
+				_hp_danger_tween.tween_property(hp_bar, "modulate", Color(1.3, 0.7, 0.7, 1.0), 0.4).set_trans(Tween.TRANS_SINE)
+				_hp_danger_tween.tween_property(hp_bar, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.4).set_trans(Tween.TRANS_SINE)
 		elif tower.crush_active:
 			# Crush中: 赤い境界線（HP状態と連動）
 			bar_bg.border_color = Color(1.0, 0.3, 0.2, 0.7)
@@ -1297,6 +1405,21 @@ func _on_tower_damaged(current: float, max_val: float) -> void:
 		else:
 			bar_bg.border_color = Color(0.2, 0.18, 0.3, 0.8)
 			bar_bg.set_border_width_all(1)
+			# 危険ゾーンを脱出したらパルス停止・色リセット
+			if _hp_danger_tween != null and _hp_danger_tween.is_running():
+				_hp_danger_tween.kill()
+				_hp_danger_tween = null
+				hp_bar.modulate = Color(1.0, 1.0, 1.0, 1.0)
+
+func _flash_hp_bar_damage() -> void:
+	## 被弾時のバー白フラッシュ（ダメージ感）
+	var fill_style := hp_bar.get_theme_stylebox("fill") as StyleBoxFlat
+	if fill_style == null:
+		return
+	var original := fill_style.bg_color
+	fill_style.bg_color = Color(1.5, 1.5, 1.5, 1.0)
+	var tween := hp_bar.create_tween()
+	tween.tween_property(fill_style, "bg_color", original, 0.15)
 
 func _flash_hp_bar_heal() -> void:
 	## HP回復時のバー緑フラッシュ
@@ -1554,6 +1677,25 @@ func _spawn_levelup_vfx() -> void:
 
 	# スクリーンシェイク
 	tower.shake(4.0)
+
+	# "LEVEL UP!" テキスト（J-8: 重要情報は大きく）
+	var lv_label := Label.new()
+	lv_label.text = "LEVEL UP!"
+	lv_label.add_theme_font_size_override("font_size", 32)
+	lv_label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.3, 1.0))
+	lv_label.add_theme_color_override("font_shadow_color", Color(0.4, 0.2, 0.0, 0.9))
+	lv_label.add_theme_constant_override("shadow_offset_x", 2)
+	lv_label.add_theme_constant_override("shadow_offset_y", 2)
+	lv_label.z_index = 200
+	lv_label.global_position = tower.global_position + Vector2(-60, -80)
+	add_child(lv_label)
+	var lv_tween := lv_label.create_tween()
+	lv_tween.set_parallel(true)
+	lv_tween.tween_property(lv_label, "global_position:y", lv_label.global_position.y - 60, 0.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	lv_tween.tween_property(lv_label, "scale", Vector2(1.4, 1.4), 0.12).set_trans(Tween.TRANS_BACK)
+	lv_tween.chain().tween_property(lv_label, "scale", Vector2(1.0, 1.0), 0.1)
+	lv_tween.chain().tween_property(lv_label, "modulate:a", 0.0, 0.4).set_delay(0.3)
+	lv_tween.chain().tween_callback(lv_label.queue_free)
 
 func _update_offscreen_indicators() -> void:
 	## 画面外の敵に対して画面端に赤い矢印を表示
@@ -1824,6 +1966,22 @@ func _show_result_screen(is_victory: bool) -> void:
 	retry.modulate.a = 0.0
 	vbox.add_child(retry)
 
+	# Ko-fi CTA — 応援リンクを目立たせすぎず添える
+	var cta_spacer := Control.new()
+	cta_spacer.custom_minimum_size = Vector2(0, 14)
+	vbox.add_child(cta_spacer)
+
+	var cta_lbl := Label.new()
+	cta_lbl.text = "☕ Enjoyed the game? Support dev → ko-fi.com/yurukusa"
+	cta_lbl.add_theme_font_size_override("font_size", 15)
+	cta_lbl.add_theme_color_override("font_color", Color(0.85, 0.75, 0.55, 1.0))
+	cta_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	cta_lbl.add_theme_constant_override("shadow_offset_x", 1)
+	cta_lbl.add_theme_constant_override("shadow_offset_y", 1)
+	cta_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cta_lbl.modulate.a = 0.0
+	vbox.add_child(cta_lbl)
+
 	# 順番にフェードインするアニメーション
 	var anim := create_tween()
 	anim.tween_property(title, "modulate:a", 1.0, 0.3).set_delay(0.5)
@@ -1831,6 +1989,7 @@ func _show_result_screen(is_victory: bool) -> void:
 	for lbl in stat_labels:
 		anim.tween_property(lbl, "modulate:a", 1.0, 0.15)
 	anim.tween_property(retry, "modulate:a", 1.0, 0.3).set_delay(0.3)
+	anim.tween_property(cta_lbl, "modulate:a", 0.75, 0.4).set_delay(0.5)
 
 	# リトライラベルの点滅
 	anim.tween_callback(func():

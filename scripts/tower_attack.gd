@@ -1084,8 +1084,30 @@ func _on_body_entered(body):
 		final_damage = int(float(damage) * crit_mult)
 		is_crit = true
 
-	body.take_damage(final_damage)
+	body.take_damage(final_damage, is_crit)
 	hit_enemies.append(body)
+
+	# インパクトエフェクト（H-6: Hit Marks — ヒット確認の視覚記号）
+	# 弾着点に小さなリングを展開して「当たった」感を強化
+	var scene_root := get_tree().current_scene
+	if scene_root:
+		var ring := Polygon2D.new()
+		var ring_pts := PackedVector2Array()
+		var ring_r := 10.0 if is_crit else 7.0
+		var sides := 6
+		for _i in range(sides):
+			ring_pts.append(Vector2(cos(_i * TAU / sides), sin(_i * TAU / sides)) * ring_r)
+		ring.polygon = ring_pts
+		ring.color = Color(1.0, 0.9, 0.2, 0.95) if is_crit else Color(1.0, 1.0, 1.0, 0.75)
+		ring.global_position = global_position
+		ring.z_index = 90
+		scene_root.add_child(ring)
+		var rt := ring.create_tween()
+		rt.set_parallel(true)
+		var r_scale := Vector2(3.5, 3.5) if is_crit else Vector2(2.5, 2.5)
+		rt.tween_property(ring, \"scale\", r_scale, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		rt.tween_property(ring, \"modulate:a\", 0.0, 0.18)
+		rt.chain().tween_callback(ring.queue_free)
 
 	# ライフスティール
 	if life_steal_pct > 0.0:
@@ -1097,14 +1119,18 @@ func _on_body_entered(body):
 	if on_hit_explode_radius > 0.0:
 		_do_aoe(global_position, on_hit_explode_radius, int(float(final_damage) * on_hit_explode_dmg_pct))
 
-	# on_hitスロー
+	# on_hitスロー + 氷ブルーティント（スロー中であることを視覚的に示す）
 	if on_hit_slow > 0.0 and \"speed\" in body:
 		var orig_speed: float = body.speed
 		body.speed *= (1.0 - on_hit_slow)
+		# 氷ブルーティント（スロー中）
+		if body.has_method(\"modulate\") or \"modulate\" in body:
+			body.modulate = Color(0.5, 0.8, 1.2, 1.0)  # 氷ブルー
 		# タイマーで元に戻す
 		get_tree().create_timer(on_hit_slow_duration).timeout.connect(func():
 			if is_instance_valid(body):
 				body.speed = orig_speed
+				body.modulate = Color.WHITE
 		)
 
 	# crit時凍結

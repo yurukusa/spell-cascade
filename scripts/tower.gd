@@ -440,10 +440,23 @@ func take_damage(amount: float) -> void:
 	hp -= amount
 	tower_damaged.emit(hp, max_hp)
 
-	# ヒットフラッシュ
-	modulate = Color(2, 0.5, 0.5, 1)
+	# ヒットフラッシュ + スクリーンシェイク（H-5原則: ダメージ量に比例した強度）
+	var pct := hp / max_hp
+	var shake_amt := 2.5
+	if amount >= 50.0:
+		shake_amt = 6.0
+		modulate = Color(2.5, 0.3, 0.3, 1)  # 大ダメージ: 鮮明な赤
+	elif amount >= 20.0:
+		shake_amt = 4.0
+		modulate = Color(2.2, 0.4, 0.4, 1)
+	else:
+		modulate = Color(2.0, 0.5, 0.5, 1)
+	# 残HP低いほどシェイク強化（危機感増幅）
+	if pct <= 0.25:
+		shake_amt *= 1.5
+	shake(shake_amt)
 	var tween := create_tween()
-	tween.tween_property(self, "modulate", Color.WHITE, 0.15)
+	tween.tween_property(self, "modulate", Color.WHITE, 0.18)
 
 	# Low HP warning（30%以下で警告音）
 	if hp > 0 and hp / max_hp <= 0.3:

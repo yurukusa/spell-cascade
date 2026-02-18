@@ -12,6 +12,7 @@ var player: Node2D
 var attack_timer := 0.0
 var attack_cooldown := 1.0  # メレー攻撃間隔
 var enemy_type := "normal"  # "normal", "swarmer", "tank", "boss"
+var is_elite := false  # エリート: 強化版（HP+50%, 速度+20%, 輪郭グロー）
 
 # Boss用
 var is_boss := false
@@ -44,6 +45,13 @@ var heal_amount := 2.0  # HP/s
 func _ready() -> void:
 	hp = max_hp
 	_install_stylized_visual()
+	# スポーンイン: 小さく→大きくスケールアニメ（ポップ感、H-1原則: Make it Pop）
+	scale = Vector2(0.1, 0.1)
+	modulate.a = 0.0
+	var spawn_tween := create_tween()
+	spawn_tween.set_parallel(true)
+	spawn_tween.tween_property(self, "scale", Vector2(1.0, 1.0), 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	spawn_tween.tween_property(self, "modulate:a", 1.0, 0.18)
 
 func _install_stylized_visual() -> void:
 	var legacy := get_node_or_null("Visual")
@@ -72,6 +80,37 @@ func _install_stylized_visual() -> void:
 			_build_healer_visual(root)
 		_:
 			_build_normal_visual(root)
+
+	# エリートなら金色のオーラリングを追加（F-19: キャラを立てるデザイン）
+	if is_elite and not is_boss:
+		_build_elite_aura(root)
+
+func _build_elite_aura(root: Node2D) -> void:
+	## エリート専用: 金色の脈動するオーラリング（G-2: やりすぎが情報損失を補う）
+	var aura := Polygon2D.new()
+	aura.color = Color(1.0, 0.85, 0.2, 0.25)
+	aura.polygon = _make_ngon(12, 44.0)
+	aura.z_index = -2
+	root.add_child(aura)
+
+	# オーラを脈動させる（生きている感）
+	var pulse := aura.create_tween()
+	pulse.set_loops()
+	pulse.tween_property(aura, "scale", Vector2(1.15, 1.15), 0.5).set_trans(Tween.TRANS_SINE)
+	pulse.tween_property(aura, "scale", Vector2(1.0, 1.0), 0.5).set_trans(Tween.TRANS_SINE)
+
+	# 金色の王冠マーカー（頭上に小さな三角形3つ）
+	for i in range(3):
+		var crown := Polygon2D.new()
+		var angle := -PI/2.0 + (i - 1) * PI / 6.0  # 上部に集中
+		var cx := cos(angle) * 28.0
+		var cy := sin(angle) * 28.0
+		crown.polygon = PackedVector2Array([
+			Vector2(cx - 4, cy), Vector2(cx, cy - 7), Vector2(cx + 4, cy),
+		])
+		crown.color = Color(1.0, 0.88, 0.2, 0.9)
+		crown.z_index = 5
+		root.add_child(crown)
 
 func _build_normal_visual(root: Node2D) -> void:
 	## 通常敵: 赤ダイヤモンド（中サイズ）
@@ -380,6 +419,15 @@ func init(target: Node2D, spd: float = 80.0, health: float = 30.0, dmg: float = 
 			xp_value = 1
 
 	hp = max_hp
+
+	# エリート判定: ボス以外で12%の確率で強化版（F-19: キャラを立てる）
+	if not is_boss and randf() < 0.12:
+		is_elite = true
+		max_hp *= 1.5
+		speed *= 1.2
+		damage *= 1.3
+		xp_value = int(xp_value * 2)
+		hp = max_hp
 
 	# タイプ変更後にビジュアル再構築
 	var old_visual := get_node_or_null("StylizedVisual")
@@ -791,7 +839,7 @@ func _on_body_entered(body):
 	call_deferred(\"queue_free\")
 """
 
-func take_damage(amount: float) -> void:
+func take_damage(amount: float, is_crit: bool = false) -> void:
 	# フェーズ移行中の無敵
 	if boss_phase_invuln > 0:
 		return
@@ -804,7 +852,7 @@ func take_damage(amount: float) -> void:
 		_boss_last_hit_msec = now
 
 	hp -= amount
-	_spawn_damage_number(amount)
+	_spawn_damage_number(amount, is_crit)
 	SFX.play_hit()
 
 	# ボスHPバー更新
@@ -812,24 +860,51 @@ func take_damage(amount: float) -> void:
 		boss_hp_changed.emit(hp, max_hp)
 		_check_boss_phase()
 
-	# ヒットフラッシュ
-	modulate = Color(2, 2, 2, 1)
-	var tween := create_tween()
-	tween.tween_property(self, "modulate", Color.WHITE, 0.1)
+	# ヒットフラッシュ: ダメージ量とクリットで色分け（H-10原則）
+	# クリット: 明るい黄金 / 大ダメージ: オレンジ / 通常: 白
+	var flash_color: Color
+	var flash_duration := 0.15  # 0.1→0.15sで視覚的に把握しやすく
+	if is_crit:
+		flash_color = Color(3.0, 2.5, 0.5, 1.0)  # 明るい黄金
+		flash_duration = 0.18
+	elif amount >= 25.0:
+		flash_color = Color(2.5, 1.2, 0.3, 1.0)  # オレンジ
+	else:
+		flash_color = Color(2.2, 2.2, 2.2, 1.0)  # 白
 
-func _spawn_damage_number(amount: float) -> void:
+	modulate = flash_color
+	var tween := create_tween()
+	tween.tween_property(self, "modulate", Color.WHITE, flash_duration)
+
+	# スケールスカッシュ: ヒット時に「潰れる」感触（H-6原則）
+	# ダメージ方向に潰れて元に戻る
+	var base_scale := scale
+	var squish_h := 1.25 if is_crit else 1.15
+	var squish_v := 0.75 if is_crit else 0.85
+	scale = base_scale * Vector2(squish_h, squish_v)
+	var sq := create_tween()
+	sq.tween_property(self, "scale", base_scale * Vector2(0.9, 1.1), 0.06).set_trans(Tween.TRANS_QUAD)
+	sq.chain().tween_property(self, "scale", base_scale, 0.08).set_trans(Tween.TRANS_BACK)
+
+func _spawn_damage_number(amount: float, is_crit: bool = false) -> void:
 	var scene_root := get_tree().current_scene
 	if scene_root == null:
 		return
 
-	# ダメージ量に応じてサイズ・色・演出を変化
+	# ダメージ量に応じてサイズ・色・演出を変化（H-9: スケールは重要度に比例）
 	var dmg_int := int(amount)
 	var font_size := 14
 	var color := Color(0.9, 0.85, 0.7, 1.0)  # 小ダメージ: 薄い白
 	var float_height := 35.0
 	var duration := 0.5
 
-	if amount >= 50.0:
+	if is_crit:
+		# クリット: 大きい金色 + 上に大きく飛ぶ
+		font_size = 30
+		color = Color(1.0, 0.9, 0.15, 1.0)  # 金色
+		float_height = 65.0
+		duration = 0.9
+	elif amount >= 50.0:
 		# 大ダメージ: 赤くて大きい
 		font_size = 26
 		color = Color(1.0, 0.2, 0.1, 1.0)
@@ -848,23 +923,28 @@ func _spawn_damage_number(amount: float) -> void:
 		float_height = 40.0
 
 	var label := Label.new()
-	label.text = str(dmg_int)
+	# クリット: 数値の前に "✦" 記号を追加して視覚的に区別
+	label.text = ("✦" + str(dmg_int)) if is_crit else str(dmg_int)
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", color)
-	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
-	label.add_theme_constant_override("shadow_offset_x", 1)
-	label.add_theme_constant_override("shadow_offset_y", 1)
-	label.global_position = global_position + Vector2(randf_range(-15, 15), -20)
+	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	label.add_theme_constant_override("shadow_offset_x", 2)
+	label.add_theme_constant_override("shadow_offset_y", 2)
+	label.global_position = global_position + Vector2(randf_range(-12, 12), -20)
 	label.z_index = 100
 	scene_root.add_child(label)
 
 	var float_tween := label.create_tween()
 	float_tween.set_parallel(true)
 	float_tween.tween_property(label, "global_position:y", label.global_position.y - float_height, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	float_tween.tween_property(label, "modulate:a", 0.0, duration).set_delay(duration * 0.3)
+	float_tween.tween_property(label, "modulate:a", 0.0, duration).set_delay(duration * 0.35)
 
-	# 大ダメージはスケールバウンスで「重い一撃」を演出
-	if amount >= 50.0:
+	# クリット・大ダメージはスケールバウンスで「重い一撃」を演出
+	if is_crit:
+		# クリットは大きく膨らんでから縮む
+		float_tween.tween_property(label, "scale", Vector2(1.5, 1.5), 0.1).set_trans(Tween.TRANS_BACK)
+		float_tween.chain().tween_property(label, "scale", Vector2(1.0, 1.0), 0.12)
+	elif amount >= 50.0:
 		float_tween.tween_property(label, "scale", Vector2(1.3, 1.3), 0.08).set_trans(Tween.TRANS_BACK)
 		float_tween.chain().tween_property(label, "scale", Vector2(1.0, 1.0), 0.1)
 

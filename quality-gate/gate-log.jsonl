@@ -569,3 +569,25 @@
   "peak_enemies": 30,
   "reasons": "pacing_warn"
 }
+{
+  "timestamp": "2026-02-17T16:08:09+09:00",
+  "verdict": "GO",
+  "source": "autotest",
+  "tier2_score": "3/4",
+  "damage_taken": 8,
+  "lowest_hp_pct": "0.790986666666667",
+  "avg_levelup_interval": "0",
+  "peak_enemies": 38,
+  "reasons": "pacing_warn"
+}
+{
+  "timestamp": "2026-02-17T16:14:23+09:00",
+  "verdict": "GO",
+  "source": "autotest",
+  "tier2_score": "3/4",
+  "damage_taken": 23,
+  "lowest_hp_pct": "0.641965",
+  "avg_levelup_interval": "5.2",
+  "peak_enemies": 33,
+  "reasons": "pacing_warn"
+}
