@@ -47,6 +47,11 @@ var heal_cooldown := 1.0
 var heal_range := 100.0
 var heal_amount := 2.0  # HP/s
 
+# 改善107: 瀕死スパークタイマー（HP15%以下の時に周期的にスパーク）
+var _near_death_spark_timer := 0.0
+var _boss_aura_poly: Polygon2D = null  # 改善113: フェーズ別オーラ色変更用
+var _boss_charge_trail_timer := 0.0  # 改善135: チャージ中の軌跡ドットタイマー
+
 func _ready() -> void:
 	hp = max_hp
 	_install_stylized_visual()
@@ -308,6 +313,7 @@ func _build_boss_visual(root: Node2D) -> void:
 	aura.polygon = _make_ngon(12, 85.0)
 	root.add_child(aura)
 	aura.z_index = -1
+	_boss_aura_poly = aura  # 改善113: フェーズ移行時に色変更するための参照
 	# 改善77: ボスオーラがゆっくり時計回りに回転（威圧感の演出、「只者ではない」を一瞬で知覚させる）
 	var boss_aura_rot := aura.create_tween()
 	boss_aura_rot.set_loops()
@@ -519,6 +525,8 @@ func init(target: Node2D, spd: float = 80.0, health: float = 30.0, dmg: float = 
 	if old_visual:
 		old_visual.queue_free()
 	_install_stylized_visual()
+	# 改善106: スポーン時のエントリーフラッシュ（「敵が来た！」の出現感を強調）
+	_spawn_entry_flash()
 
 func set_texture(tex: Texture2D) -> void:
 	var visual := $Visual as Sprite2D
@@ -546,6 +554,30 @@ func _physics_process(delta: float) -> void:
 	if _stagger_timer > 0:
 		_stagger_timer -= delta
 		velocity *= 0.25
+
+	# 改善107: 瀕死スパーク（HP15%以下で周期的に小スパークを散らす）
+	if max_hp > 0 and hp / max_hp < 0.15 and hp > 0:
+		_near_death_spark_timer -= delta
+		if _near_death_spark_timer <= 0:
+			_near_death_spark_timer = 0.35
+			var scene_root := get_tree().current_scene
+			if scene_root:
+				for _ndi in range(2):
+					var sp := Polygon2D.new()
+					sp.polygon = _make_ngon(3, 3.0)
+					sp.color = Color(1.0, 0.6, 0.1, 0.9)
+					sp.global_position = global_position + Vector2(randf_range(-8, 8), randf_range(-8, 8))
+					sp.z_index = 95
+					scene_root.add_child(sp)
+					var sa := randf() * TAU
+					var sd := randf_range(10.0, 20.0)
+					var st := sp.create_tween()
+					st.set_parallel(true)
+					st.tween_property(sp, "global_position",
+						sp.global_position + Vector2(cos(sa), sin(sa)) * sd, 0.28
+					).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+					st.tween_property(sp, "modulate:a", 0.0, 0.28)
+					st.chain().tween_callback(sp.queue_free)
 
 func _melee_process(delta: float) -> void:
 	## 通常/swarmer/tank/splitter共通: 接近→メレー
@@ -599,6 +631,18 @@ func _fire_enemy_bullet(dir: Vector2) -> void:
 	var scene_root := get_tree().current_scene
 	if scene_root == null:
 		return
+
+	# 改善101: 射撃直前のターゲットラインフラッシュ（「今ここから撃った」瞬間を可視化）
+	if is_instance_valid(player):
+		var laser := Line2D.new()
+		laser.default_color = Color(0.55, 0.3, 1.0, 0.55)
+		laser.width = 2.0
+		laser.points = PackedVector2Array([global_position, player.global_position])
+		laser.z_index = 60
+		scene_root.add_child(laser)
+		var lt := laser.create_tween()
+		lt.tween_property(laser, "modulate:a", 0.0, 0.2)
+		lt.tween_callback(laser.queue_free)
 
 	var bullet := Area2D.new()
 	bullet.name = "ShooterBullet"
@@ -716,6 +760,48 @@ func _spawn_dying_ring() -> void:
 	tween.tween_property(ring, "modulate:a", 0.0, 0.4)
 	tween.chain().tween_callback(ring.queue_free)
 
+func _spawn_entry_flash() -> void:
+	## 改善106: スポーン時の出現フラッシュ（敵の登場を視覚的にアナウンス）
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+	# タイプ別カラー: boss=赤橙, tank=橙, swarmer=緑, shooter=紫, normal=白
+	var flash_col: Color
+	match enemy_type:
+		"boss":    flash_col = Color(1.0, 0.25, 0.1, 0.7)
+		"tank":    flash_col = Color(1.0, 0.55, 0.15, 0.65)
+		"swarmer": flash_col = Color(0.3, 0.9, 0.4, 0.6)
+		"shooter": flash_col = Color(0.65, 0.3, 1.0, 0.65)
+		_:         flash_col = Color(0.85, 0.85, 0.95, 0.5)
+	var ring := Polygon2D.new()
+	ring.polygon = _make_ngon(10, 10.0)
+	ring.color = flash_col
+	ring.global_position = global_position
+	ring.z_index = 80
+	scene_root.add_child(ring)
+	var tween := ring.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(ring, "scale", Vector2(3.5, 3.5), 0.38).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(ring, "modulate:a", 0.0, 0.38)
+	tween.chain().tween_callback(ring.queue_free)
+
+func _spawn_splitter_split_warning() -> void:
+	## 改善105: スプリッターHP30%時の橙リング（分裂間近の視覚的「緊張感」演出）
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+	var ring := Polygon2D.new()
+	ring.polygon = _make_ngon(8, 12.0)
+	ring.color = Color(1.0, 0.55, 0.1, 0.8)
+	ring.global_position = global_position
+	ring.z_index = 90
+	scene_root.add_child(ring)
+	var tween := ring.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(ring, "scale", Vector2(5.0, 5.0), 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(ring, "modulate:a", 0.0, 0.5)
+	tween.chain().tween_callback(ring.queue_free)
+
 func _show_heal_beam(target_pos: Vector2) -> void:
 	## ヒーラーから対象へのビーム（改善37: 回復の視覚的な繋がり）
 	var scene_root := get_tree().current_scene
@@ -796,6 +882,12 @@ func _boss_phase_transition() -> void:
 				core_tween.tween_property(_boss_core_poly, "scale", Vector2(0.9, 0.9), 0.18).set_trans(Tween.TRANS_SINE)
 				_boss_core_poly.color = Color(1.0, 0.4, 0.1, 1.0)  # 金→赤橙（危機感）
 
+	# 改善113: フェーズ移行でオーラ色変更（Phase2=橙、Phase3=赤: 脅威レベルを視覚で即伝達）
+	if _boss_aura_poly != null and is_instance_valid(_boss_aura_poly):
+		match boss_phase:
+			2: _boss_aura_poly.color = Color(1.0, 0.4, 0.1, 0.2)   # 橙: 警戒
+			3: _boss_aura_poly.color = Color(1.0, 0.1, 0.1, 0.25)  # 赤: 危機
+
 	# 視覚: 紫のパルスリング
 	var scene_root := get_tree().current_scene
 	if scene_root == null:
@@ -816,6 +908,19 @@ func _boss_phase_transition() -> void:
 	tween.tween_property(ring, "scale", Vector2(6.0, 6.0), 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.tween_property(ring, "modulate:a", 0.0, 0.4)
 	tween.chain().tween_callback(ring.queue_free)
+
+	# 改善103: 遅延する2重目ショックウェーブ（フェーズ移行の「余韻」で格を増す）
+	var ring2 := Polygon2D.new()
+	ring2.polygon = _make_ngon(20, 15.0)
+	ring2.color = Color(1.0, 0.9, 0.3, 0.5)
+	ring2.global_position = global_position
+	ring2.z_index = 131
+	scene_root.add_child(ring2)
+	var t2 := ring2.create_tween()
+	t2.set_parallel(true)
+	t2.tween_property(ring2, "scale", Vector2(8.0, 8.0), 0.6).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT).set_delay(0.15)
+	t2.tween_property(ring2, "modulate:a", 0.0, 0.6).set_delay(0.15)
+	t2.chain().tween_callback(ring2.queue_free)
 
 	# 本体フラッシュ（改善54: フェーズ別の色でPhase移行の「格」を表現）
 	# P1→P2: 金オレンジ（活性化）, P2→P3: 深紅（危機的状況）
@@ -889,6 +994,23 @@ func _boss_process(delta: float) -> void:
 		"charge":
 			boss_timer += delta
 			move_and_slide()
+			# 改善135: チャージ中の赤い軌跡ドット（突進の速さと危険感を空間で表現）
+			_boss_charge_trail_timer -= delta
+			if _boss_charge_trail_timer <= 0:
+				_boss_charge_trail_timer = 0.05  # 最大20/秒
+				var sr := get_tree().current_scene
+				if sr:
+					var trd := Polygon2D.new()
+					trd.polygon = _make_ngon(6, 5.0)
+					trd.color = Color(1.0, 0.2, 0.1, 0.8)
+					trd.global_position = global_position
+					trd.z_index = 115
+					sr.add_child(trd)
+					var trt := trd.create_tween()
+					trt.set_parallel(true)
+					trt.tween_property(trd, "scale", Vector2(2.0, 2.0), 0.22)
+					trt.tween_property(trd, "modulate:a", 0.0, 0.22)
+					trt.chain().tween_callback(trd.queue_free)
 			# 突進中の接触ダメージ
 			var dist := global_position.distance_to(player.global_position)
 			if dist <= 60.0 and player.has_method("take_damage"):
@@ -985,12 +1107,33 @@ func _boss_start_telegraph_charge() -> void:
 	boss_state = "telegraph_charge"
 	boss_timer = 0.0
 	modulate = Color(2.0, 0.4, 0.3, 1.0)
+	# 改善102: チャージテレグラフ放射パーティクル（「突進が来る」強調）
+	var scene_root := get_tree().current_scene
+	if scene_root:
+		for i in range(8):
+			var a := float(i) * TAU / 8.0
+			var p := Polygon2D.new()
+			p.polygon = _make_ngon(3, 4.0)
+			p.color = Color(1.0, 0.35, 0.15, 0.9)
+			p.global_position = global_position
+			p.z_index = 120
+			scene_root.add_child(p)
+			var pt := p.create_tween()
+			pt.set_parallel(true)
+			pt.tween_property(p, "global_position", global_position + Vector2(cos(a), sin(a)) * 45.0, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			pt.tween_property(p, "modulate:a", 0.0, 0.5)
+			pt.chain().tween_callback(p.queue_free)
 
 func _boss_start_charge() -> void:
 	## 突進実行
 	boss_state = "charge"
 	boss_timer = 0.0
+	_boss_charge_trail_timer = 0.0  # 即座に最初のドットを出す
 	modulate = Color(1.0, 1.0, 1.0, 1.0)
+	# 改善137: 突進開始のスケールポップ（「突っ込む！」瞬間を体で感じる）
+	var sc_tween := create_tween()
+	sc_tween.tween_property(self, "scale", Vector2(1.35, 0.7), 0.08).set_trans(Tween.TRANS_BACK)
+	sc_tween.tween_property(self, "scale", Vector2(1.0, 1.0), 0.12).set_trans(Tween.TRANS_ELASTIC)
 
 	var direction := (player.global_position - global_position).normalized()
 	velocity = direction * speed * 4.0  # 4倍速で突進
@@ -1064,6 +1207,9 @@ func take_damage(amount: float, is_crit: bool = false) -> void:
 	var curr_pct := hp / max_hp
 	if prev_pct > 0.2 and curr_pct <= 0.2 and hp > 0:
 		_spawn_dying_ring()
+	# 改善105: スプリッターHP30%以下の瞬間に橙リング（分裂間近の「不安定感」演出）
+	if enemy_type == "splitter" and prev_pct > 0.3 and curr_pct <= 0.3 and hp > 0:
+		_spawn_splitter_split_warning()
 
 	# ヒットフラッシュ: ダメージ量とクリットで色分け（H-10原則）
 	# クリット: 明るい黄金 / 大ダメージ: オレンジ / 通常: 白
@@ -1094,6 +1240,33 @@ func take_damage(amount: float, is_crit: bool = false) -> void:
 	var sq := create_tween()
 	sq.tween_property(self, "scale", base_scale * Vector2(0.9, 1.1), 0.06).set_trans(Tween.TRANS_QUAD)
 	sq.chain().tween_property(self, "scale", base_scale, 0.08).set_trans(Tween.TRANS_BACK)
+
+	# 改善104: 全敵被弾時の小スパーク（攻撃の手応えをすべての敵で体感）
+	if amount >= 15.0:
+		var sr2 := get_tree().current_scene
+		if sr2:
+			var spark_count := 2
+			var spark_color := Color(0.9, 0.85, 0.5, 0.85)  # 通常: 薄黄
+			if enemy_type == "tank":
+				spark_color = Color(0.7, 0.8, 1.0, 0.85)  # タンク: 青白
+			elif enemy_type == "boss":
+				spark_color = Color(1.0, 0.6, 0.2, 0.9)  # ボス: オレンジ
+			for _si2 in range(spark_count):
+				var sp := Polygon2D.new()
+				var sa2 := randf() * TAU
+				sp.polygon = PackedVector2Array([
+					Vector2(-2.0, -0.6), Vector2(2.0, 0.0), Vector2(-2.0, 0.6),
+				])
+				sp.color = spark_color
+				sp.global_position = global_position
+				sp.rotation = sa2
+				sp.z_index = 55
+				sr2.add_child(sp)
+				var spt := sp.create_tween()
+				spt.set_parallel(true)
+				spt.tween_property(sp, "global_position", global_position + Vector2(cos(sa2), sin(sa2)) * randf_range(10.0, 22.0), 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+				spt.tween_property(sp, "modulate:a", 0.0, 0.2)
+				spt.chain().tween_callback(sp.queue_free)
 
 	# 改善95: エリート敵ヒット時にスパーク散布（強敵を攻撃している「手応え」を増幅）
 	if is_elite:
@@ -1218,6 +1391,20 @@ func _spawn_damage_number(amount: float, is_crit: bool = false) -> void:
 		_spawn_drops()
 		# splitter: 死亡時にswarmer×2分裂シグナルを発火
 		if enemy_type == "splitter":
+			# 改善136: スプリッター分裂前の橙バースト（「何かが生まれる」視覚的ドラマ）
+			var sr3 := get_tree().current_scene
+			if sr3:
+				var sp_ring := Polygon2D.new()
+				sp_ring.polygon = _make_ngon(10, 14.0)
+				sp_ring.color = Color(1.0, 0.55, 0.1, 0.85)
+				sp_ring.global_position = global_position
+				sp_ring.z_index = 92
+				sr3.add_child(sp_ring)
+				var srt := sp_ring.create_tween()
+				srt.set_parallel(true)
+				srt.tween_property(sp_ring, "scale", Vector2(4.0, 4.0), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+				srt.tween_property(sp_ring, "modulate:a", 0.0, 0.35)
+				srt.chain().tween_callback(sp_ring.queue_free)
 			split_on_death.emit(global_position)
 		died.emit(self)
 		call_deferred("queue_free")

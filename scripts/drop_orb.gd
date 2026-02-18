@@ -46,9 +46,11 @@ func _create_visual() -> void:
 
 	# 外側グロー（HPオーブは4角ダイヤ、その他は6角）
 	# HPオーブは大きめ（改善46: 「回復チャンス」を見逃さないよう視認性向上）
-	var sides := 4 if orb_type == "hp" else 6
-	var glow_radius := 14.0 if orb_type == "hp" else 10.0
-	var core_radius := 7.0 if orb_type == "hp" else 5.0
+	# 改善143: 高XP値オーブ（xp_value>=3）は1.5倍サイズ＋8角形（ボスや強敵のXPドロップを目立たせる）
+	var sides := 4 if orb_type == "hp" else (8 if xp_value >= 3 else 6)
+	var size_mult := 1.5 if (orb_type == "xp" and xp_value >= 3) else 1.0
+	var glow_radius := 14.0 if orb_type == "hp" else 10.0 * size_mult
+	var core_radius := 7.0 if orb_type == "hp" else 5.0 * size_mult
 	var glow := Polygon2D.new()
 	var glow_pts: PackedVector2Array = []
 	for i in range(sides):
@@ -68,11 +70,12 @@ func _create_visual() -> void:
 	core.color = color
 	add_child(core)
 
-	# パルスアニメーション
+	# パルスアニメーション（改善70: チップオーブは高速パルスで「特別感」を強調）
+	var pulse_speed := 0.25 if orb_type in ["chip", "chip_move"] else 0.4
 	var tween := create_tween()
 	tween.set_loops()
-	tween.tween_property(core, "scale", Vector2(1.2, 1.2), 0.4).set_trans(Tween.TRANS_SINE)
-	tween.tween_property(core, "scale", Vector2(1.0, 1.0), 0.4).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(core, "scale", Vector2(1.2, 1.2), pulse_speed).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(core, "scale", Vector2(1.0, 1.0), pulse_speed).set_trans(Tween.TRANS_SINE)
 
 func _process(delta: float) -> void:
 	lifetime -= delta
@@ -81,6 +84,19 @@ func _process(delta: float) -> void:
 		call_deferred("queue_free")
 		set_process(false)
 		return
+
+	# 改善69: 有効期限が近いXPオーブの点滅（「急いで拾え」の視覚的合図）
+	if orb_type == "xp" and lifetime < 1.5:
+		var flicker := abs(sin(lifetime * TAU * 4.0))
+		modulate.a = 0.3 + flicker * 0.7
+
+	# 改善142: HPオーブの高速点滅（タワーHP30%未満時: 「今すぐ拾え」の緊急シグナル）
+	if orb_type == "hp" and is_instance_valid(target) and "max_hp" in target and "hp" in target:
+		var hp_ratio: float = float(target.hp) / float(target.max_hp)
+		if hp_ratio < 0.3:
+			var pulse_freq := 6.0 + (1.0 - hp_ratio / 0.3) * 6.0  # HP低いほど高速（6〜12Hz）
+			var flicker_hp := abs(sin(lifetime * TAU * pulse_freq))
+			modulate.a = 0.45 + flicker_hp * 0.55
 
 	if not is_instance_valid(target):
 		return
@@ -152,14 +168,22 @@ func _on_collected() -> void:
 		target.add_xp(xp_value)
 		SFX.play_xp_pickup()
 
-	# 回収エフェクト
+	# 改善128: タイプ別色の回収エフェクト（XP=緑, HP=赤, Chip=金）
+	var collect_color: Color
+	if orb_type == "hp":
+		collect_color = Color(1.0, 0.3, 0.35, 0.8)
+	elif orb_type in ["chip", "chip_move"]:
+		collect_color = Color(1.0, 0.88, 0.25, 0.8)
+	else:
+		collect_color = Color(0.4, 1.0, 0.55, 0.8)  # XP: 緑
+
 	var flash := Polygon2D.new()
 	var pts: PackedVector2Array = []
 	for i in range(8):
 		var a := i * TAU / 8
 		pts.append(Vector2(cos(a), sin(a)) * 8.0)
 	flash.polygon = pts
-	flash.color = Color(1.0, 1.0, 0.8, 0.7)
+	flash.color = collect_color
 	flash.global_position = global_position
 
 	var scene_root := get_tree().current_scene
@@ -167,9 +191,28 @@ func _on_collected() -> void:
 		scene_root.add_child(flash)
 		var tween := flash.create_tween()
 		tween.set_parallel(true)
-		tween.tween_property(flash, "scale", Vector2(2.0, 2.0), 0.15)
-		tween.tween_property(flash, "modulate:a", 0.0, 0.15)
+		tween.tween_property(flash, "scale", Vector2(2.5, 2.5), 0.2)
+		tween.tween_property(flash, "modulate:a", 0.0, 0.2)
 		tween.chain().tween_callback(flash.queue_free)
+		# 改善129: 回収時スパークル（3粒の輝く粒子）
+		for _si in range(3):
+			var sp := Polygon2D.new()
+			sp.polygon = PackedVector2Array([
+				Vector2(-1.5, 0), Vector2(1.5, 0), Vector2(0, -3.0)
+			])
+			sp.color = collect_color
+			sp.global_position = global_position
+			sp.z_index = 110
+			scene_root.add_child(sp)
+			var sa := randf() * TAU
+			var sd := randf_range(12.0, 24.0)
+			var st := sp.create_tween()
+			st.set_parallel(true)
+			st.tween_property(sp, "global_position",
+				global_position + Vector2(cos(sa), sin(sa)) * sd, 0.3
+			).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			st.tween_property(sp, "modulate:a", 0.0, 0.3)
+			st.chain().tween_callback(sp.queue_free)
 
 	# physics callback中のarea_set_shape_disabledエラー防止: monitoring無効化→遅延free
 	set_deferred("monitoring", false)

@@ -666,6 +666,8 @@ func _create_projectile(direction: Vector2) -> void:
 	# トレイル色を弾タイプに合わせる（スキル識別性向上: J-7 色による区分）
 	var tc := _get_bullet_color()
 	bullet.set("trail_color", Color(tc.r, tc.g, tc.b, 0.55))
+	# 改善119/120: タグを弾に伝播（インパクト色のタイプ別差別化に使用）
+	bullet.set("tags", stats.get("tags", []))
 
 	bullet.collision_layer = 2
 	bullet.collision_mask = 4
@@ -676,6 +678,24 @@ func _create_projectile(direction: Vector2) -> void:
 		bullet.scale = Vector2(size_mult, size_mult)
 
 	get_tree().current_scene.add_child(bullet)
+
+	# 改善140: 発射時マズルフラッシュ（弾が出た瞬間の「発射感」を空間で演出）
+	var mf_color := _get_bullet_color()
+	var mf := Polygon2D.new()
+	var mf_pts: PackedVector2Array = []
+	for i in range(6):
+		var a := float(i) * TAU / 6.0
+		mf_pts.append(Vector2(cos(a), sin(a)) * 6.0)
+	mf.polygon = mf_pts
+	mf.color = Color(mf_color.r, mf_color.g, mf_color.b, 0.7)
+	mf.global_position = global_position
+	mf.z_index = 52
+	get_tree().current_scene.add_child(mf)
+	var mft := mf.create_tween()
+	mft.set_parallel(true)
+	mft.tween_property(mf, "scale", Vector2(2.5, 2.5), 0.12).set_trans(Tween.TRANS_QUAD)
+	mft.tween_property(mf, "modulate:a", 0.0, 0.12)
+	mft.chain().tween_callback(mf.queue_free)
 
 	# self_damage_per_attack
 	if stats.get("self_damage_per_attack", 0) > 0:
@@ -1066,6 +1086,7 @@ var crit_freeze_duration := 0.0
 var crit_chance := 0.0
 var crit_mult := 1.0
 var trail_color := Color(0.9, 0.9, 1.0, 0.65)  # 弾のトレイル色（外部からset可）
+var tags := []  # 改善119: タイプタグ（fire/lightning/cold等。インパクト色分けに使用）
 var _trail_timer := 0.0  # トレイル間隔タイマー
 
 func _ready():
@@ -1100,6 +1121,12 @@ func _process(delta):
 	if _trail_timer <= 0:
 		_trail_timer = 0.038  # ~26個/秒（改善60: より密なトレイルで弾の軌跡を強調）
 		_emit_spark_trail()
+		# 改善127: 火属性の余燼エフェクト（火の弾に熱感を付加）
+		if \"fire\" in tags and randf() < 0.4:
+			_emit_ember_pop()
+		# 改善127b: 冷属性の氷結マーク（冷気の漂いを後ろに残す）
+		elif \"cold\" in tags and randf() < 0.3:
+			_emit_ice_drift()
 
 	# トレイル更新
 	var trail := get_node_or_null(\"Trail\")
@@ -1147,7 +1174,19 @@ func _on_body_entered(body):
 		for _i in range(sides):
 			ring_pts.append(Vector2(cos(_i * TAU / sides), sin(_i * TAU / sides)) * ring_r)
 		ring.polygon = ring_pts
-		ring.color = Color(1.0, 0.9, 0.2, 0.95) if is_crit else Color(1.0, 1.0, 1.0, 0.75)
+		# 改善119: 攻撃タイプ別インパクトリング色（タイプの違いを直感で伝える）
+		var ring_base: Color
+		if is_crit:
+			ring_base = Color(1.0, 0.9, 0.2, 0.95)  # クリット: 金
+		elif \"fire\" in tags:
+			ring_base = Color(1.0, 0.45, 0.1, 0.9)   # 火: 橙
+		elif \"lightning\" in tags:
+			ring_base = Color(0.3, 0.9, 1.0, 0.9)    # 雷: シアン
+		elif \"cold\" in tags:
+			ring_base = Color(0.5, 0.75, 1.0, 0.9)   # 冷: 氷青
+		else:
+			ring_base = Color(1.0, 1.0, 1.0, 0.75)   # デフォルト: 白
+		ring.color = ring_base
 		ring.global_position = global_position
 		ring.z_index = 90
 		scene_root.add_child(ring)
@@ -1160,7 +1199,18 @@ func _on_body_entered(body):
 
 	# インパクトバースト: 3つの小粒子が飛散（改善57: 弾着点の「重さ」を強化）
 	if scene_root:
-		var burst_color := Color(1.0, 0.9, 0.4, 0.9) if is_crit else Color(1.0, 1.0, 0.8, 0.7)
+		# 改善120: バーストパーティクルもタイプ別色（インパクト全体の一貫性）
+		var burst_color: Color
+		if is_crit:
+			burst_color = Color(1.0, 0.9, 0.4, 0.9)
+		elif \"fire\" in tags:
+			burst_color = Color(1.0, 0.5, 0.15, 0.85)
+		elif \"lightning\" in tags:
+			burst_color = Color(0.4, 0.95, 1.0, 0.85)
+		elif \"cold\" in tags:
+			burst_color = Color(0.55, 0.8, 1.0, 0.85)
+		else:
+			burst_color = Color(1.0, 1.0, 0.8, 0.7)
 		for _bi in range(3):
 			var frag := Polygon2D.new()
 			frag.polygon = PackedVector2Array([
@@ -1180,11 +1230,40 @@ func _on_body_entered(body):
 			ft.tween_property(frag, \"modulate:a\", 0.0, 0.22)
 			ft.chain().tween_callback(frag.queue_free)
 
+	# 改善141: holyタグの十字スパーク（聖なる弾の「神聖な一撃」を視覚的に強調）
+	if \"holy\" in tags and scene_root:
+		for _hci in range(4):
+			var hc := Polygon2D.new()
+			var hc_ang := float(_hci) * PI * 0.5
+			hc.polygon = PackedVector2Array([Vector2(-1.5, 0), Vector2(1.5, 0), Vector2(0, -4.0)])
+			hc.color = Color(1.0, 0.95, 0.8, 0.9)
+			hc.global_position = global_position
+			hc.rotation = hc_ang
+			hc.z_index = 91
+			scene_root.add_child(hc)
+			var hct := hc.create_tween()
+			hct.set_parallel(true)
+			hct.tween_property(hc, \"global_position\", global_position + Vector2(cos(hc_ang), sin(hc_ang)) * 18.0, 0.25)
+			hct.tween_property(hc, \"modulate:a\", 0.0, 0.25)
+			hct.chain().tween_callback(hc.queue_free)
+
 	# クリット時: タワーにシェイクフィードバック（改善59: クリの「重み」を体全体で感じる）
 	if is_crit:
 		var tower_node := get_tree().current_scene.get_node_or_null(\"Tower\")
 		if tower_node and tower_node.has_method(\"shake\"):
 			tower_node.shake(1.5)
+		# 改善110: クリット時の極薄白フラッシュ（「特別な一撃」を体感させる、Control層に追加）
+		var ui_layer2 := get_tree().current_scene.get_node_or_null(\"UI\")
+		if ui_layer2:
+			var cf := ColorRect.new()
+			cf.color = Color(1.0, 1.0, 1.0, 0.07)
+			cf.set_anchors_preset(Control.PRESET_FULL_RECT)
+			cf.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			cf.z_index = 145
+			ui_layer2.add_child(cf)
+			var cft := cf.create_tween()
+			cft.tween_property(cf, \"color:a\", 0.0, 0.18).set_trans(Tween.TRANS_QUAD)
+			cft.tween_callback(cf.queue_free)
 
 	# ライフスティール
 	if life_steal_pct > 0.0:
@@ -1192,9 +1271,25 @@ func _on_body_entered(body):
 		if tower2 and tower2.has_method(\"heal\"):
 			tower2.heal(int(float(final_damage) * life_steal_pct))
 
-	# on_hit爆発
+	# on_hit爆発 + 改善111: 爆発リング（AoE範囲を一瞬可視化してゲームプレイを読みやすく）
 	if on_hit_explode_radius > 0.0:
 		_do_aoe(global_position, on_hit_explode_radius, int(float(final_damage) * on_hit_explode_dmg_pct))
+		var exp_root := get_tree().current_scene
+		if exp_root:
+			var exp_ring := Polygon2D.new()
+			var exp_pts := PackedVector2Array()
+			for _ei in range(20):
+				exp_pts.append(Vector2(cos(_ei * TAU / 20.0), sin(_ei * TAU / 20.0)) * on_hit_explode_radius * 0.4)
+			exp_ring.polygon = exp_pts
+			exp_ring.color = Color(1.0, 0.55, 0.1, 0.55)
+			exp_ring.global_position = global_position
+			exp_ring.z_index = 88
+			exp_root.add_child(exp_ring)
+			var ert := exp_ring.create_tween()
+			ert.set_parallel(true)
+			ert.tween_property(exp_ring, \"scale\", Vector2(2.5, 2.5), 0.3).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+			ert.tween_property(exp_ring, \"modulate:a\", 0.0, 0.3)
+			ert.chain().tween_callback(exp_ring.queue_free)
 
 	# on_hitスロー + 氷ブルーティント（スロー中であることを視覚的に示す）
 	if on_hit_slow > 0.0 and \"speed\" in body:
@@ -1236,17 +1331,40 @@ func _on_body_entered(body):
 		chain_remaining -= 1
 		var next := _find_chain_target(body)
 		if next:
-			# チェインVFX: 雷弧（改善58: チェイン発動の視覚的フィードバック）
+			# 改善109: 強化チェインVFX — ジグザグ雷弧+グロー（雷の「飛んだ！」感を強調）
 			var arc_root := get_tree().current_scene
 			if arc_root:
+				# 下層: 太いグロー
+				var arc_glow := Line2D.new()
+				arc_glow.default_color = Color(0.3, 0.7, 1.0, 0.4)
+				arc_glow.width = 7.0
+				# ジグザグ点を生成（5分割で中間点をランダムに±8pxオフセット）
+				var start := global_position
+				var end := next.global_position
+				var seg := end - start
+				var perp := Vector2(-seg.y, seg.x).normalized()
+				var zz_pts := PackedVector2Array()
+				zz_pts.append(start)
+				for _zi in range(4):
+					var t_val := float(_zi + 1) / 5.0
+					var mid := start + seg * t_val + perp * randf_range(-8.0, 8.0)
+					zz_pts.append(mid)
+				zz_pts.append(end)
+				arc_glow.points = zz_pts
+				arc_glow.z_index = 93
+				arc_root.add_child(arc_glow)
+				var glow_tw := arc_glow.create_tween()
+				glow_tw.tween_property(arc_glow, \"modulate:a\", 0.0, 0.22)
+				glow_tw.chain().tween_callback(arc_glow.queue_free)
+				# 上層: 細い白いコアライン
 				var arc := Line2D.new()
-				arc.default_color = Color(0.5, 0.85, 1.0, 0.9)
-				arc.width = 2.5
-				arc.points = PackedVector2Array([global_position, next.global_position])
+				arc.default_color = Color(0.75, 0.95, 1.0, 0.95)
+				arc.width = 1.8
+				arc.points = zz_pts
 				arc.z_index = 95
 				arc_root.add_child(arc)
 				var arc_tw := arc.create_tween()
-				arc_tw.tween_property(arc, \"modulate:a\", 0.0, 0.25)
+				arc_tw.tween_property(arc, \"modulate:a\", 0.0, 0.22)
 				arc_tw.chain().tween_callback(arc.queue_free)
 			direction = (next.global_position - global_position).normalized()
 			return  # 弾は消えない
@@ -1380,6 +1498,44 @@ func _emit_spark_trail() -> void:
 	t.tween_property(dot, \"scale\", Vector2(0.1, 0.1), 0.14).set_trans(Tween.TRANS_QUAD)
 	t.tween_property(dot, \"modulate:a\", 0.0, 0.14)
 	t.chain().tween_callback(dot.queue_free)
+
+func _emit_ember_pop() -> void:
+	## 改善127: 火の余燼（大き目のオレンジ丸が上方向にふわりと漂う）
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+	var ember := Polygon2D.new()
+	ember.polygon = PackedVector2Array([
+		Vector2(-2, -2), Vector2(2, -2), Vector2(2, 2), Vector2(-2, 2)
+	])
+	ember.color = Color(1.0, randf_range(0.35, 0.7), 0.1, 0.85)
+	ember.global_position = global_position + Vector2(randf_range(-4, 4), randf_range(-4, 4))
+	ember.z_index = 2
+	scene_root.add_child(ember)
+	var t := ember.create_tween()
+	t.set_parallel(true)
+	t.tween_property(ember, \"global_position:y\", ember.global_position.y - randf_range(10, 20), 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	t.tween_property(ember, \"modulate:a\", 0.0, 0.45).set_delay(0.1)
+	t.chain().tween_callback(ember.queue_free)
+
+func _emit_ice_drift() -> void:
+	## 改善127b: 冷気の漂い（水色の小ひし形がゆっくり拡散）
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+	var crystal := Polygon2D.new()
+	crystal.polygon = PackedVector2Array([
+		Vector2(0, -3), Vector2(2, 0), Vector2(0, 3), Vector2(-2, 0)
+	])
+	crystal.color = Color(0.5, 0.85, 1.0, 0.7)
+	crystal.global_position = global_position + Vector2(randf_range(-5, 5), randf_range(-5, 5))
+	crystal.z_index = 2
+	scene_root.add_child(crystal)
+	var t := crystal.create_tween()
+	t.set_parallel(true)
+	t.tween_property(crystal, \"scale\", Vector2(2.5, 2.5), 0.4).set_trans(Tween.TRANS_QUAD)
+	t.tween_property(crystal, \"modulate:a\", 0.0, 0.4)
+	t.chain().tween_callback(crystal.queue_free)
 
 func _simple_bullet_script() -> String:
 	return \"extends Area2D\\nvar direction := Vector2.ZERO\\nvar speed := 350.0\\nvar damage := 5\\nvar lifetime := 1.5\\n\\nfunc _ready():\\n\\tbody_entered.connect(func(body):\\n\\t\\tif body.has_method(\\\\\\\"take_damage\\\\\\\"):\\n\\t\\t\\tbody.take_damage(damage)\\n\\t\\tset_deferred(\\\\\\\"monitoring\\\\\\\", false)\\n\\t\\tcall_deferred(\\\\\\\"queue_free\\\\\\\")\\n\\t)\\n\\tcollision_layer = 2\\n\\tcollision_mask = 4\\n\\nfunc _process(delta):\\n\\tposition += direction * speed * delta\\n\\tlifetime -= delta\\n\\tif lifetime <= 0:\\n\\t\\tset_deferred(\\\\\\\"monitoring\\\\\\\", false)\\n\\t\\tcall_deferred(\\\\\\\"queue_free\\\\\\\")\\n\"

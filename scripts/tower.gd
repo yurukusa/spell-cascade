@@ -59,6 +59,12 @@ const CRUSH_BREAKOUT_KNOCKBACK := 80.0
 
 var _tower_core_poly: Polygon2D = null  # HPで色変化するコア（改善40）
 
+# Loop 4 追加変数
+var _ambient_ring_timer := 0.0  # 改善109: アンビエントパルスリングタイマー
+var _trail_timer := 0.0  # 改善113: 移動トレイルタイマー
+var _crush_pulse_timer := 0.0  # 改善108: クラッシュ中のパルスリングタイマー
+var _hp_crit_ring_timer := 0.0  # 改善115: HP危機のグローリングタイマー
+
 func _ready() -> void:
 	hp = max_hp
 	start_y = position.y
@@ -213,6 +219,33 @@ func _physics_process(delta: float) -> void:
 	# Crush state: 包囲DPS
 	_update_crush(enemies, delta)
 
+	# 改善109: アンビエントパルスリング（タワーの「存在感」を漂わせる、低alpha大リング）
+	_ambient_ring_timer -= delta
+	if _ambient_ring_timer <= 0:
+		_ambient_ring_timer = 3.0
+		_spawn_ambient_ring()
+
+	# 改善113: 高速移動時の軌跡ドット（kiteや手動での俊敏な動きが視覚的に伝わる）
+	if velocity.length() > 120.0:
+		_trail_timer -= delta
+		if _trail_timer <= 0:
+			_trail_timer = 0.09  # 最大11/秒
+			_spawn_move_trail_dot()
+
+	# 改善108: クラッシュ中のパルスリング（「包囲されてる！」緊張感を床から演出）
+	if crush_active:
+		_crush_pulse_timer -= delta
+		if _crush_pulse_timer <= 0:
+			_crush_pulse_timer = 0.65
+			_spawn_crush_pulse_ring()
+
+	# 改善115: HP低下時の赤グローリング（危機感を空間で表現）
+	if max_hp > 0 and hp / max_hp < 0.25 and hp > 0:
+		_hp_crit_ring_timer -= delta
+		if _hp_crit_ring_timer <= 0:
+			_hp_crit_ring_timer = 1.5
+			_spawn_hp_crit_ring()
+
 func _get_manual_input() -> Vector2:
 	var dir := Vector2.ZERO
 	if Input.is_action_pressed("move_up"):
@@ -311,6 +344,41 @@ func _do_crush_breakout(enemies: Array) -> void:
 	## Crush 3秒耐えたご褒美: 周囲に衝撃波ダメージ+ノックバック
 	crush_breakout.emit()
 	shake(6.0)
+	# 改善111: BURST後の黄金リング（「耐えた！」の爽快感を即時演出）
+	var scene_root := get_tree().current_scene
+	if scene_root:
+		var gold_ring := Polygon2D.new()
+		var pts: PackedVector2Array = []
+		for i in range(20):
+			var a := float(i) * TAU / 20.0
+			pts.append(Vector2(cos(a), sin(a)) * 25.0)
+		gold_ring.polygon = pts
+		gold_ring.color = Color(1.0, 0.85, 0.2, 0.75)
+		gold_ring.global_position = global_position
+		gold_ring.z_index = 165
+		scene_root.add_child(gold_ring)
+		var gt := gold_ring.create_tween()
+		gt.set_parallel(true)
+		gt.tween_property(gold_ring, "scale", Vector2(6.5, 6.5), 0.55).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		gt.tween_property(gold_ring, "modulate:a", 0.0, 0.55)
+		gt.chain().tween_callback(gold_ring.queue_free)
+
+		# 改善139: 2重目の白い衝撃波（「炸裂した！」余韻のシェル）
+		var white_shell := Polygon2D.new()
+		var ws_pts: PackedVector2Array = []
+		for i in range(24):
+			var a := float(i) * TAU / 24.0
+			ws_pts.append(Vector2(cos(a), sin(a)) * 30.0)
+		white_shell.polygon = ws_pts
+		white_shell.color = Color(1.0, 1.0, 1.0, 0.55)
+		white_shell.global_position = global_position
+		white_shell.z_index = 163
+		scene_root.add_child(white_shell)
+		var wst := white_shell.create_tween()
+		wst.set_parallel(true)
+		wst.tween_property(white_shell, "scale", Vector2(5.0, 5.0), 0.45).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT).set_delay(0.1)
+		wst.tween_property(white_shell, "modulate:a", 0.0, 0.45).set_delay(0.1)
+		wst.chain().tween_callback(white_shell.queue_free)
 
 	# 範囲内の全敵にダメージ+ノックバック
 	for e in enemies:
@@ -465,6 +533,22 @@ func take_damage(amount: float) -> void:
 	if hp > 0 and hp / max_hp <= 0.3:
 		SFX.play_low_hp_warning()
 
+	# 改善138: 大ダメージ時のUI赤フラッシュ（50+ダメージ: 「重い一撃」を全画面で）
+	if amount >= 50.0:
+		var scene_root := get_tree().current_scene
+		if scene_root:
+			var ui := scene_root.get_node_or_null("UI") as CanvasLayer
+			if ui:
+				var big_dmg_flash := ColorRect.new()
+				big_dmg_flash.color = Color(0.9, 0.05, 0.05, 0.22)
+				big_dmg_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+				big_dmg_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				big_dmg_flash.z_index = 162
+				ui.add_child(big_dmg_flash)
+				var bdf := big_dmg_flash.create_tween()
+				bdf.tween_property(big_dmg_flash, "color:a", 0.0, 0.45).set_trans(Tween.TRANS_CUBIC)
+				bdf.tween_callback(big_dmg_flash.queue_free)
+
 	_update_low_hp_glow()
 	_update_tower_core_color()
 
@@ -523,6 +607,126 @@ func _spawn_heal_vfx(amount: float) -> void:
 	ring_tween.tween_property(ring, "modulate:a", 0.0, 0.4)
 	ring_tween.chain().tween_callback(ring.queue_free)
 
+func _spawn_level_up_burst() -> void:
+	## 改善110: レベルアップ時の放射パーティクル（「強くなった！」を爆発で体感）
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+	for i in range(10):
+		var a := float(i) * TAU / 10.0 + randf() * 0.2
+		var p := Polygon2D.new()
+		p.polygon = PackedVector2Array([
+			Vector2(-2.5, -0.8), Vector2(2.5, 0.0), Vector2(-2.5, 0.8),
+		])
+		p.color = Color(0.6, 0.95, 1.0, 1.0)  # タワーシアン
+		p.rotation = a
+		p.global_position = global_position
+		p.z_index = 145
+		scene_root.add_child(p)
+		var t := p.create_tween()
+		t.set_parallel(true)
+		t.tween_property(p, "global_position", global_position + Vector2(cos(a), sin(a)) * randf_range(45.0, 80.0), 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		t.tween_property(p, "modulate:a", 0.0, 0.55).set_delay(0.2)
+		t.chain().tween_callback(p.queue_free)
+	# 大きな白フラッシュリング
+	var glow := Polygon2D.new()
+	var glow_pts: PackedVector2Array = []
+	for i in range(16):
+		var a := float(i) * TAU / 16.0
+		glow_pts.append(Vector2(cos(a), sin(a)) * 22.0)
+	glow.polygon = glow_pts
+	glow.color = Color(0.6, 0.95, 1.0, 0.6)
+	glow.global_position = global_position
+	glow.z_index = 144
+	scene_root.add_child(glow)
+	var gt := glow.create_tween()
+	gt.set_parallel(true)
+	gt.tween_property(glow, "scale", Vector2(4.0, 4.0), 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	gt.tween_property(glow, "modulate:a", 0.0, 0.4)
+	gt.chain().tween_callback(glow.queue_free)
+
+func _spawn_ambient_ring() -> void:
+	## 改善109: 低alpha大リング（タワーのプレゼンス演出。クラッチ感・重みを加える）
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+	var ring := Polygon2D.new()
+	var ring_pts: PackedVector2Array = []
+	for i in range(12):
+		var a := float(i) * TAU / 12.0
+		ring_pts.append(Vector2(cos(a), sin(a)) * 20.0)
+	ring.polygon = ring_pts
+	ring.color = Color(0.35, 0.75, 1.0, 0.06)  # タワーのシアンカラー、極低alpha
+	ring.global_position = global_position
+	ring.z_index = -5
+	scene_root.add_child(ring)
+	var t := ring.create_tween()
+	t.set_parallel(true)
+	t.tween_property(ring, "scale", Vector2(5.0, 5.0), 2.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	t.tween_property(ring, "modulate:a", 0.0, 2.5).set_ease(Tween.EASE_IN)
+	t.chain().tween_callback(ring.queue_free)
+
+func _spawn_move_trail_dot() -> void:
+	## 改善113: 移動中の軌跡ドット（俊敏な動きを視覚化）
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+	var dot := Polygon2D.new()
+	var dot_pts: PackedVector2Array = []
+	for i in range(6):
+		var a := float(i) * TAU / 6.0
+		dot_pts.append(Vector2(cos(a), sin(a)) * 4.0)
+	dot.polygon = dot_pts
+	dot.color = Color(0.35, 0.75, 1.0, 0.35)
+	dot.global_position = global_position
+	dot.z_index = -3
+	scene_root.add_child(dot)
+	var t := dot.create_tween()
+	t.set_parallel(true)
+	t.tween_property(dot, "scale", Vector2(2.0, 2.0), 0.28)
+	t.tween_property(dot, "modulate:a", 0.0, 0.28)
+	t.chain().tween_callback(dot.queue_free)
+
+func _spawn_crush_pulse_ring() -> void:
+	## 改善108: クラッシュ中の橙パルスリング（「包囲プレッシャー」を床で示す）
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+	var ring := Polygon2D.new()
+	var pts: PackedVector2Array = []
+	for i in range(16):
+		pts.append(Vector2(cos(i * TAU / 16.0), sin(i * TAU / 16.0)) * 20.0)
+	ring.polygon = pts
+	ring.color = Color(1.0, 0.45, 0.1, 0.45)
+	ring.global_position = global_position
+	ring.z_index = -4
+	scene_root.add_child(ring)
+	var t := ring.create_tween()
+	t.set_parallel(true)
+	t.tween_property(ring, "scale", Vector2(CRUSH_RADIUS / 20.0 * 1.15, CRUSH_RADIUS / 20.0 * 1.15), 0.55).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	t.tween_property(ring, "modulate:a", 0.0, 0.55)
+	t.chain().tween_callback(ring.queue_free)
+
+func _spawn_hp_crit_ring() -> void:
+	## 改善115: HP25%以下時の赤グローリング（空間で危機感を表現）
+	var scene_root := get_tree().current_scene
+	if scene_root == null:
+		return
+	var ring := Polygon2D.new()
+	var pts: PackedVector2Array = []
+	for i in range(12):
+		pts.append(Vector2(cos(i * TAU / 12.0), sin(i * TAU / 12.0)) * 16.0)
+	ring.polygon = pts
+	ring.color = Color(0.95, 0.1, 0.1, 0.30)
+	ring.global_position = global_position
+	ring.z_index = -2
+	scene_root.add_child(ring)
+	var t := ring.create_tween()
+	t.set_parallel(true)
+	t.tween_property(ring, "scale", Vector2(5.0, 5.0), 1.0).set_trans(Tween.TRANS_SINE)
+	t.tween_property(ring, "modulate:a", 0.0, 1.0).set_delay(0.25)
+	t.chain().tween_callback(ring.queue_free)
+
 func _update_tower_core_color() -> void:
 	## コア色をHP割合でシアン→オレンジ→赤に変化（改善40: タワーの危機感を視覚化）
 	if _tower_core_poly == null or not is_instance_valid(_tower_core_poly):
@@ -543,6 +747,12 @@ func add_xp(amount: int) -> void:
 	while level - 1 < level_thresholds.size() and xp >= level_thresholds[level - 1]:
 		level += 1
 		level_up.emit(level)
+		# 改善110: レベルアップ放射パーティクルバースト（達成感の即時フィードバック）
+		_spawn_level_up_burst()
+		# 改善112: タワー本体スケールポップ（「成長した！」を身体で感じる）
+		var lup_tween := create_tween()
+		lup_tween.tween_property(self, "scale", Vector2(1.25, 1.25), 0.1).set_trans(Tween.TRANS_BACK)
+		lup_tween.tween_property(self, "scale", Vector2(1.0, 1.0), 0.15).set_trans(Tween.TRANS_ELASTIC)
 
 func get_xp_for_next_level() -> int:
 	if level - 1 < level_thresholds.size():

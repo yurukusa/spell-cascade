@@ -70,6 +70,13 @@ var _combo_timer_bar: ProgressBar = null
 var _timer_30s_warned := false
 var _timer_10s_warned := false
 
+# 改善118: 圧力インジケーター（敵数が多い時の緊張感強化）
+var _pressure_label: Label = null
+var _pressure_active := false
+
+# 改善128: OVERTIMEラベル（9分到達で表示）
+var _overtime_announced := false
+
 # Shrine（中盤イベント: 120-225sのquiet zone対策）
 const SHRINE_TIME := 150.0  # 2:30で出現
 const SHRINE_AUTO_SELECT_TIME := 10.0  # 10秒で自動選択
@@ -256,6 +263,23 @@ func _process(delta: float) -> void:
 	if distance_m >= next_milestone:
 		_show_milestone(int(next_milestone))
 		next_milestone += 50.0
+
+	# 改善118: 敵数圧力インジケーター（12体以上で "PRESSURE!" 表示）
+	var pressure_threshold := 12
+	if enemies_alive >= pressure_threshold and not boss_spawned:
+		if not _pressure_active:
+			_pressure_active = true
+			_show_pressure_label()
+	else:
+		if _pressure_active:
+			_pressure_active = false
+			if _pressure_label and is_instance_valid(_pressure_label):
+				_pressure_label.visible = false
+
+	# 改善128: 9分経過でOVERTIMEラベル（「10分まで粘ろう」動機付け）
+	if not _overtime_announced and run_time >= 540.0:
+		_overtime_announced = true
+		_announce_overtime()
 
 	# Onboarding overlay タイマー
 	if onboarding_panel and onboarding_timer > 0:
@@ -940,6 +964,16 @@ func _show_shrine_toast(choice_name: String, color: Color) -> void:
 	var tween := label.create_tween()
 	tween.tween_property(label, "modulate:a", 0.0, 1.5).set_delay(1.0)
 	tween.tween_callback(label.queue_free)
+	# 改善131: Shrine選択時の色カラーフラッシュ（「何かが変わった」瞬間を全画面で演出）
+	var shrine_flash := ColorRect.new()
+	shrine_flash.color = Color(color.r, color.g, color.b, 0.18)
+	shrine_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shrine_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shrine_flash.z_index = 155
+	ui_layer.add_child(shrine_flash)
+	var sft := shrine_flash.create_tween()
+	sft.tween_property(shrine_flash, "color:a", 0.0, 0.5).set_trans(Tween.TRANS_QUAD)
+	sft.tween_callback(shrine_flash.queue_free)
 
 func _spawn_boss() -> void:
 	if enemy_scene == null:
@@ -1037,6 +1071,17 @@ func _on_boss_died(_enemy: Node2D) -> void:
 	var tween := label.create_tween()
 	tween.tween_property(label, "modulate:a", 0.0, 2.0).set_delay(1.5)
 	tween.chain().tween_callback(label.queue_free)
+
+	# 改善122: ボス撃破の黄金フラッシュ（最高の達成感を全画面で演出）
+	var boss_flash := ColorRect.new()
+	boss_flash.color = Color(1.0, 0.85, 0.2, 0.25)
+	boss_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	boss_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	boss_flash.z_index = 165
+	ui_layer.add_child(boss_flash)
+	var bft := boss_flash.create_tween()
+	bft.tween_property(boss_flash, "color:a", 0.0, 0.7).set_trans(Tween.TRANS_CUBIC)
+	bft.tween_callback(boss_flash.queue_free)
 
 	# Boss HP bar除去
 	_remove_boss_hp_bar()
@@ -1315,6 +1360,29 @@ func _on_boss_phase_changed(phase: int, _hp_pct: float) -> void:
 	text_tween.tween_property(label, "modulate:a", 0.0, 0.8).set_delay(0.5)
 	text_tween.tween_callback(label.queue_free)
 
+	# 改善132: Phase別カラースパーク（Phase2=橙/Phase3=赤で脅威レベルを粒子で印象付け）
+	var phase_spark_color := Color(1.0, 0.5, 0.1, 0.9)  # Phase2: 橙
+	if phase == 3:
+		phase_spark_color = Color(1.0, 0.15, 0.1, 0.9)  # Phase3: 赤
+	for _pi in range(12):
+		var pa := float(_pi) * TAU / 12.0
+		var pp := Polygon2D.new()
+		pp.polygon = PackedVector2Array([
+			Vector2(-2.0, -0.7), Vector2(2.0, 0.0), Vector2(-2.0, 0.7),
+		])
+		pp.color = phase_spark_color
+		pp.rotation = pa
+		pp.global_position = tower.global_position
+		pp.z_index = 202
+		add_child(pp)
+		var pt := pp.create_tween()
+		pt.set_parallel(true)
+		pt.tween_property(pp, "global_position",
+			tower.global_position + Vector2(cos(pa), sin(pa)) * randf_range(55.0, 100.0), 0.5
+		).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		pt.tween_property(pp, "modulate:a", 0.0, 0.5).set_delay(0.15)
+		pt.chain().tween_callback(pp.queue_free)
+
 ## v0.3.3: 近距離初期波 — Dead Time序盤空白を潰す
 func _spawn_initial_wave() -> void:
 	if enemy_scene == null:
@@ -1462,6 +1530,40 @@ func _on_enemy_died(enemy: Node2D) -> void:
 		kt.tween_property(ktext, "modulate:a", 0.0, 0.55).set_delay(0.2)
 		kt.chain().tween_callback(ktext.queue_free)
 
+	# 改善123: キル位置に小さな黄金リング（「敵を倒した」確認フィードバック）
+	if is_instance_valid(enemy):
+		var dr_pts := PackedVector2Array()
+		for _dri in range(8):
+			dr_pts.append(Vector2(cos(_dri * TAU / 8.0), sin(_dri * TAU / 8.0)) * 8.0)
+		var death_ring := Polygon2D.new()
+		death_ring.polygon = dr_pts
+		death_ring.color = Color(1.0, 0.82, 0.2, 0.7)
+		death_ring.global_position = enemy.global_position
+		death_ring.z_index = 85
+		add_child(death_ring)
+		var drt := death_ring.create_tween()
+		drt.set_parallel(true)
+		drt.tween_property(death_ring, "scale", Vector2(3.5, 3.5), 0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		drt.tween_property(death_ring, "modulate:a", 0.0, 0.25)
+		drt.chain().tween_callback(death_ring.queue_free)
+
+	# 改善133: 高XP敵（tank/boss等）の大きなデスリング（「強敵を倒した」を空間で表現）
+	if is_instance_valid(enemy) and "xp_value" in enemy and enemy.xp_value >= 3:
+		var big_ring := Polygon2D.new()
+		var br_pts := PackedVector2Array()
+		for _bri in range(12):
+			br_pts.append(Vector2(cos(_bri * TAU / 12.0), sin(_bri * TAU / 12.0)) * 20.0)
+		big_ring.polygon = br_pts
+		big_ring.color = Color(1.0, 0.6, 0.15, 0.85)  # 橙: 強敵撃破の達成感
+		big_ring.global_position = enemy.global_position
+		big_ring.z_index = 86
+		add_child(big_ring)
+		var brt := big_ring.create_tween()
+		brt.set_parallel(true)
+		brt.tween_property(big_ring, "scale", Vector2(5.5, 5.5), 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		brt.tween_property(big_ring, "modulate:a", 0.0, 0.4)
+		brt.chain().tween_callback(big_ring.queue_free)
+
 	# キルマイルストーン（10, 25, 50, 100, 200キル: 達成感の積み上げ）
 	if kill_count in [10, 25, 50, 100, 200]:
 		_announce_kill_milestone(kill_count)
@@ -1491,6 +1593,26 @@ func _show_area_cleared() -> void:
 	tween.chain().tween_property(lbl, "modulate:a", 0.0, 0.4)
 	tween.chain().tween_callback(lbl.queue_free)
 	tower.shake(3.0)
+
+	# 改善126: 上から降る紙吹雪（クリア感を空間全体で表現）
+	for _conf_i in range(14):
+		var conf := Polygon2D.new()
+		conf.polygon = PackedVector2Array([
+			Vector2(-3, -3), Vector2(3, -3), Vector2(3, 3), Vector2(-3, 3)
+		])
+		var conf_colors := [Color(0.4, 1.0, 0.6), Color(1.0, 0.85, 0.2), Color(0.5, 0.8, 1.0), Color(1.0, 0.4, 0.7)]
+		conf.color = conf_colors[_conf_i % conf_colors.size()]
+		conf.global_position = Vector2(randf_range(200, 1080), -20)
+		conf.z_index = 195
+		add_child(conf)
+		var cfx: float = conf.global_position.x + randf_range(-80, 80)
+		var cfy: float = conf.global_position.y + randf_range(500, 700)
+		var ct := conf.create_tween()
+		ct.set_parallel(true)
+		ct.tween_property(conf, "global_position", Vector2(cfx, cfy), randf_range(1.2, 2.0)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		ct.tween_property(conf, "rotation", randf_range(-TAU, TAU), 2.0)
+		ct.tween_property(conf, "modulate:a", 0.0, 2.0).set_delay(0.6)
+		ct.chain().tween_callback(conf.queue_free)
 
 	# 改善65: タワー位置から放射状パーティクルバースト（「エリア制圧」の爽快感）
 	var pos := tower.global_position
@@ -1522,6 +1644,25 @@ func _announce_kill_milestone(count: int) -> void:
 	# 改善94: 50キル以上のマイルストーンは大きなシェイク（節目の重みを体感させる）
 	var shake_intensity := 3.5 if count < 50 else (6.0 if count < 100 else 9.0)
 	tower.shake(shake_intensity)
+	# 改善125: マイルストーン爆発リング（達成の瞬間を空間で表現）
+	var n_rings := 1 if count < 50 else (2 if count < 100 else 3)
+	for ri in range(n_rings):
+		var mring := Polygon2D.new()
+		var mrpts := PackedVector2Array()
+		for _mri in range(16):
+			mrpts.append(Vector2(cos(_mri * TAU / 16.0), sin(_mri * TAU / 16.0)) * 18.0)
+		mring.polygon = mrpts
+		mring.color = col
+		mring.global_position = tower.global_position
+		mring.z_index = 172
+		mring.modulate.a = 0.65 - ri * 0.15
+		add_child(mring)
+		var mrt := mring.create_tween()
+		mrt.set_parallel(true)
+		var delay := ri * 0.12
+		mrt.tween_property(mring, "scale", Vector2(7.0 + ri * 2.0, 7.0 + ri * 2.0), 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT).set_delay(delay)
+		mrt.tween_property(mring, "modulate:a", 0.0, 0.55).set_delay(delay)
+		mrt.chain().tween_callback(mring.queue_free)
 	var ann := Label.new()
 	ann.text = msg
 	ann.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1594,6 +1735,22 @@ func _update_combo_display() -> void:
 		var shake_lvl := 2.5 if combo_count == 8 else (3.5 if combo_count == 15 else 5.0)
 		if is_instance_valid(tower):
 			tower.shake(shake_lvl)
+		# 改善124: ティアアップ時のタワー位置から放射リング（「強化」の視覚的アンカー）
+		var tier_ring := Polygon2D.new()
+		var trpts := PackedVector2Array()
+		for _tri in range(12):
+			trpts.append(Vector2(cos(_tri * TAU / 12.0), sin(_tri * TAU / 12.0)) * 14.0)
+		tier_ring.polygon = trpts
+		tier_ring.color = tier_color
+		tier_ring.global_position = tower.global_position
+		tier_ring.z_index = 170
+		add_child(tier_ring)
+		var rtt := tier_ring.create_tween()
+		rtt.set_parallel(true)
+		var tier_scale := 3.5 if combo_count < 30 else 5.0
+		rtt.tween_property(tier_ring, "scale", Vector2(tier_scale, tier_scale), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		rtt.tween_property(tier_ring, "modulate:a", 0.0, 0.35)
+		rtt.chain().tween_callback(tier_ring.queue_free)
 
 func _announce_stage(stage: int) -> void:
 	## ステージ遷移告知: プレイヤーに新しい局面を知らせる（J-8: 重要情報を大きく）
@@ -1679,6 +1836,11 @@ func _show_combo_break(count: int) -> void:
 	var tween := br.create_tween()
 	tween.tween_property(br, "modulate:a", 0.0, 1.4).set_delay(0.4)
 	tween.chain().tween_callback(br.queue_free)
+	# 改善130: 高コンボブレーク時のシェイク（15連続以上が途切れた瞬間の喪失感を体感させる）
+	if count >= 15 and is_instance_valid(tower):
+		tower.shake(3.5)
+	elif count >= 8 and is_instance_valid(tower):
+		tower.shake(2.0)
 
 # --- タワーイベント ---
 
@@ -1693,6 +1855,16 @@ func _on_tower_damaged(current: float, max_val: float) -> void:
 	elif hp_bar_last_value >= 0 and current < hp_bar_last_value:
 		SFX.play_damage_taken()
 		_flash_hp_bar_damage()
+		# 改善121: 被弾時の赤い画面フラッシュ（「痛い！」を全画面で体感）
+		var dmg_flash := ColorRect.new()
+		dmg_flash.color = Color(0.8, 0.05, 0.05, 0.18)
+		dmg_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+		dmg_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		dmg_flash.z_index = 160
+		ui_layer.add_child(dmg_flash)
+		var dft := dmg_flash.create_tween()
+		dft.tween_property(dmg_flash, "color:a", 0.0, 0.35).set_trans(Tween.TRANS_QUAD)
+		dft.tween_callback(dmg_flash.queue_free)
 	hp_bar_last_value = current
 
 	hp_bar.value = current
@@ -1988,6 +2160,10 @@ func _on_level_up(new_level: int) -> void:
 			xp_fill.bg_color = Color(1.0, 1.0, 0.6, 1.0)
 			var bar_tween := xp_bar.create_tween()
 			bar_tween.tween_property(xp_fill, "bg_color", original_color, 0.3)
+		# 改善134: XPバーのスケールバウンス（「満タンになって弾けた！」の感触）
+		var xb_tween := xp_bar.create_tween()
+		xb_tween.tween_property(xp_bar, "scale", Vector2(1.0, 1.5), 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		xb_tween.tween_property(xp_bar, "scale", Vector2(1.0, 1.0), 0.15).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
 	# 改善62: レベルアップ時タワーが金色フラッシュ（「強くなった！」瞬間の視覚的報酬）
 	if is_instance_valid(tower):
@@ -1997,6 +2173,17 @@ func _on_level_up(new_level: int) -> void:
 
 	# レベルアップフラッシュVFX
 	_spawn_levelup_vfx()
+
+	# 改善116: 全画面黄金パルスオーバーレイ（達成感を全身で体感させる）
+	var lv_glow := ColorRect.new()
+	lv_glow.color = Color(0.9, 0.75, 0.15, 0.20)
+	lv_glow.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lv_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lv_glow.z_index = 148
+	ui_layer.add_child(lv_glow)
+	var lv_glow_t := lv_glow.create_tween()
+	lv_glow_t.tween_property(lv_glow, "color:a", 0.0, 0.5).set_trans(Tween.TRANS_QUAD)
+	lv_glow_t.tween_callback(lv_glow.queue_free)
 
 func _apply_levelup_stat(stat_id: String) -> void:
 	# スタット名と確認テキストのマップ（改善43: 選んだ効果を即時フィードバック）
@@ -2131,6 +2318,48 @@ func _spawn_levelup_vfx() -> void:
 	lv_tween.chain().tween_property(lv_label, "scale", Vector2(1.0, 1.0), 0.1)
 	lv_tween.chain().tween_property(lv_label, "modulate:a", 0.0, 0.4).set_delay(0.3)
 	lv_tween.chain().tween_callback(lv_label.queue_free)
+
+func _show_pressure_label() -> void:
+	## 改善118: 敵数圧力インジケーター（12体以上の状況での緊張感強化）
+	if _pressure_label and is_instance_valid(_pressure_label):
+		_pressure_label.visible = true
+		return
+	_pressure_label = Label.new()
+	_pressure_label.text = "⚠ PRESSURE"
+	_pressure_label.add_theme_font_size_override("font_size", 14)
+	_pressure_label.add_theme_color_override("font_color", Color(1.0, 0.5, 0.15, 1.0))
+	_pressure_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	_pressure_label.add_theme_constant_override("shadow_offset_x", 1)
+	_pressure_label.add_theme_constant_override("shadow_offset_y", 1)
+	_pressure_label.position = Vector2(640, 96)
+	_pressure_label.z_index = 175
+	ui_layer.add_child(_pressure_label)
+	# ゆっくり点滅
+	var pt := _pressure_label.create_tween()
+	pt.set_loops()
+	pt.tween_property(_pressure_label, "modulate:a", 0.4, 0.5).set_trans(Tween.TRANS_SINE)
+	pt.tween_property(_pressure_label, "modulate:a", 1.0, 0.5).set_trans(Tween.TRANS_SINE)
+
+func _announce_overtime() -> void:
+	## 改善128: 9分到達でOVERTIME告知（「あと1分！ゴールは近い」）
+	var lbl := Label.new()
+	lbl.text = "OVERTIME!"
+	lbl.add_theme_font_size_override("font_size", 36)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.7, 0.1, 1.0))
+	lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	lbl.add_theme_constant_override("shadow_offset_x", 3)
+	lbl.add_theme_constant_override("shadow_offset_y", 3)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.custom_minimum_size = Vector2(760, 0)
+	lbl.position = Vector2(200, 270)
+	lbl.z_index = 180
+	ui_layer.add_child(lbl)
+	tower.shake(5.0)
+	var t := lbl.create_tween()
+	t.set_parallel(true)
+	t.tween_property(lbl, "position:y", 230.0, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.tween_property(lbl, "modulate:a", 0.0, 2.0).set_delay(0.6)
+	t.chain().tween_callback(lbl.queue_free)
 
 func _update_offscreen_indicators() -> void:
 	## 画面外の敵に対して画面端に赤い矢印を表示
