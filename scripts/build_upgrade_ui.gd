@@ -204,7 +204,7 @@ func _on_support_chosen(support_id: String) -> void:
 
 	for i in range(tower.max_slots):
 		var module: Variant = tower.get_module(i)
-		if module == null or module.support_ids.size() >= 2:
+		if module == null or module.support_ids.size() >= 4:  # v0.6.0: 2→4に拡張（ぐらす要望: 好きにたくさん組める）
 			continue
 		# タグ互換性チェック
 		if req_tag == "":
@@ -218,7 +218,7 @@ func _on_support_chosen(support_id: String) -> void:
 		# 互換スロットがない → フォールバック（空きリンクがあるスロット）
 		for i in range(tower.max_slots):
 			var module: Variant = tower.get_module(i)
-			if module != null and module.support_ids.size() < 2:
+			if module != null and module.support_ids.size() < 4:  # v0.6.0: 4に合わせる
 				candidates.append(i)
 
 	if candidates.is_empty():
