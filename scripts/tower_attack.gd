@@ -140,6 +140,7 @@ func _fire() -> void:
 	# areaスキル: 8方向に拡散（Poison Nova等）
 	var area_radius: float = stats.get("area_radius", 0)
 	if area_radius > 0:
+		_spawn_nova_ring()  # v0.6.0: 毒の波紋エフェクト（弾が飛ぶ前に波が広がる）
 		_fire_spread(8)
 		return
 
@@ -429,6 +430,38 @@ func _fire_spread(directions: int) -> void:
 		var dir := Vector2(cos(angle), sin(angle))
 		_create_projectile(dir)
 
+func _spawn_nova_ring() -> void:
+	## v0.6.0: Poison Nova発動時に毒の波紋エフェクトを生成。
+	## 弾が飛び出す前に「波が広がる」を視覚化 — 「波が広がるもの」という要求に応える。
+	var ring_node := Node2D.new()
+	ring_node.global_position = global_position
+	get_tree().current_scene.add_child(ring_node)
+
+	# 外周リング（Line2Dで円を描く）
+	var ring := Line2D.new()
+	ring.width = 8.0
+	ring.default_color = Color(0.38, 0.92, 0.08, 0.85)
+	var ring_pts: PackedVector2Array = []
+	for i in range(25):
+		var a := float(i) * TAU / 24.0
+		ring_pts.append(Vector2(cos(a), sin(a)) * 10.0)
+	ring.points = ring_pts
+	ring_node.add_child(ring)
+
+	# 内側グロー（半透明塗りつぶし）
+	var fill := Polygon2D.new()
+	fill.polygon = _make_ngon(24, 10.0)
+	fill.color = Color(0.3, 0.85, 0.05, 0.20)
+	ring_node.add_child(fill)
+
+	# Tweenで拡大（半径 10→150px）+ フェードアウト（0.55秒）
+	# modulate.aを使えば子ノード全体が一括フェードする
+	var tw := ring_node.create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(ring_node, "scale", Vector2(15.0, 15.0), 0.55)
+	tw.tween_property(ring_node, "modulate:a", 0.0, 0.55)
+	tw.chain().tween_callback(ring_node.queue_free)
+
 func _get_aim_direction(enemies: Array) -> Vector2:
 	## Attack chipに基づいてターゲット方向を決定
 	var attack_chip: Dictionary = build_system.get_equipped_chip("attack")
@@ -617,7 +650,7 @@ func _build_skill_visual(bullet: Area2D, direction: Vector2) -> void:
 	elif "cold" in tags:
 		_visual_ice_shard(bullet, color, direction)
 	elif "lightning" in tags:
-		_visual_spark(bullet, color)
+		_visual_spark(bullet, color, direction)  # v0.6.0: direction追加
 	elif "chaos" in tags:
 		_visual_poison(bullet, color)
 	elif "holy" in tags:
@@ -625,10 +658,19 @@ func _build_skill_visual(bullet: Area2D, direction: Vector2) -> void:
 	else:
 		_visual_default(bullet, color)
 
-	# トレイル（全スキル共通、色だけ変化）
+	# トレイル（スキル別に幅を変える — 稲妻は細く鋭く、聖光は太く）
 	var trail := Line2D.new()
 	trail.name = "Trail"
-	trail.width = 5.0 if "holy" not in tags else 10.0
+	var trail_w := 5.0
+	if "holy" in tags:
+		trail_w = 14.0
+	elif "lightning" in tags:
+		trail_w = 2.5
+	elif "fire" in tags:
+		trail_w = 8.0
+	elif "cold" in tags:
+		trail_w = 4.0
+	trail.width = trail_w
 	trail.default_color = Color(color.r, color.g, color.b, 0.5)
 	trail.gradient = Gradient.new()
 	trail.gradient.set_color(0, Color(color.r, color.g, color.b, 0.5))
@@ -683,150 +725,195 @@ func _visual_fireball(bullet: Area2D, color: Color, direction: Vector2) -> void:
 	bullet.add_child(core)
 
 func _visual_ice_shard(bullet: Area2D, color: Color, direction: Vector2) -> void:
-	## 氷の破片: 鋭角な菱形、結晶感
-	var rot := direction.angle()
+	## 氷晶爆発: v0.6.0 — 菱形廃止。スノウフレーク型クリスタル。
+	## 「飛ぶ氷の塊」ではなく「回転する六角結晶体」として表現。
 
-	# 霜のオーラ
-	var glow := Polygon2D.new()
-	glow.polygon = _make_ngon(6, 20.0)
-	glow.color = Color(0.5, 0.8, 1.0, 0.15)
-	bullet.add_child(glow)
-
-	# 鋭い菱形（前後に長く、横に薄い）
-	var body := Polygon2D.new()
-	body.polygon = PackedVector2Array([
-		Vector2(16, 0),    # 前端（鋭い）
-		Vector2(0, -5),    # 上辺
-		Vector2(-12, 0),   # 後端
-		Vector2(0, 5),     # 下辺
-	])
-	body.color = color
-	body.rotation = rot
-	bullet.add_child(body)
-
-	# 結晶ハイライト線
-	var highlight := Polygon2D.new()
-	highlight.polygon = PackedVector2Array([
-		Vector2(12, 0),
-		Vector2(0, -2),
-		Vector2(-8, 0),
-		Vector2(0, 2),
-	])
-	highlight.color = Color(0.7, 0.95, 1.0, 0.7)
-	highlight.rotation = rot
-	bullet.add_child(highlight)
-
-func _visual_spark(bullet: Area2D, color: Color) -> void:
-	## スパーク: 電気球 + 稲妻の腕（視認性強化版）
-	# 電気オーラ（大きめ、明るめ）
-	var glow := Polygon2D.new()
-	var glow_pts: PackedVector2Array = []
-	for i in range(8):
-		var a := i * TAU / 8
-		var r := randf_range(16.0, 26.0)
-		glow_pts.append(Vector2(cos(a), sin(a)) * r)
-	glow.polygon = glow_pts
-	glow.color = Color(1.0, 1.0, 0.4, 0.35)
-	bullet.add_child(glow)
-
-	# 電気コア（大きめ）
-	var core := Polygon2D.new()
-	core.polygon = _make_ngon(5, 10.0)
-	core.color = color
-	bullet.add_child(core)
-
-	# 中心のホットスポット
-	var hot := Polygon2D.new()
-	hot.polygon = _make_ngon(4, 4.0)
-	hot.color = Color(1.0, 1.0, 0.9, 1.0)
-	bullet.add_child(hot)
-
-	# 稲妻の腕（3本のジグザグ線で電気感を強調）
-	for j in range(3):
-		var bolt := Line2D.new()
-		bolt.width = 2.0
-		bolt.default_color = Color(1.0, 1.0, 0.5, 0.7)
-		var base_angle := float(j) * TAU / 3.0
-		var pts: PackedVector2Array = [Vector2.ZERO]
-		var pos := Vector2.ZERO
-		for k in range(2):
-			pos += Vector2(cos(base_angle), sin(base_angle)) * randf_range(6.0, 10.0)
-			pos += Vector2(randf_range(-3, 3), randf_range(-3, 3))
-			pts.append(pos)
-		bolt.points = pts
-		bullet.add_child(bolt)
-
-func _visual_poison(bullet: Area2D, color: Color) -> void:
-	## 毒弾: 不定形のぶよぶよした球体
-	# 毒霧オーラ
+	# 霜のオーラ（外縁の淡い青）
 	var glow := Polygon2D.new()
 	glow.polygon = _make_ngon(12, 20.0)
-	glow.color = Color(0.3, 0.8, 0.1, 0.15)
+	glow.color = Color(0.4, 0.7, 1.0, 0.18)
 	bullet.add_child(glow)
 
-	# ぶよぶよボディ（不規則な多角形）
+	# 主スパイク6本（60度おき）— 氷の尖った結晶腕
+	for i in range(6):
+		var a := float(i) * TAU / 6.0
+		var spike := Polygon2D.new()
+		spike.polygon = PackedVector2Array([
+			Vector2(0, -2.5),
+			Vector2(16, 0),
+			Vector2(0, 2.5),
+			Vector2(3, 0),
+		])
+		spike.color = color
+		spike.rotation = a
+		bullet.add_child(spike)
+
+	# 副スパイク6本（30度オフセット、短め）— 細かい結晶面
+	for i in range(6):
+		var a := float(i) * TAU / 6.0 + PI / 6.0
+		var spike2 := Polygon2D.new()
+		spike2.polygon = PackedVector2Array([
+			Vector2(0, -1.5),
+			Vector2(9, 0),
+			Vector2(0, 1.5),
+			Vector2(2, 0),
+		])
+		spike2.color = Color(0.75, 0.92, 1.0, 0.85)
+		spike2.rotation = a
+		bullet.add_child(spike2)
+
+	# 中心コア（六角形の輝く核）
+	var core := Polygon2D.new()
+	core.polygon = _make_ngon(6, 4.5)
+	core.color = Color(0.88, 0.96, 1.0, 0.95)
+	bullet.add_child(core)
+
+func _visual_spark(bullet: Area2D, color: Color, direction: Vector2) -> void:
+	## 稲妻ボルト: v0.6.0 — 球体廃止。ジグザグ電光が空気を引き裂きながら飛ぶ。
+	## 「電流が流れる」ビジュアル体験。前後方向にだけ伸びる稲妻形状。
+	var rot := direction.angle()
+
+	# 外縁の電気オーラ（横長の楕円）
+	var aura := Polygon2D.new()
+	aura.polygon = PackedVector2Array([
+		Vector2(24, -11), Vector2(28, 0), Vector2(24, 11),
+		Vector2(-24, 8), Vector2(-28, 0), Vector2(-24, -8),
+	])
+	aura.color = Color(0.65, 0.82, 1.0, 0.20)
+	aura.rotation = rot
+	bullet.add_child(aura)
+
+	# メイン稲妻ボルト（Line2D ジグザグ — 前方に向かって飛ぶ）
+	var bolt := Line2D.new()
+	bolt.width = 3.5
+	bolt.default_color = Color(0.95, 0.98, 1.0, 1.0)
+	bolt.points = PackedVector2Array([
+		Vector2(-22, 0),
+		Vector2(-12, -9),
+		Vector2(-3, 3),
+		Vector2(5, -8),
+		Vector2(13, 4),
+		Vector2(22, 0),
+	])
+	bolt.rotation = rot
+	bullet.add_child(bolt)
+
+	# サブボルト（少しオフセット、青みがかった副放電）
+	var bolt2 := Line2D.new()
+	bolt2.width = 2.0
+	bolt2.default_color = Color(0.5, 0.78, 1.0, 0.75)
+	bolt2.points = PackedVector2Array([
+		Vector2(-20, 3),
+		Vector2(-9, -5),
+		Vector2(0, 7),
+		Vector2(9, -3),
+		Vector2(18, 5),
+		Vector2(22, 2),
+	])
+	bolt2.rotation = rot
+	bullet.add_child(bolt2)
+
+	# 先端輝点（稲妻の先端が最も明るい）
+	var tip := Polygon2D.new()
+	tip.polygon = _make_ngon(4, 4.5)
+	tip.color = Color(1.0, 1.0, 1.0, 1.0)
+	tip.position = Vector2(cos(rot), sin(rot)) * 22.0
+	bullet.add_child(tip)
+
+func _visual_poison(bullet: Area2D, color: Color) -> void:
+	## 毒球: v0.6.0 — ノヴァリングが発動の「波」を担うため、弾自体はドクドクした液体感で。
+	## 泡立つ毒液として8方向を飛び回る。
+
+	# 毒霧の広がりオーラ（より大きく、濃く）
+	var glow := Polygon2D.new()
+	glow.polygon = _make_ngon(16, 22.0)
+	glow.color = Color(0.25, 0.80, 0.05, 0.18)
+	bullet.add_child(glow)
+
+	# ぶよぶよした毒液ボディ（10頂点で有機的な形状）
 	var body := Polygon2D.new()
 	var pts: PackedVector2Array = []
-	for i in range(8):
-		var a := i * TAU / 8
-		var r := 8.0 + randf_range(-2.0, 2.0)
+	for i in range(10):
+		var a := float(i) * TAU / 10.0
+		var r := 9.5 + randf_range(-2.5, 2.5)
 		pts.append(Vector2(cos(a), sin(a)) * r)
 	body.polygon = pts
 	body.color = color
 	bullet.add_child(body)
 
-	# 泡のアクセント
-	var bubble := Polygon2D.new()
-	bubble.polygon = _make_ngon(6, 3.5)
-	bubble.color = Color(0.6, 1.0, 0.4, 0.6)
-	bubble.position = Vector2(randf_range(-3, 3), randf_range(-3, 3))
-	bullet.add_child(bubble)
+	# 毒の光沢ハイライト（内部に明るい核）
+	var core := Polygon2D.new()
+	core.polygon = _make_ngon(8, 5.0)
+	core.color = Color(0.55, 1.0, 0.25, 0.75)
+	core.position = Vector2(-1.5, -2.0)
+	bullet.add_child(core)
+
+	# 泡粒（3つ散りばめる）
+	for _i in range(3):
+		var dot := Polygon2D.new()
+		dot.polygon = _make_ngon(5, randf_range(1.5, 3.0))
+		dot.color = Color(0.5, 1.0, 0.2, randf_range(0.5, 0.85))
+		dot.position = Vector2(randf_range(-6, 6), randf_range(-6, 6))
+		bullet.add_child(dot)
 
 func _visual_holy(bullet: Area2D, color: Color, direction: Vector2) -> void:
-	## 聖光ビーム: 細長い光の帯 + 金色パーティクル
+	## 聖光レーザー: v0.6.0 — 光の帯廃止。高密度な鋭いレーザービームに変更。
+	## 細く長く、中心が白く輝く「神の一矢」的表現。
 	var rot := direction.angle()
 
-	# 広がるオーラ
-	var glow := Polygon2D.new()
-	glow.polygon = PackedVector2Array([
-		Vector2(20, -8),
-		Vector2(24, 0),
-		Vector2(20, 8),
-		Vector2(-20, 4),
-		Vector2(-24, 0),
-		Vector2(-20, -4),
+	# 最外部の光芒（細長い楕円状グロー）
+	var outer := Polygon2D.new()
+	outer.polygon = PackedVector2Array([
+		Vector2(36, -13), Vector2(42, 0), Vector2(36, 13),
+		Vector2(-36, 9),  Vector2(-42, 0), Vector2(-36, -9),
 	])
-	glow.color = Color(1.0, 0.95, 0.7, 0.2)
-	glow.rotation = rot
-	bullet.add_child(glow)
+	outer.color = Color(1.0, 0.90, 0.45, 0.12)
+	outer.rotation = rot
+	bullet.add_child(outer)
 
-	# 細長いビーム本体
-	var body := Polygon2D.new()
-	body.polygon = PackedVector2Array([
-		Vector2(18, -3),
-		Vector2(22, 0),
-		Vector2(18, 3),
-		Vector2(-18, 2),
-		Vector2(-20, 0),
-		Vector2(-18, -2),
+	# 中間グロー（やや細く、明るく）
+	var mid := Polygon2D.new()
+	mid.polygon = PackedVector2Array([
+		Vector2(32, -7), Vector2(36, 0), Vector2(32, 7),
+		Vector2(-32, 5), Vector2(-35, 0), Vector2(-32, -5),
 	])
-	body.color = color
-	body.rotation = rot
-	bullet.add_child(body)
+	mid.color = Color(1.0, 0.95, 0.65, 0.28)
+	mid.rotation = rot
+	bullet.add_child(mid)
 
-	# 中心のクロス（十字架モチーフ）
+	# ビーム本体（細く鋭い金色）
+	var beam := Polygon2D.new()
+	beam.polygon = PackedVector2Array([
+		Vector2(29, -3), Vector2(33, 0), Vector2(29, 3),
+		Vector2(-29, 2.5), Vector2(-31, 0), Vector2(-29, -2.5),
+	])
+	beam.color = color
+	beam.rotation = rot
+	bullet.add_child(beam)
+
+	# ビーム中心白線（最輝部）
+	var core_beam := Polygon2D.new()
+	core_beam.polygon = PackedVector2Array([
+		Vector2(27, -1.2), Vector2(29, 0), Vector2(27, 1.2),
+		Vector2(-27, 1.2), Vector2(-28, 0), Vector2(-27, -1.2),
+	])
+	core_beam.color = Color(1.0, 1.0, 0.98, 1.0)
+	core_beam.rotation = rot
+	bullet.add_child(core_beam)
+
+	# 中心の十字紋章（神聖さの象徴）
 	var cross_h := Polygon2D.new()
 	cross_h.polygon = PackedVector2Array([
-		Vector2(-4, -1), Vector2(4, -1), Vector2(4, 1), Vector2(-4, 1),
+		Vector2(-5, -1.5), Vector2(5, -1.5), Vector2(5, 1.5), Vector2(-5, 1.5),
 	])
-	cross_h.color = Color(1.0, 1.0, 0.9, 0.8)
+	cross_h.color = Color(1.0, 1.0, 0.92, 0.95)
 	bullet.add_child(cross_h)
 
 	var cross_v := Polygon2D.new()
 	cross_v.polygon = PackedVector2Array([
-		Vector2(-1, -4), Vector2(1, -4), Vector2(1, 4), Vector2(-1, 4),
+		Vector2(-1.5, -5), Vector2(1.5, -5), Vector2(1.5, 5), Vector2(-1.5, 5),
 	])
-	cross_v.color = Color(1.0, 1.0, 0.9, 0.8)
+	cross_v.color = Color(1.0, 1.0, 0.92, 0.95)
 	bullet.add_child(cross_v)
 
 func _visual_default(bullet: Area2D, color: Color) -> void:
