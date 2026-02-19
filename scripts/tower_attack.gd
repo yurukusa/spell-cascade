@@ -691,9 +691,10 @@ func _create_projectile(direction: Vector2) -> void:
 	bullet.collision_mask = 4
 
 	# projectile_size_mult: 弾サイズ拡大
-	var size_mult: float = stats.get("projectile_size_mult", 1.0)
-	if size_mult != 1.0:
-		bullet.scale = Vector2(size_mult, size_mult)
+	# v0.9: base 2x scale — bullets were too small to read against backgrounds.
+	# Additional projectile_size_mult from mods stacks on top.
+	var size_mult: float = 2.0 * stats.get("projectile_size_mult", 1.0)
+	bullet.scale = Vector2(size_mult, size_mult)
 
 	get_tree().current_scene.add_child(bullet)
 
@@ -722,18 +723,19 @@ func _create_projectile(direction: Vector2) -> void:
 			tower.take_damage(stats["self_damage_per_attack"])
 
 func _get_bullet_color() -> Color:
+	# v0.9: brightened bullet colors for better visibility on dark backgrounds
 	var tags: Array = stats.get("tags", [])
 	if "fire" in tags:
-		return Color(1.0, 0.4, 0.1, 0.9)
+		return Color(1.0, 0.55, 0.2, 1.0)
 	elif "cold" in tags:
-		return Color(0.3, 0.7, 1.0, 0.9)
+		return Color(0.5, 0.85, 1.0, 1.0)
 	elif "lightning" in tags:
-		return Color(1.0, 1.0, 0.3, 0.9)
+		return Color(1.0, 1.0, 0.5, 1.0)
 	elif "chaos" in tags:
-		return Color(0.4, 0.9, 0.2, 0.9)
+		return Color(0.55, 1.0, 0.35, 1.0)
 	elif "holy" in tags:
-		return Color(1.0, 0.95, 0.7, 0.9)
-	return Color(0.8, 0.8, 0.9, 0.9)
+		return Color(1.0, 0.97, 0.8, 1.0)
+	return Color(0.9, 0.9, 1.0, 1.0)
 
 func _build_skill_visual(bullet: Area2D, direction: Vector2) -> void:
 	## タグに基づいてスキル固有の弾ビジュアルを構築

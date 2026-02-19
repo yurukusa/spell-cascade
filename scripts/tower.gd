@@ -76,11 +76,8 @@ func _ready() -> void:
 	_setup_camera()
 
 func _install_stylized_visual() -> void:
-	# The current sprite pack reads as "placeholder". Replace with a simple stylized silhouette
-	# using Polygon2D only (no new external art), per ops/deep-research-report (1).md:
-	# - silhouette first
-	# - threats/readability > detail
-	# - minimal VFX, no clutter
+	# v0.9: Kenney top-down-shooter sprite replaces polygon placeholders.
+	# manBlue_stand.png — recognizable character, high contrast on dark backgrounds.
 	var legacy := get_node_or_null("Visual")
 	if legacy and legacy is CanvasItem:
 		legacy.visible = false
@@ -92,61 +89,34 @@ func _install_stylized_visual() -> void:
 	root.name = "StylizedVisual"
 	add_child(root)
 
-	# Palette: 1 base + 2 accents max (locked)
-	var base_dark := Color(0.08, 0.09, 0.12, 1.0)
-	var accent := Color(0.35, 0.75, 1.0, 1.0)  # cyan
-	var accent2 := Color(0.95, 0.35, 0.70, 1.0)  # magenta
+	# Sprite from Kenney top-down-shooter (CC0)
+	var sprite := Sprite2D.new()
+	sprite.name = "PlayerSprite"
+	var tex := load("res://assets/sprites/kenney/top-down-shooter/PNG/Man Blue/manBlue_stand.png")
+	sprite.texture = tex
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # pixel-art crisp
+	# Scale up for visibility (original ~33x43px, target ~50-60px body)
+	sprite.scale = Vector2(1.5, 1.5)
+	# Kenney sprite faces UP (-Y), but StylizedVisual rotation assumes facing RIGHT (+X).
+	# Offset by -90° so default rotation=0 means facing right.
+	sprite.rotation = -PI / 2.0
+	root.add_child(sprite)
 
-	# Body outline (bigger, behind)
-	var outline := Polygon2D.new()
-	outline.color = Color(0.02, 0.02, 0.03, 1.0)
-	outline.polygon = _make_ngon(10, 30.0)
-	root.add_child(outline)
+	# Soft glow behind player for readability on any background
+	var glow := Polygon2D.new()
+	glow.color = Color(0.35, 0.75, 1.0, 0.12)
+	glow.polygon = _make_ngon(12, 38.0)
+	glow.z_index = -1
+	root.add_child(glow)
 
-	# Body
-	var body := Polygon2D.new()
-	body.color = base_dark
-	body.polygon = _make_ngon(10, 26.0)
-	root.add_child(body)
+	# Keep core reference for HP color change (改善40 compatibility)
+	_tower_core_poly = glow
 
-	# "Cape" / hood cue: one strong silhouette feature
-	var cape := Polygon2D.new()
-	cape.color = accent2.darkened(0.25)
-	cape.polygon = PackedVector2Array([
-		Vector2(-10, -6),
-		Vector2(-34, 6),
-		Vector2(-12, 20),
-	])
-	root.add_child(cape)
-	cape.z_index = -1
-
-	# Core glow (small, readable)
-	var core_glow := Polygon2D.new()
-	core_glow.color = Color(accent.r, accent.g, accent.b, 0.18)
-	core_glow.polygon = _make_ngon(8, 18.0)
-	root.add_child(core_glow)
-
-	var core := Polygon2D.new()
-	core.color = accent
-	core.polygon = _make_ngon(8, 12.0)
-	root.add_child(core)
-	_tower_core_poly = core  # HP色変化用に参照を保持（改善40）
-
-	# Direction hint (front notch) so "where is facing" is readable even in chaos
-	var notch := Polygon2D.new()
-	notch.color = accent.lightened(0.15)
-	notch.polygon = PackedVector2Array([
-		Vector2(18, -4),
-		Vector2(32, 0),
-		Vector2(18, 4),
-	])
-	root.add_child(notch)
-
-	# Slight idle pulse (very low amplitude to avoid clutter)
+	# Subtle idle pulse on the glow
 	var tween := create_tween()
 	tween.set_loops()
-	tween.tween_property(core, "scale", Vector2(1.05, 1.05), 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(core, "scale", Vector2(1.0, 1.0), 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(glow, "scale", Vector2(1.08, 1.08), 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(glow, "scale", Vector2(1.0, 1.0), 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _make_ngon(sides: int, radius: float) -> PackedVector2Array:
 	var pts: PackedVector2Array = []

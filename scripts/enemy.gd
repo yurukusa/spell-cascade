@@ -93,6 +93,8 @@ func _ready() -> void:
 		srt.chain().tween_callback(sp_ring.queue_free)
 
 func _install_stylized_visual() -> void:
+	# v0.9: Kenney tiny-dungeon sprites replace polygon placeholders.
+	# Each enemy type maps to a distinct 16x16 tile, scaled up for readability.
 	var legacy := get_node_or_null("Visual")
 	if legacy and legacy is CanvasItem:
 		legacy.visible = false
@@ -104,21 +106,70 @@ func _install_stylized_visual() -> void:
 	root.name = "StylizedVisual"
 	add_child(root)
 
+	# Sprite tile mapping: enemy_type → [tile_number, scale]
+	var tile_map: Dictionary = {
+		"normal":   [110, 2.5],   # red demon
+		"swarmer":  [108, 1.8],   # green slime (small)
+		"tank":     [112, 3.5],   # dark armored (big)
+		"shooter":  [121, 2.5],   # skeleton
+		"splitter": [111, 2.5],   # brown creature
+		"healer":   [99,  2.5],   # purple mage
+		"boss":     [120, 5.0],   # fire creature (huge)
+	}
+
+	var entry: Array = tile_map.get(enemy_type, [110, 2.5])
+	var tile_num: int = entry[0]
+	var sprite_scale: float = entry[1]
+
+	# Load sprite from tiny-dungeon tiles
+	var tile_path := "res://assets/sprites/kenney/tiny-dungeon/Tiles/tile_%04d.png" % tile_num
+	var sprite := Sprite2D.new()
+	sprite.name = "EnemySprite"
+	sprite.texture = load(tile_path)
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	sprite.scale = Vector2(sprite_scale, sprite_scale)
+	root.add_child(sprite)
+
+	# Type-specific color tint and animations
 	match enemy_type:
-		"swarmer":
-			_build_swarmer_visual(root)
-		"tank":
-			_build_tank_visual(root)
 		"boss":
-			_build_boss_visual(root)
-		"shooter":
-			_build_shooter_visual(root)
-		"splitter":
-			_build_splitter_visual(root)
+			# Boss: larger, with pulsing aura
+			var aura := Polygon2D.new()
+			aura.color = Color(0.5, 0.2, 0.8, 0.15)
+			aura.polygon = _make_ngon(12, 85.0)
+			aura.z_index = -1
+			root.add_child(aura)
+			_boss_aura_poly = aura
+			var boss_aura_rot := aura.create_tween()
+			boss_aura_rot.set_loops()
+			boss_aura_rot.tween_method(func(v: float): aura.rotation = v, 0.0, TAU, 6.0)
+			# Core reference for phase changes
+			_boss_core_poly = sprite  # reuse sprite as core ref for phase pulse
+			# Boss pulse
+			var pulse := sprite.create_tween()
+			pulse.set_loops()
+			pulse.tween_property(sprite, "scale", Vector2(sprite_scale * 1.1, sprite_scale * 1.1), 0.5).set_trans(Tween.TRANS_SINE)
+			pulse.tween_property(sprite, "scale", Vector2(sprite_scale, sprite_scale), 0.5).set_trans(Tween.TRANS_SINE)
+		"swarmer":
+			# Fast pulse for urgency
+			var sw_pulse := sprite.create_tween()
+			sw_pulse.set_loops()
+			sw_pulse.tween_property(sprite, "scale", Vector2(sprite_scale * 1.12, sprite_scale * 1.12), 0.18).set_trans(Tween.TRANS_SINE)
+			sw_pulse.tween_property(sprite, "scale", Vector2(sprite_scale * 0.92, sprite_scale * 0.92), 0.18).set_trans(Tween.TRANS_SINE)
+		"tank":
+			# Slow pulse for heavy feel
+			var aura := Polygon2D.new()
+			aura.color = Color(0.8, 0.15, 0.1, 0.12)
+			aura.polygon = _make_ngon(8, 58.0)
+			aura.z_index = -1
+			root.add_child(aura)
+			var tank_pulse := aura.create_tween()
+			tank_pulse.set_loops()
+			tank_pulse.tween_property(aura, "scale", Vector2(1.25, 1.25), 0.9).set_trans(Tween.TRANS_SINE)
+			tank_pulse.tween_property(aura, "scale", Vector2(1.0, 1.0), 0.9).set_trans(Tween.TRANS_SINE)
 		"healer":
-			_build_healer_visual(root)
-		_:
-			_build_normal_visual(root)
+			# Green tint for healer identity
+			sprite.modulate = Color(0.7, 1.0, 0.7, 1.0)
 
 	# エリートなら金色のオーラリングを追加（F-19: キャラを立てるデザイン）
 	if is_elite and not is_boss:

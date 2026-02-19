@@ -427,12 +427,9 @@ func _style_hud() -> void:
 	xp_bar.add_theme_stylebox_override("fill", xp_bar_fill)
 	ui_layer.add_child(xp_bar)
 
-	# Build info label
-	build_label.add_theme_font_size_override("font_size", 13)
-	build_label.add_theme_color_override("font_color", dim_text)
-	build_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
-	build_label.add_theme_constant_override("shadow_offset_x", 1)
-	build_label.add_theme_constant_override("shadow_offset_y", 1)
+	# Build info label — hidden: was exposing debug text ("Move: Kite | Aim: Nearest" etc.)
+	# which made the game look like a prototype. Hide for release builds.
+	build_label.visible = false
 
 	# Crush warning label
 	crush_label.add_theme_font_size_override("font_size", 22)

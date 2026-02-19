@@ -1,9 +1,13 @@
 extends Node2D
 
 ## ProceduralBackground - 縦スクロール用の手続き型背景。
-## カメラ移動に応じて暗いダンジョンの床タイルを生成・破棄。
-## 全てPolygon2D/Line2Dで描画（外部アセット不要）。
+## カメラ移動に応じてダンジョンの床タイルを生成・破棄。
+## v0.9: Kenney tiny-dungeon タイルテクスチャ使用。
 ## z_index = -100 で全ゲーム要素の背後に描画。
+
+# Kenney tiny-dungeon floor tile textures (16x16, CC0)
+# Stone floor variations — deterministic selection per tile position
+var _floor_textures: Array[Texture2D] = []
 
 # タイル管理
 const TILE_SIZE := 128.0  # 1タイルの大きさ（px）
@@ -21,6 +25,12 @@ var world_seed := 0
 func _ready() -> void:
 	z_index = -100
 	world_seed = randi()
+	# Load Kenney tiny-dungeon floor textures (stone variations)
+	for tile_id in [36, 37, 38, 48, 49]:
+		var path := "res://assets/sprites/kenney/tiny-dungeon/Tiles/tile_%04d.png" % tile_id
+		var tex: Texture2D = load(path)
+		if tex:
+			_floor_textures.append(tex)
 
 func _process(_delta: float) -> void:
 	if camera_ref == null:
@@ -80,40 +90,26 @@ func _generate_row(row_index: int, _cam_x: float) -> void:
 	_maybe_add_decorations(row_container, row_index, row_seed)
 
 func _draw_floor_tile(parent: Node2D, x: float, seed_val: int) -> void:
-	## 1つの床タイル: 微妙な色差のある暗い四角形 + 溝線
-	# 疑似乱数で色をわずかに変化（タイルごとに異なるが決定論的）
+	## v0.9: Kenney tiny-dungeon floor sprite replaces polygon placeholder.
+	## 16x16 tiles scaled to TILE_SIZE (128px) with slight color variation.
 	var hash_val := _simple_hash(seed_val)
-	var brightness := 0.06 + float(hash_val % 30) * 0.001  # 0.06 ~ 0.09
 
-	# タイル本体
-	var half := TILE_SIZE * 0.48  # 少し小さくして溝を見せる
-	var tile := Polygon2D.new()
-	tile.polygon = PackedVector2Array([
-		Vector2(-half, -half),
-		Vector2(half, -half),
-		Vector2(half, half),
-		Vector2(-half, half),
-	])
-	tile.color = Color(brightness, brightness * 0.8, brightness * 1.2, 1.0)
-	tile.position.x = x
-	parent.add_child(tile)
+	if _floor_textures.is_empty():
+		return  # fallback: no textures loaded
 
-	# 溝線（タイルの境界線）- 微かに暗い
-	var groove := Line2D.new()
-	groove.width = 1.5
-	groove.default_color = Color(0.03, 0.02, 0.04, 0.6)
-	groove.points = PackedVector2Array([
-		Vector2(x - half, -half),
-		Vector2(x + half, -half),
-		Vector2(x + half, half),
-		Vector2(x - half, half),
-		Vector2(x - half, -half),
-	])
-	parent.add_child(groove)
-
-	# 一部のタイルにひび割れ
-	if hash_val % 7 == 0:
-		_draw_crack(parent, x, hash_val)
+	# Deterministic texture selection
+	var tex_idx := hash_val % _floor_textures.size()
+	var sprite := Sprite2D.new()
+	sprite.texture = _floor_textures[tex_idx]
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	# Scale 16px tile to fill TILE_SIZE (128px) = 8x
+	var tile_scale := TILE_SIZE / 16.0
+	sprite.scale = Vector2(tile_scale, tile_scale)
+	sprite.position.x = x
+	# Slight brightness variation per tile (dungeon feel)
+	var brightness := 0.55 + float(hash_val % 30) * 0.015  # 0.55 ~ 1.0
+	sprite.modulate = Color(brightness, brightness * 0.9, brightness, 1.0)
+	parent.add_child(sprite)
 
 func _draw_crack(parent: Node2D, x: float, hash_val: int) -> void:
 	## タイル上のひび割れ線
