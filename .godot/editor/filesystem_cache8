@@ -1743,10 +1743,10 @@ index.icon.png::CompressedTexture2D::3251918485760288976::1771463950::1771488300
 index.png::CompressedTexture2D::2167170042801107346::1771463950::1771488300::1::::<><>::
 ::res://exports/::1771315370
 ::res://exports/crazygames/::1771222460
-::res://exports/web/::1771502074
-index.apple-touch-icon.png::CompressedTexture2D::2682522209208933427::1771502074::1771502136::1::::<><>::
-index.icon.png::CompressedTexture2D::2336617920036771879::1771502074::1771502136::1::::<><>::
-index.png::CompressedTexture2D::3064158263262926669::1771502074::1771502136::1::::<><>::
+::res://exports/web/::1771502137
+index.apple-touch-icon.png::CompressedTexture2D::2682522209208933427::1771502137::1771502198::1::::<><>::
+index.icon.png::CompressedTexture2D::2336617920036771879::1771502137::1771502198::1::::<><>::
+index.png::CompressedTexture2D::3064158263262926669::1771502137::1771502198::1::::<><>::
 SpellCascade.apple-touch-icon.png::CompressedTexture2D::695864557840992174::1771314287::1771315364::1::::<><>::
 SpellCascade.icon.png::CompressedTexture2D::8834037824074368269::1771314287::1771315364::1::::<><>::
 SpellCascade.png::CompressedTexture2D::8929438421282720327::1771314287::1771315364::1::::<><>::
@@ -1859,7 +1859,7 @@ enemy.tscn::PackedScene::151590118762::1771157009::0::1::::<><>::res://scripts/e
 game.tscn::PackedScene::4620602034568220::1771169084::0::1::::<><>::res://scripts/game_main.gd<>res://scripts/tower.gd<>res://assets/kenney-tiny-dungeon/tile_0084.png
 main.tscn::PackedScene::142876485625246::1771157180::0::1::::<><>::res://scripts/main.gd<>res://scripts/player.gd<>res://scripts/wave_manager.gd<>res://scripts/auto_attack.gd<>uid://c5enemy1::::res://scenes/enemy.tscn<>res://assets/kenney-tiny-dungeon/tile_0084.png
 title.tscn::PackedScene::-1::1771181225::0::1::::<><>::res://scripts/title.gd
-::res://scripts/::1771502116
+::res://scripts/::1771502179
 auto_attack.gd::GDScript::-1::1771168410::0::1::::<>Node2D<>::
 background.gd::GDScript::-1::1771495865::0::1::::<>Node2D<>::
 build_system.gd::GDScript::-1::1771326104::0::1::::<>Node<>::
@@ -1876,7 +1876,7 @@ sfx.gd::GDScript::-1::1771493682::0::1::::<>Node<>::
 title.gd::GDScript::-1::1771499371::0::1::::<>Control<>::
 tower.gd::GDScript::-1::1771501981::0::1::::<>CharacterBody2D<>::
 tower_attack.gd::GDScript::-1::1771491738::0::1::::<>Node2D<>::
-upgrade_ui.gd::GDScript::-1::1771498709::0::1::::<>CanvasLayer<>::
+upgrade_ui.gd::GDScript::-1::1771502179::0::1::::<>CanvasLayer<>::
 wave_manager.gd::GDScript::-1::1771323954::0::1::::<>Node<>::
 ::res://scripts/debug/::1771222101
 AutoPlayer.gd::GDScript::-1::1771206080::0::1::::<>Node<>::

@@ -93,6 +93,18 @@ func show_choices(orb_types: Array) -> void:
 		btn.add_theme_stylebox_override("hover", hover_style)
 
 		btn.pressed.connect(_on_orb_chosen.bind(orb_type))
+		# 改善238: ホバースケールアニメーション（「触れた感触」を加える）
+		# Why: 色変化だけでは「選択できる」感が弱い。スケールで「押せる」感を補完。
+		# pivot_offsetをボタン中心に設定することで中央から拡縮する。
+		btn.pivot_offset = btn.custom_minimum_size / 2.0
+		btn.mouse_entered.connect(func() -> void:
+			var ht := btn.create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+			ht.tween_property(btn, "scale", Vector2(1.05, 1.05), 0.08).set_trans(Tween.TRANS_QUAD)
+		)
+		btn.mouse_exited.connect(func() -> void:
+			var ht := btn.create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+			ht.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.12).set_trans(Tween.TRANS_QUAD)
+		)
 		buttons_container.add_child(btn)
 
 	# 改善207: パネルポップイン（Wave Clear の達成感をオーブ選択UIの登場でさらに高める）
