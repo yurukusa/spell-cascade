@@ -1281,6 +1281,13 @@ func _on_body_entered(body):
 		var tower_node := get_tree().current_scene.get_node_or_null(\"Tower\")
 		if tower_node and tower_node.has_method(\"shake\"):
 			tower_node.shake(1.5)
+		# 改善246: クリット時スローモーション（「特別な一撃」を時間軸で演出）
+		# Why: 白フラッシュ+シェイクだけでは高速戦闘でクリが視覚的に埋もれる。
+		# 0.06s間だけtime_scale=0.2。長すぎるとテンポが壊れるので60ms上限。
+		Engine.time_scale = 0.2
+		get_tree().create_timer(0.06, true, false, true).timeout.connect(func():
+			Engine.time_scale = 1.0
+		)
 		# 改善110: クリット時の極薄白フラッシュ（「特別な一撃」を体感させる、Control層に追加）
 		var ui_layer2 := get_tree().current_scene.get_node_or_null(\"UI\")
 		if ui_layer2:

@@ -529,6 +529,13 @@ func take_damage(amount: float) -> void:
 	shake(shake_amt)
 	var tween := create_tween()
 	tween.tween_property(self, "modulate", Color.WHITE, 0.18)
+	# 改善245: スカッシュ＆ストレッチ（被ダメの「重さ」を物理的に体感させる）
+	# Why: 色変化+シェイクだけでは「ぶつかった感」が弱い。形の変形で「衝撃」を加える。
+	# 水平に伸びて垂直に縮む（横から殴られたイメージ）→ 元に戻る
+	var ss_tween := create_tween()
+	var ss_amt := 0.12 if amount >= 20.0 else 0.07
+	ss_tween.tween_property(self, "scale", Vector2(1.0 + ss_amt, 1.0 - ss_amt * 0.6), 0.07).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	ss_tween.tween_property(self, "scale", Vector2(1.0, 1.0), 0.18).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
 	# Low HP warning（30%以下で警告音）
 	if hp > 0 and hp / max_hp <= 0.3:
