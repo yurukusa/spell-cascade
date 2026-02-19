@@ -475,10 +475,16 @@ func show_levelup_choice(level: int, options: Array[Dictionary]) -> void:
 func _show_animated() -> void:
 	## 改善186: パネルをスケールイン+フェードインで表示
 	## なぜ: 即時ポップインは唐突。アニメーションで「選択の時間が来た」感を演出
+	## 改善195: 各ボタンを70msずつ遅らせてフェードイン（カードを配る演出）
 	if _overlay:
 		_overlay.modulate.a = 0.0
 	panel.scale = Vector2(0.85, 0.85)
 	panel.modulate.a = 0.0
+	# 各ボタンを非表示状態から始める（パネルフェードイン後に順次登場）
+	var btns := buttons_container.get_children()
+	for btn in btns:
+		if btn is Control:
+			btn.modulate.a = 0.0
 	visible = true
 	get_tree().paused = true
 	var t := create_tween()
@@ -487,6 +493,13 @@ func _show_animated() -> void:
 		t.tween_property(_overlay, "modulate:a", 1.0, 0.18).set_trans(Tween.TRANS_QUAD)
 	t.tween_property(panel, "modulate:a", 1.0, 0.18).set_trans(Tween.TRANS_QUAD)
 	t.tween_property(panel, "scale", Vector2(1.0, 1.0), 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	# パネルが出た後 (0.20s) にボタンを70msずつ遅らせてフェードイン
+	const BTN_DELAY_BASE := 0.20
+	const BTN_STAGGER := 0.07
+	const BTN_FADE_DUR := 0.12
+	for i in btns.size():
+		if btns[i] is Control:
+			t.tween_property(btns[i], "modulate:a", 1.0, BTN_FADE_DUR).set_delay(BTN_DELAY_BASE + i * BTN_STAGGER).set_trans(Tween.TRANS_QUAD)
 
 func hide_ui() -> void:
 	# 改善155: 選択後のUI閉じる前に白フラッシュ（「選択が確定した」瞬間を強調）
