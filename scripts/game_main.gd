@@ -1653,20 +1653,17 @@ func _spawn_enemy() -> void:
 	var speed_val := 75.0 + distance_m * 0.15 + run_time * 0.25
 	var dmg_val := 14.0 + distance_m * 0.03  # v0.3: 10→14（HP500に対して体感できるダメージ）
 
-	# 敵タイプ選択: ステージ別ゲーティング（#247: splitter/healer解禁）
-	# Stage 1: normal only / Stage 2: +swarmer(25%) / Stage 3: +tank(15%)
-	# Stage 4: +splitter(10%) / Stage 5: +healer(8%)
-	# Why: splitter/healerはenemy.gdに完全実装済みだが出現条件がなかった。
-	# Stage 4+で少量出現させ、プレイヤーに戦術的多様性を提供する。
+	# 敵タイプ選択: 時間ゲーティング（#247バグ修正: current_stageは最大3まで）
+	# 0s+: normal / 20s+: +swarmer / 40s+: +tank / 120s+: +splitter / 240s+: +healer
 	var type_roll := randf()
 	var etype := "normal"
-	if current_stage >= 5 and type_roll < 0.08:
+	if run_time >= 240.0 and type_roll < 0.08:
 		etype = "healer"
-	elif current_stage >= 4 and type_roll < 0.18:
+	elif run_time >= 120.0 and type_roll < 0.18:
 		etype = "splitter"
-	elif current_stage >= 3 and type_roll < 0.33:
+	elif run_time >= 40.0 and type_roll < 0.33:
 		etype = "tank"
-	elif current_stage >= 2 and type_roll < 0.55:
+	elif run_time >= 20.0 and type_roll < 0.55:
 		etype = "swarmer"
 
 	enemy.init(tower, speed_val, hp_val, dmg_val, etype)
