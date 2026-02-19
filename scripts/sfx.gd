@@ -69,6 +69,10 @@ var _heal_large_player: AudioStreamPlayer
 var _heal_cooldown := 0.0
 const HEAL_COOLDOWN := 1.2  # 1.2s以内は再生しない（life steal連打抑制）
 const HEAL_LARGE_THRESHOLD := 50.0  # 大回復SFXの閾値
+# 改善188: CRUSH/BREAKOUT SFX
+# Why: CRUSHは包囲という重大危機、BREAKOUTは脱出という最高の達成感。両方に音なしは損失。
+var _crush_start_player: AudioStreamPlayer
+var _breakout_player: AudioStreamPlayer
 
 const SAMPLE_RATE := 22050
 
@@ -257,6 +261,16 @@ func _ready() -> void:
 		p.volume_db = combo_vols[i]
 		add_child(p)
 		_combo_tier_players.append(p)
+
+	# 改善188: CRUSH/BREAKOUT SFX
+	_crush_start_player = AudioStreamPlayer.new()
+	_crush_start_player.stream = _gen_crush_start()
+	_crush_start_player.volume_db = -4.0  # 包囲警告: 聞こえるが派手すぎない
+	add_child(_crush_start_player)
+	_breakout_player = AudioStreamPlayer.new()
+	_breakout_player.stream = _gen_breakout()
+	_breakout_player.volume_db = -1.0  # 脱出: 最大の達成感として最も大きく
+	add_child(_breakout_player)
 
 func _process(delta: float) -> void:
 	if _low_hp_cooldown > 0.0:
@@ -1211,3 +1225,74 @@ func _gen_stage_alert(level: int) -> AudioStreamWAV:
 	var fb := PackedFloat32Array()
 	fb.resize(100)
 	return _make_stream(fb)
+
+## 改善188: CRUSH/BREAKOUT SFX
+
+func play_crush_start() -> void:
+	## 包囲開始: 低音警告バズ（「危ない！」感を音で伝える）
+	if _crush_start_player.playing:
+		return  # 重複防止: CRUSH状態は持続するが音は1回だけ
+	_crush_start_player.play()
+
+func play_breakout() -> void:
+	## 脱出成功: 爆裂衝撃波（「やった！」の解放感）
+	_breakout_player.play()
+
+func _gen_crush_start() -> AudioStreamWAV:
+	## 包囲音: E2+Bb2の不協和音バズ (0.4s) + 急速減衰
+	## なぜこの音: 包囲=閉塞感。低音の不協和は「圧迫」「危険」を本能的に伝える
+	var dur := 0.4
+	var cnt := int(SAMPLE_RATE * dur)
+	var samples := PackedFloat32Array()
+	samples.resize(cnt)
+	var freq1 := 82.41   # E2 — 低音の圧迫感
+	var freq2 := 116.54  # Bb2 — E2と不協和（減5度: 悪魔の音程）
+	for i in cnt:
+		var t := float(i) / SAMPLE_RATE
+		var env := 1.0
+		if t < 0.02: env = t / 0.02              # 短いアタック
+		if t > dur - 0.1: env = (dur - t) / 0.1  # 素早いリリース
+		var s := env * 0.5 * sin(TAU * freq1 * t)
+		s += env * 0.3 * sin(TAU * freq2 * t)
+		s += env * 0.12 * sin(TAU * freq1 * 2.0 * t)  # 倍音で金属感
+		samples[i] = s
+	return _make_stream(samples)
+
+func _gen_breakout() -> AudioStreamWAV:
+	## 脱出音: 低音爆発(0.12s) + G4→C5上昇フレア(0.4s) + 残響(0.3s)
+	## なぜこの音: 爆発=解放のカタルシス。上昇音階=「突き抜けた」感。残響=余韻の達成感
+	var explode_dur := 0.12
+	var flare_dur := 0.40
+	var reverb_dur := 0.30
+	var total_dur := explode_dur + flare_dur + reverb_dur
+	var cnt := int(SAMPLE_RATE * total_dur)
+	var samples := PackedFloat32Array()
+	samples.resize(cnt)
+	var flare_notes := [392.0, 440.0, 523.25, 659.25]  # G4, A4, C5, E5 — 明快な上昇
+	for i in cnt:
+		var t := float(i) / SAMPLE_RATE
+		var s := 0.0
+		if t < explode_dur:
+			# 低音爆発: 白色ノイズ的な低周波
+			var env := 1.0 - t / explode_dur
+			s = env * 0.65 * sin(TAU * 55.0 * t)   # A1 ズシン
+			s += env * 0.35 * sin(TAU * 82.4 * t)  # E2 ボム
+			s += env * 0.20 * sin(TAU * 110.0 * t) # A2 質感
+		elif t < explode_dur + flare_dur:
+			# 上昇フレア: 4音アルペジオ
+			var ft := t - explode_dur
+			var ni := mini(int(ft / (flare_dur / 4.0)), 3)
+			var nt := ft - ni * (flare_dur / 4.0)
+			var nd := flare_dur / 4.0
+			var freq: float = flare_notes[ni]
+			var env := 1.0
+			if nt < 0.005: env = nt / 0.005
+			elif nt > nd - 0.02: env = (nd - nt) / 0.02
+			s = env * 0.55 * sin(TAU * freq * t) + env * 0.22 * sin(TAU * freq * 2.0 * t)
+		else:
+			# 残響: E5の余韻
+			var rt := t - explode_dur - flare_dur
+			var renv := exp(-rt * 4.5)
+			s = renv * 0.20 * sin(TAU * 659.25 * t) + renv * 0.08 * sin(TAU * 659.25 * 0.5 * t)
+		samples[i] = s
+	return _make_stream(samples)

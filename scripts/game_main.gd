@@ -2149,7 +2149,8 @@ func _on_crush_changed(active: bool, count: int) -> void:
 	if active:
 		crush_label.text = "SURROUNDED x%d" % count
 		crush_label.visible = true
-		# 包囲開始: 警告シェイク
+		# 包囲開始: 警告シェイク + 改善188 CRUSH SE
+		SFX.play_crush_start()
 		tower.shake(4.0)
 		# Warning labelは非表示に（crushが上位表示）
 		if crush_warning_label:
@@ -2228,7 +2229,8 @@ func _on_crush_warning(count: int) -> void:
 		crush_warning_label.visible = false
 
 func _on_crush_breakout() -> void:
-	## Breakout burst VFX: 金色の衝撃波リング
+	## Breakout burst VFX: 金色の衝撃波リング + 改善188 BREAKOUT SE
+	SFX.play_breakout()
 	var ring := Polygon2D.new()
 	var pts: PackedVector2Array = []
 	for i in range(24):
