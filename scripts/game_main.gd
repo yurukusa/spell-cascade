@@ -909,9 +909,14 @@ func _show_boss_warning() -> void:
 	label.position = Vector2(640 - 150, 160)
 	label.custom_minimum_size = Vector2(300, 0)
 	label.z_index = 200
+	# 改善215: スケールパンチイン（STAGE告知・FINAL PUSH等と一貫した「登場の一撃」）
+	# Why: 他の重要告知ラベルは全て scale 2.x→1.0 の登場演出を持つのに
+	# BOSS IN 10s だけが即時表示のままで「ボス前の最重要警告」として存在感が薄かった。
+	label.scale = Vector2(1.8, 1.8)
 	ui_layer.add_child(label)
-	# パルスアニメーション→フェードアウト
+	# スケールパンチ → パルスアニメーション→フェードアウト
 	var tween := label.create_tween()
+	tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_property(label, "modulate:a", 0.3, 0.4).set_trans(Tween.TRANS_SINE)
 	tween.tween_property(label, "modulate:a", 1.0, 0.4).set_trans(Tween.TRANS_SINE)
 	tween.tween_property(label, "modulate:a", 0.3, 0.4).set_trans(Tween.TRANS_SINE)
