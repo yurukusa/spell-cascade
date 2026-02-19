@@ -2490,11 +2490,14 @@ func _on_crush_breakout() -> void:
 	label.position = Vector2(540, 280)
 	label.custom_minimum_size = Vector2(200, 0)
 	label.z_index = 200
+	# 改善226: BREAKOUT!スケールパンチイン（旧: 1.0→1.2→1.0 → 新: 1.8→1.0 TRANS_BACK）
+	# Why: CRUSH耐久は重大な達成。「耐えた！弾け出た！」という爽快感を
+	# STAGE/FINAL PUSHと同じパターンで伝える。1.8（STAGE2.0よりやや小さく）。
+	label.scale = Vector2(1.8, 1.8)
 	ui_layer.add_child(label)
 
 	var text_tween := label.create_tween()
-	text_tween.tween_property(label, "scale", Vector2(1.2, 1.2), 0.1).set_trans(Tween.TRANS_BACK)
-	text_tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1)
+	text_tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	text_tween.tween_property(label, "modulate:a", 0.0, 1.0).set_delay(0.5)
 	text_tween.tween_callback(label.queue_free)
 
