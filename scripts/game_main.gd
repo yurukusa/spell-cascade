@@ -71,6 +71,8 @@ var _vignette_critical := false  # 改善211: クリティカル状態フラグ�
 
 # ボスHP臨界パルス（改善86/98: <15%でラベルとバーが赤く点滅）
 var _boss_hp_crit_tween: Tween = null
+# 改善240: HPバーのスムーズトランジション（即時ジャンプをtweenで滑らか化）
+var _hp_bar_tween: Tween = null
 
 # コンボタイマーバー（改善100: コンボウィンドウの残り時間を視覚化）
 var _combo_timer_bar: ProgressBar = null
@@ -2214,7 +2216,14 @@ func _on_tower_damaged(current: float, max_val: float) -> void:
 		dft.tween_callback(dmg_flash.queue_free)
 	hp_bar_last_value = current
 
-	hp_bar.value = current
+	# 改善240: HPバースムーズトランジション（即時ジャンプ→0.15sのSINEで滑らか化）
+	# Why: ProgressBarのvalueを直接セットすると「ガクッ」と跳ぶ。
+	# Tweenで補間することでHP減少の「流れ」が見えてダメージの重さが伝わる。
+	# 前のtweenをkillしてから新tween: 連続ダメージでも常に正確な最終値に到達。
+	if _hp_bar_tween != null:
+		_hp_bar_tween.kill()
+	_hp_bar_tween = create_tween()
+	_hp_bar_tween.tween_property(hp_bar, "value", current, 0.15).set_trans(Tween.TRANS_SINE)
 	_update_hp_label(current, max_val)
 
 	# HP低下で連続的な色変化（smooth lerp）
