@@ -2445,7 +2445,14 @@ func _on_crush_warning(count: int) -> void:
 		return
 	if count >= 2 and not tower.crush_active:
 		crush_warning_label.text = "DANGER x%d" % count
+		# 改善232: DANGER警告ラベルの初回フェードイン（visible=trueの即時出現を改善）
+		# Why: 2体目が包囲圏に入った瞬間だけフェードイン。3体以上では既に表示中なので不要。
+		var was_visible := crush_warning_label.visible
 		crush_warning_label.visible = true
+		if not was_visible:
+			crush_warning_label.modulate.a = 0.0
+			var dw_in := crush_warning_label.create_tween()
+			dw_in.tween_property(crush_warning_label, "modulate:a", 1.0, 0.12).set_trans(Tween.TRANS_QUAD)
 	elif count == 1:
 		crush_warning_label.visible = false
 	else:
