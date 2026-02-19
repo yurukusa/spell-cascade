@@ -27,6 +27,7 @@ var enemies_alive := 0
 var game_started := false
 var boss_spawned := false
 var kill_count := 0
+var total_damage_dealt := 0.0  # 改善162: ダメージ累計（リザルト画面でDPS表示用）
 var next_milestone := 50.0  # 50mごとにマイルストーン
 
 # Kill combo（連続キル）
@@ -304,6 +305,10 @@ func _process(delta: float) -> void:
 		# コンボなし: バーを非表示
 		if _combo_timer_bar != null and is_instance_valid(_combo_timer_bar):
 			_combo_timer_bar.visible = false
+
+func record_damage(amount: float) -> void:
+	# 改善162: enemy.gd の take_damage から呼ばれ、ダメージ累計を記録
+	total_damage_dealt += amount
 
 func _update_timer_display() -> void:
 	var remaining := maxf(max_run_time - run_time, 0.0)
@@ -2716,6 +2721,7 @@ func _show_result_screen(is_victory: bool) -> void:
 		["Level", "%d" % tower.level],
 		["Kills", "%d" % kill_count],
 		["Best Combo", "x%d" % best_combo],
+		["Damage Dealt", "%d" % int(total_damage_dealt)],  # 改善162: 総ダメージ量
 		["Time", "%d:%02d" % [t_min, t_sec]],
 	]
 

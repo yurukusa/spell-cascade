@@ -1201,6 +1201,10 @@ func take_damage(amount: float, is_crit: bool = false) -> void:
 	hp -= amount
 	_spawn_damage_number(amount, is_crit)
 	SFX.play_hit()
+	# 改善162: ダメージ累計をgame_mainに通知（リザルト画面でDamage Dealt表示用）
+	var gm := get_parent()
+	if gm and gm.has_method("record_damage"):
+		gm.record_damage(amount)
 
 	# ヒットスタッガー: 大ダメージほど長く（改善36）
 	_stagger_timer = 0.28 if is_crit else 0.18
