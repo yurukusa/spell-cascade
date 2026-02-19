@@ -69,6 +69,38 @@ func unlock_chip(category: String, chip_id: String) -> bool:
 func get_unlocked_chips() -> Dictionary:
 	return _data.get("unlocked_chips", _default_data()["unlocked_chips"]).duplicate()
 
+## 改善177: ベストレコード取得（キーがない場合はデフォルト返す）
+## 保存キー: best_kills, best_combo, best_time_sec, best_stage
+func get_best_records() -> Dictionary:
+	var defaults := {"best_kills": 0, "best_combo": 0, "best_time_sec": 0.0, "best_stage": 1}
+	var saved: Dictionary = _data.get("best_records", defaults)
+	# キー欠落を安全に補完
+	for k in defaults.keys():
+		if not saved.has(k):
+			saved[k] = defaults[k]
+	return saved
+
+## 改善177: ベストレコード更新。新記録だったキーの配列を返す。
+func update_best_records(kills: int, combo: int, time_sec: float, stage: int) -> Array[String]:
+	var current := get_best_records()
+	var broken: Array[String] = []
+	if kills > current.get("best_kills", 0):
+		current["best_kills"] = kills
+		broken.append("kills")
+	if combo > current.get("best_combo", 0):
+		current["best_combo"] = combo
+		broken.append("combo")
+	if time_sec > current.get("best_time_sec", 0.0):
+		current["best_time_sec"] = time_sec
+		broken.append("time")
+	if stage > current.get("best_stage", 1):
+		current["best_stage"] = stage
+		broken.append("stage")
+	if broken.size() > 0:
+		_data["best_records"] = current
+		_save()
+	return broken
+
 ## チップが手動でないか（何か解放されているか）
 func has_any_unlock() -> bool:
 	var chips: Dictionary = get_unlocked_chips()

@@ -2696,6 +2696,12 @@ func _win_game() -> void:
 func _show_result_screen(is_victory: bool) -> void:
 	## リザルト画面: 暗転 → タイトル → スタッツ → リトライ
 	_save_unlocked_chips()
+	# 改善177: クロスランベストレコード確認 + 保存
+	# Why: ランをまたいで記録を残すことで「もう一度！」の動機を生む
+	var save_mgr_rec := get_node_or_null("/root/SaveManager")
+	var broken_records: Array[String] = []
+	if save_mgr_rec and save_mgr_rec.has_method("update_best_records"):
+		broken_records = save_mgr_rec.update_best_records(kill_count, best_combo, run_time, current_stage)
 	var result_layer := CanvasLayer.new()
 	result_layer.layer = 100
 	add_child(result_layer)
@@ -2768,21 +2774,44 @@ func _show_result_screen(is_victory: bool) -> void:
 	@warning_ignore("integer_division")
 	var t_min := time_sec / 60
 	var t_sec := time_sec % 60
-
-	# 改善76: Stage Reached をリザルトに追加（ゲームの進行感を数値で示す）
-	var stats_data: Array[Array] = [
-		["Distance", "%dm" % int(distance_m)],
-		["Stage Reached", "Stage %d" % current_stage],
-		["Level", "%d" % tower.level],
-		["Kills", "%d" % kill_count],
-		["Best Combo", "x%d" % best_combo],
-		["Damage Dealt", "%d" % int(total_damage_dealt)],  # 改善162: 総ダメージ量
-		["DPS", "%.1f" % (total_damage_dealt / maxf(float(time_sec), 1.0))],  # 改善163: DPS（連続性の指標）
-		["Time", "%d:%02d" % [t_min, t_sec]],
-	]
-
+	# stat_labelsをここで宣言: NEW RECORDバナー追加より前に初期化が必要
 	var stat_labels: Array[Label] = []
 	var stat_color := Color(0.85, 0.82, 0.92, 1.0)
+
+	# 改善177: NEW RECORD!バナー（1件以上の記録更新があった場合）
+	if broken_records.size() > 0:
+		var nr_lbl := Label.new()
+		nr_lbl.text = "★ NEW PERSONAL BEST! ★"
+		nr_lbl.add_theme_font_size_override("font_size", 26)
+		nr_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.1, 1.0))
+		nr_lbl.add_theme_color_override("font_shadow_color", Color(0.5, 0.2, 0.0, 0.9))
+		nr_lbl.add_theme_constant_override("shadow_offset_x", 2)
+		nr_lbl.add_theme_constant_override("shadow_offset_y", 2)
+		nr_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		nr_lbl.modulate.a = 0.0
+		vbox.add_child(nr_lbl)
+		stat_labels.append(nr_lbl)
+
+	# 改善76: Stage Reached をリザルトに追加（ゲームの進行感を数値で示す）
+	# 改善177: 記録更新した項目に「★NEW!」サフィックス付与
+	var _kills_str := "%d" % kill_count
+	if "kills" in broken_records: _kills_str += "  ★NEW!"
+	var _combo_str := "x%d" % best_combo
+	if "combo" in broken_records: _combo_str += "  ★NEW!"
+	var _time_str := "%d:%02d" % [t_min, t_sec]
+	if "time" in broken_records: _time_str += "  ★NEW!"
+	var _stage_str := "Stage %d" % current_stage
+	if "stage" in broken_records: _stage_str += "  ★NEW!"
+	var stats_data: Array[Array] = [
+		["Distance", "%dm" % int(distance_m)],
+		["Stage Reached", _stage_str],
+		["Level", "%d" % tower.level],
+		["Kills", _kills_str],
+		["Best Combo", _combo_str],
+		["Damage Dealt", "%d" % int(total_damage_dealt)],  # 改善162: 総ダメージ量
+		["DPS", "%.1f" % (total_damage_dealt / maxf(float(time_sec), 1.0))],  # 改善163: DPS（連続性の指標）
+		["Time", _time_str],
+	]
 
 	for stat in stats_data:
 		var lbl := Label.new()
