@@ -45,6 +45,10 @@ var crush_warning_label: Label = null  # pre-crush "DANGER" 表示
 var boss_hp_bar: ProgressBar = null
 var _boss_hp_root: Control = null  # 改善187: 全ボスHP UI要素のコンテナ（フェードイン管理+クリーンアップ用）
 
+# 改善189: スロット別クールダウンバー（スキルのリチャージ状態を可視化）
+var _cd_bar_container: Control = null
+var _cd_bars: Array = []  # slot_index → ProgressBar or null
+
 # Hitstop リエントラント管理（複数同時呼び出しで早期復帰を防止）
 var _hitstop_depth := 0
 var boss_hp_label: Label = null
@@ -149,6 +153,7 @@ func _ready() -> void:
 	tower.set_module(0, module)
 	_setup_tower_attacks()
 	_update_build_display()
+	_rebuild_cd_bars()  # 改善189
 	var initial_xp_target: int = tower.get_xp_for_next_level()
 	wave_label.text = "Lv.1  XP: 0/%d" % initial_xp_target
 	game_started = true
@@ -172,6 +177,7 @@ func _process(delta: float) -> void:
 	run_time += delta
 	_update_timer_display()
 	_update_distance_display()
+	_update_cd_bars()  # 改善189: スロットCDバー更新
 
 	# Crush表示更新（敵数が変わるので毎フレーム更新）
 	if tower.crush_active:
@@ -621,6 +627,7 @@ func _on_upgrade_chosen(upgrade_data: Dictionary) -> void:
 				_setup_tower_attacks()
 
 	_update_build_display()
+	_rebuild_cd_bars()  # 改善189: スロット変更時にバーを再構築
 
 # --- Onboarding overlay ---
 
@@ -801,6 +808,66 @@ func _setup_tower_attacks() -> void:
 		attack_node.add_to_group("tower_attacks")
 		tower.add_child(attack_node)
 		attack_node.setup(i, stats)
+
+func _rebuild_cd_bars() -> void:
+	## 改善189: タワー各スロットのリチャージバーを再構築（スロット変更時に呼ぶ）
+	if _cd_bar_container and is_instance_valid(_cd_bar_container):
+		_cd_bar_container.queue_free()
+	_cd_bar_container = null
+	_cd_bars.clear()
+
+	_cd_bar_container = Control.new()
+	_cd_bar_container.name = "CDBarsContainer"
+	_cd_bar_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui_layer.add_child(_cd_bar_container)
+
+	const BAR_W := 80.0
+	const BAR_H := 5.0
+	const BAR_GAP := 8.0
+	const X_START := 20.0
+	const Y_START := 163.0
+	# スロットごとに色を変えて識別しやすくする（青→紫→シアン）
+	var slot_hues := [0.58, 0.67, 0.50]
+
+	for i in range(tower.max_slots):
+		_cd_bars.append(null)
+		if tower.get_module(i) == null:
+			continue
+
+		var bar := ProgressBar.new()
+		bar.min_value = 0.0
+		bar.max_value = 1.0
+		bar.value = 0.0
+		bar.show_percentage = false
+		bar.position = Vector2(X_START, Y_START + float(i) * (BAR_H + BAR_GAP))
+		bar.custom_minimum_size = Vector2(BAR_W, BAR_H)
+		bar.size = Vector2(BAR_W, BAR_H)
+
+		var bg_style := StyleBoxFlat.new()
+		bg_style.bg_color = Color(0.08, 0.05, 0.15, 0.7)
+		bg_style.set_corner_radius_all(2)
+		bar.add_theme_stylebox_override("background", bg_style)
+
+		var fill_style := StyleBoxFlat.new()
+		var hue: float = slot_hues[mini(i, slot_hues.size() - 1)]
+		fill_style.bg_color = Color.from_hsv(hue, 0.8, 0.95, 0.9)
+		fill_style.set_corner_radius_all(2)
+		bar.add_theme_stylebox_override("fill", fill_style)
+
+		_cd_bar_container.add_child(bar)
+		_cd_bars[i] = bar
+
+func _update_cd_bars() -> void:
+	## 改善189: 毎フレーム各スロットのCD充填率をバーに反映
+	if _cd_bar_container == null or not is_instance_valid(_cd_bar_container):
+		return
+	for atk in get_tree().get_nodes_in_group("tower_attacks"):
+		var idx: int = atk.slot_index
+		if idx < _cd_bars.size() and _cd_bars[idx] != null:
+			var cooldown: float = atk.stats.get("cooldown", 1.0)
+			if "cooldown_mult" in tower:
+				cooldown *= tower.cooldown_mult
+			_cd_bars[idx].value = clampf(atk.timer / maxf(cooldown, 0.001), 0.0, 1.0)
 
 # --- 敵スポーン ---
 
