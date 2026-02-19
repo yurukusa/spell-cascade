@@ -87,7 +87,7 @@ func _process(delta: float) -> void:
 
 	# 改善69: 有効期限が近いXPオーブの点滅（「急いで拾え」の視覚的合図）
 	if orb_type == "xp" and lifetime < 1.5:
-		var flicker := abs(sin(lifetime * TAU * 4.0))
+		var flicker: float = abs(sin(lifetime * TAU * 4.0))  # 改善144: 型推論警告修正
 		modulate.a = 0.3 + flicker * 0.7
 
 	# 改善142: HPオーブの高速点滅（タワーHP30%未満時: 「今すぐ拾え」の緊急シグナル）
@@ -95,7 +95,7 @@ func _process(delta: float) -> void:
 		var hp_ratio: float = float(target.hp) / float(target.max_hp)
 		if hp_ratio < 0.3:
 			var pulse_freq := 6.0 + (1.0 - hp_ratio / 0.3) * 6.0  # HP低いほど高速（6〜12Hz）
-			var flicker_hp := abs(sin(lifetime * TAU * pulse_freq))
+			var flicker_hp: float = abs(sin(lifetime * TAU * pulse_freq))  # 改善144: 型推論警告修正
 			modulate.a = 0.45 + flicker_hp * 0.55
 
 	if not is_instance_valid(target):

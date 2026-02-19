@@ -314,7 +314,7 @@ func _update_timer_display() -> void:
 	timer_label.text = "%d:%02d" % [minutes, seconds]
 	# カウントダウン演出: 残り60秒以下で赤く、30秒以下でパルス（J-7: 色による区分）
 	if remaining <= 30.0:
-		var pulse := abs(sin(run_time * 3.0))  # 毎秒3回点滅
+		var pulse: float = abs(sin(run_time * 3.0))  # 改善144: 型推論警告修正（毎秒3回点滅）
 		timer_label.add_theme_color_override("font_color", Color(1.0, 0.3 + pulse * 0.4, 0.2, 1.0))
 	elif remaining <= 60.0:
 		timer_label.add_theme_color_override("font_color", Color(0.95, 0.55, 0.2, 1.0))  # オレンジ
@@ -1274,6 +1274,10 @@ func _on_boss_hp_changed(current: float, max_val: float) -> void:
 		if boss_hp_label:
 			var hp_pct_int := int(pct * 100)
 			boss_hp_label.text = "BOSS  %d%%" % hp_pct_int
+			# 改善161: ボスHP被弾のたびにラベルがマイクロバウンス（「当たってる！」即時確認）
+			var lb_t := boss_hp_label.create_tween()
+			lb_t.tween_property(boss_hp_label, "scale", Vector2(1.06, 1.06), 0.04)
+			lb_t.tween_property(boss_hp_label, "scale", Vector2(1.0, 1.0), 0.07)
 			# 低HP時にラベルも赤に
 			if pct <= 0.33:
 				boss_hp_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.2, 1.0))
@@ -1359,6 +1363,13 @@ func _on_boss_phase_changed(phase: int, _hp_pct: float) -> void:
 	text_tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1)
 	text_tween.tween_property(label, "modulate:a", 0.0, 0.8).set_delay(0.5)
 	text_tween.tween_callback(label.queue_free)
+
+	# 改善158: ボスHPバーのフィル色をフェーズに合わせて変更（Phase2=橙, Phase3=赤）
+	if boss_hp_bar and is_instance_valid(boss_hp_bar):
+		var phase_fill_color := Color(0.9, 0.5, 0.1, 1.0) if phase == 2 else Color(0.9, 0.15, 0.1, 1.0)
+		var bf := boss_hp_bar.get_theme_stylebox("fill") as StyleBoxFlat
+		if bf:
+			bf.bg_color = phase_fill_color
 
 	# 改善132: Phase別カラースパーク（Phase2=橙/Phase3=赤で脅威レベルを粒子で印象付け）
 	var phase_spark_color := Color(1.0, 0.5, 0.1, 0.9)  # Phase2: 橙
@@ -1530,14 +1541,24 @@ func _on_enemy_died(enemy: Node2D) -> void:
 		kt.tween_property(ktext, "modulate:a", 0.0, 0.55).set_delay(0.2)
 		kt.chain().tween_callback(ktext.queue_free)
 
-	# 改善123: キル位置に小さな黄金リング（「敵を倒した」確認フィードバック）
+	# 改善123: キル位置に小さなリング（「敵を倒した」確認フィードバック）
+	# 改善157: 敵タイプ別リング色（タイプの違いを倒した瞬間に確認できる）
 	if is_instance_valid(enemy):
 		var dr_pts := PackedVector2Array()
 		for _dri in range(8):
 			dr_pts.append(Vector2(cos(_dri * TAU / 8.0), sin(_dri * TAU / 8.0)) * 8.0)
 		var death_ring := Polygon2D.new()
 		death_ring.polygon = dr_pts
-		death_ring.color = Color(1.0, 0.82, 0.2, 0.7)
+		var etype: String = enemy.get("enemy_type") if "enemy_type" in enemy else ""
+		var dr_color: Color
+		match etype:
+			"swarmer": dr_color = Color(0.4, 0.9, 0.3, 0.7)    # 緑
+			"tank":    dr_color = Color(1.0, 0.55, 0.1, 0.75)   # 橙
+			"shooter": dr_color = Color(0.3, 0.7, 1.0, 0.7)     # 青
+			"healer":  dr_color = Color(1.0, 0.3, 0.7, 0.7)     # ピンク
+			"splitter":dr_color = Color(0.7, 0.3, 1.0, 0.7)     # 紫
+			_:         dr_color = Color(1.0, 0.82, 0.2, 0.7)    # デフォルト: 金
+		death_ring.color = dr_color
 		death_ring.global_position = enemy.global_position
 		death_ring.z_index = 85
 		add_child(death_ring)
@@ -1563,6 +1584,24 @@ func _on_enemy_died(enemy: Node2D) -> void:
 		brt.tween_property(big_ring, "scale", Vector2(5.5, 5.5), 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		brt.tween_property(big_ring, "modulate:a", 0.0, 0.4)
 		brt.chain().tween_callback(big_ring.queue_free)
+
+	# 改善159: 高XP敵（xp_value≥2）にフローティング"+N XP"ピップ（XP獲得量の即時確認）
+	if is_instance_valid(enemy) and "xp_value" in enemy and enemy.xp_value >= 2:
+		var xp_pip := Label.new()
+		xp_pip.text = "+%d XP" % enemy.xp_value
+		xp_pip.add_theme_font_size_override("font_size", 15)
+		xp_pip.add_theme_color_override("font_color", Color(0.3, 0.95, 0.5, 0.95))
+		xp_pip.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+		xp_pip.add_theme_constant_override("shadow_offset_x", 1)
+		xp_pip.add_theme_constant_override("shadow_offset_y", 1)
+		xp_pip.z_index = 93
+		xp_pip.global_position = enemy.global_position + Vector2(randf_range(-15, 15), -35)
+		add_child(xp_pip)
+		var xpt := xp_pip.create_tween()
+		xpt.set_parallel(true)
+		xpt.tween_property(xp_pip, "global_position:y", xp_pip.global_position.y - 45.0, 0.7).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		xpt.tween_property(xp_pip, "modulate:a", 0.0, 0.7).set_delay(0.25)
+		xpt.chain().tween_callback(xp_pip.queue_free)
 
 	# キルマイルストーン（10, 25, 50, 100, 200キル: 達成感の積み上げ）
 	if kill_count in [10, 25, 50, 100, 200]:
@@ -1634,6 +1673,23 @@ func _show_area_cleared() -> void:
 		ct.tween_property(frag, "global_position", pos + Vector2(cos(fangle), sin(fangle)) * fdist, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		ct.tween_property(frag, "modulate:a", 0.0, 0.5).set_delay(0.15)
 		ct.chain().tween_callback(frag.queue_free)
+
+	# 改善146: 全敵撃破時の2重エメラルドリング波紋（「制圧完了」の爽快感を空間全体で表現）
+	for _ri in range(2):
+		var aring := Polygon2D.new()
+		var aring_pts := PackedVector2Array()
+		for _api in range(20):
+			aring_pts.append(Vector2(cos(_api * TAU / 20.0), sin(_api * TAU / 20.0)) * 22.0)
+		aring.polygon = aring_pts
+		aring.color = Color(0.2, 0.95, 0.5, 0.7)
+		aring.global_position = pos
+		aring.z_index = 155
+		add_child(aring)
+		var art := aring.create_tween()
+		art.set_parallel(true)
+		art.tween_property(aring, "scale", Vector2(8.0, 8.0), 0.7).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT).set_delay(float(_ri) * 0.18)
+		art.tween_property(aring, "modulate:a", 0.0, 0.7).set_delay(float(_ri) * 0.18)
+		art.chain().tween_callback(aring.queue_free)
 
 func _announce_kill_milestone(count: int) -> void:
 	## キルマイルストーン告知（J-8: 達成を大きく演出）
@@ -1718,6 +1774,13 @@ func _update_combo_display() -> void:
 	combo_label_node.add_theme_color_override("font_color", tier_color)
 	best_combo = maxi(best_combo, combo_count)
 
+	# 改善152: 毎キルでの微小スケールバウンス（コンボが積み上がる「リズム感」）
+	if combo_count >= 3 and combo_count not in [3, 8, 15, 30]:
+		var micro_tween := combo_label_node.create_tween()
+		var micro_scale := 1.08 + minf(float(combo_count) / 200.0, 0.12)  # コンボ多いほど少し大きく
+		micro_tween.tween_property(combo_label_node, "scale", Vector2(micro_scale, micro_scale), 0.05).set_trans(Tween.TRANS_BACK)
+		micro_tween.tween_property(combo_label_node, "scale", Vector2(1.0, 1.0), 0.07)
+
 	# 改善100: コンボタイマーバーをコンボ中は表示し、色もティアに合わせる
 	if _combo_timer_bar != null and is_instance_valid(_combo_timer_bar):
 		_combo_timer_bar.visible = true
@@ -1782,6 +1845,16 @@ func _announce_stage(stage: int) -> void:
 	tween.tween_property(ann, "modulate:a", 0.0, 2.5).set_delay(0.85)
 	tween.chain().tween_callback(ann.queue_free)
 	tower.shake(3.5)
+	# 改善153: ステージ遷移時の画面カラーフラッシュ（STAGE2=橙, STAGE3=赤）
+	var st_flash := ColorRect.new()
+	st_flash.color = Color(colors[stage - 1].r, colors[stage - 1].g, colors[stage - 1].b, 0.22)
+	st_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	st_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	st_flash.z_index = 175
+	ui_layer.add_child(st_flash)
+	var stft := st_flash.create_tween()
+	stft.tween_property(st_flash, "color:a", 0.0, 0.6).set_trans(Tween.TRANS_CUBIC)
+	stft.tween_callback(st_flash.queue_free)
 
 func _announce_desperate_push() -> void:
 	## デスパレートプッシュ告知: 最後15秒の総力戦を伝える（H-1: 緊張の頂点）
@@ -1841,6 +1914,15 @@ func _show_combo_break(count: int) -> void:
 		tower.shake(3.5)
 	elif count >= 8 and is_instance_valid(tower):
 		tower.shake(2.0)
+	# 改善156: コンボラベルの崩壊演出（コンボ途切れの「喪失感」を視覚的に伝える）
+	if count >= 3 and combo_label_node != null and is_instance_valid(combo_label_node):
+		var cl_break_tween := combo_label_node.create_tween()
+		cl_break_tween.set_parallel(true)
+		cl_break_tween.tween_property(combo_label_node, "modulate", Color(1.0, 0.3, 0.2, 1.0), 0.06)
+		cl_break_tween.tween_property(combo_label_node, "scale", Vector2(1.2, 0.7), 0.06).set_trans(Tween.TRANS_BACK)
+		cl_break_tween.chain().tween_property(combo_label_node, "modulate", Color.WHITE, 0.25)
+		cl_break_tween.chain().tween_property(combo_label_node, "scale", Vector2(0.0, 0.0), 0.12).set_trans(Tween.TRANS_QUAD)
+		cl_break_tween.chain().tween_callback(func(): if is_instance_valid(combo_label_node): combo_label_node.scale = Vector2(1.0, 1.0); combo_label_node.visible = false)
 
 # --- タワーイベント ---
 
@@ -2185,6 +2267,26 @@ func _on_level_up(new_level: int) -> void:
 	lv_glow_t.tween_property(lv_glow, "color:a", 0.0, 0.5).set_trans(Tween.TRANS_QUAD)
 	lv_glow_t.tween_callback(lv_glow.queue_free)
 
+	# 改善160: "LEVEL UP! Lv.N" フローティングテキスト（「強くなった！」の言語的確認）
+	var lv_label := Label.new()
+	lv_label.text = "LEVEL UP!  Lv.%d" % new_level
+	lv_label.add_theme_font_size_override("font_size", 28)
+	lv_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.35, 1.0))
+	lv_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.9))
+	lv_label.add_theme_constant_override("shadow_offset_x", 2)
+	lv_label.add_theme_constant_override("shadow_offset_y", 2)
+	lv_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lv_label.position = Vector2(640 - 180, 310)
+	lv_label.custom_minimum_size = Vector2(360, 0)
+	lv_label.z_index = 195
+	ui_layer.add_child(lv_label)
+	var lv_lt := lv_label.create_tween()
+	lv_lt.tween_property(lv_label, "scale", Vector2(1.25, 1.25), 0.1).set_trans(Tween.TRANS_BACK)
+	lv_lt.tween_property(lv_label, "scale", Vector2(1.0, 1.0), 0.1)
+	lv_lt.tween_interval(0.65)
+	lv_lt.tween_property(lv_label, "modulate:a", 0.0, 0.4)
+	lv_lt.tween_callback(lv_label.queue_free)
+
 func _apply_levelup_stat(stat_id: String) -> void:
 	# スタット名と確認テキストのマップ（改善43: 選んだ効果を即時フィードバック）
 	var stat_labels := {
@@ -2492,6 +2594,34 @@ func _show_milestone(meters: int) -> void:
 	tower.shake(4.0)
 
 func _on_tower_destroyed() -> void:
+	# 改善151: ゲームオーバー時の赤フラッシュ＋破壊パーティクル（「敗北の衝撃」を体感させる）
+	var death_flash := ColorRect.new()
+	death_flash.color = Color(0.9, 0.05, 0.05, 0.55)
+	death_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	death_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	death_flash.z_index = 180
+	ui_layer.add_child(death_flash)
+	var dft := death_flash.create_tween()
+	dft.tween_property(death_flash, "color:a", 0.0, 1.2).set_trans(Tween.TRANS_CUBIC)
+	dft.tween_callback(death_flash.queue_free)
+	# 破壊パーティクル（タワー位置から放射状に赤いシャード）
+	if is_instance_valid(tower):
+		for _di in range(16):
+			var da := float(_di) * TAU / 16.0
+			var dp := Polygon2D.new()
+			dp.polygon = PackedVector2Array([Vector2(-2.0, 0), Vector2(2.0, 0), Vector2(0, -6.0)])
+			dp.color = Color(1.0, 0.15 + randf() * 0.3, 0.1, 0.9)
+			dp.rotation = da
+			dp.global_position = tower.global_position
+			dp.z_index = 202
+			add_child(dp)
+			var dt := dp.create_tween()
+			dt.set_parallel(true)
+			dt.tween_property(dp, "global_position",
+				tower.global_position + Vector2(cos(da), sin(da)) * randf_range(60.0, 140.0), 0.8
+			).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			dt.tween_property(dp, "modulate:a", 0.0, 0.8).set_delay(0.2)
+			dt.chain().tween_callback(dp.queue_free)
 	game_over = true
 	_reset_time_scale()
 	SFX.stop_bgm()

@@ -607,6 +607,20 @@ func _spawn_heal_vfx(amount: float) -> void:
 	ring_tween.tween_property(ring, "modulate:a", 0.0, 0.4)
 	ring_tween.chain().tween_callback(ring.queue_free)
 
+	# 改善145: 大回復（50+）時のUI全画面グリーンフラッシュ（「大きな回復チャンス」を全画面で表現）
+	if amount >= 50.0:
+		var ui := scene_root.get_node_or_null("UI") as CanvasLayer
+		if ui:
+			var big_heal_flash := ColorRect.new()
+			big_heal_flash.color = Color(0.1, 0.9, 0.2, 0.18)
+			big_heal_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+			big_heal_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			big_heal_flash.z_index = 163
+			ui.add_child(big_heal_flash)
+			var bhf := big_heal_flash.create_tween()
+			bhf.tween_property(big_heal_flash, "color:a", 0.0, 0.55).set_trans(Tween.TRANS_CUBIC)
+			bhf.tween_callback(big_heal_flash.queue_free)
+
 func _spawn_level_up_burst() -> void:
 	## 改善110: レベルアップ時の放射パーティクル（「強くなった！」を爆発で体感）
 	var scene_root := get_tree().current_scene

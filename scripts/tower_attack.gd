@@ -1298,6 +1298,25 @@ func _on_body_entered(body):
 		# 氷ブルーティント（スロー中）
 		if body.has_method(\"modulate\") or \"modulate\" in body:
 			body.modulate = Color(0.5, 0.8, 1.2, 1.0)  # 氷ブルー
+		# 改善147: スロー時の霜パーティクル（「凍った！」を一瞬で伝える）
+		if scene_root:
+			for _fi in range(5):
+				var frost := Polygon2D.new()
+				var frost_pts := PackedVector2Array()
+				for _fpi in range(6):
+					frost_pts.append(Vector2(cos(_fpi * TAU / 6.0), sin(_fpi * TAU / 6.0)) * 3.5)
+				frost.polygon = frost_pts
+				frost.color = Color(0.6, 0.85, 1.0, 0.85)
+				var fa := randf() * TAU
+				var fr := randf_range(8.0, 18.0)
+				frost.global_position = body.global_position + Vector2(cos(fa), sin(fa)) * fr
+				frost.z_index = 94
+				scene_root.add_child(frost)
+				var ft := frost.create_tween()
+				ft.set_parallel(true)
+				ft.tween_property(frost, \"scale\", Vector2(2.0, 2.0), 0.4).set_trans(Tween.TRANS_QUAD)
+				ft.tween_property(frost, \"modulate:a\", 0.0, 0.4).set_delay(0.1)
+				ft.chain().tween_callback(frost.queue_free)
 		# タイマーで元に戻す
 		get_tree().create_timer(on_hit_slow_duration).timeout.connect(func():
 			if is_instance_valid(body):
@@ -1380,6 +1399,23 @@ func _on_body_entered(body):
 	# Pierce: 貫通
 	if pierce_remaining > 0:
 		pierce_remaining -= 1
+		# 改善150: ピアス貫通時の青い貫通エフェクト（「貫いた！」視覚フィードバック）
+		var pierce_root := get_tree().current_scene
+		if pierce_root:
+			var pr := Polygon2D.new()
+			var pr_pts: PackedVector2Array = []
+			for _pri in range(6):
+				pr_pts.append(Vector2(cos(_pri * TAU / 6.0), sin(_pri * TAU / 6.0)) * 8.0)
+			pr.polygon = pr_pts
+			pr.color = Color(0.3, 0.7, 1.0, 0.75)
+			pr.global_position = global_position
+			pr.z_index = 93
+			pierce_root.add_child(pr)
+			var prt := pr.create_tween()
+			prt.set_parallel(true)
+			prt.tween_property(pr, \"scale\", Vector2(2.5, 2.5), 0.2).set_trans(Tween.TRANS_QUAD)
+			prt.tween_property(pr, \"modulate:a\", 0.0, 0.2)
+			prt.chain().tween_callback(pr.queue_free)
 		return  # 弾は消えない
 
 	# ゴースト弾は壁を貫通して消えない（敵のみ貫通）
@@ -1445,6 +1481,24 @@ func _do_split(_hit_body):
 
 func _do_fork(_hit_body):
 	# Fork弾を生成（fork_countは0にして無限分裂を防止）
+	# 改善149: フォーク分裂時のVフラッシュ（「弾が割れた！」を一瞬で伝える）
+	var fork_scene_root := get_tree().current_scene
+	if fork_scene_root:
+		var fvf := Polygon2D.new()
+		var fvf_pts: PackedVector2Array = []
+		for _fvi in range(8):
+			fvf_pts.append(Vector2(cos(_fvi * TAU / 8.0), sin(_fvi * TAU / 8.0)) * 7.0)
+		fvf.polygon = fvf_pts
+		fvf.color = Color(0.9, 0.9, 1.0, 0.8)
+		fvf.global_position = global_position
+		fvf.z_index = 95
+		fork_scene_root.add_child(fvf)
+		var fvt := fvf.create_tween()
+		fvt.set_parallel(true)
+		fvt.tween_property(fvf, "scale", Vector2(3.0, 3.0), 0.15).set_trans(Tween.TRANS_QUAD)
+		fvt.tween_property(fvf, "modulate:a", 0.0, 0.15)
+		fvt.chain().tween_callback(fvf.queue_free)
+
 	var base_angle := direction.angle()
 	for i in range(2):
 		var offset := deg_to_rad(fork_angle) * (i * 2 - 1) * 0.5

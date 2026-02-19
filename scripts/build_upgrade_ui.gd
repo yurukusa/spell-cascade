@@ -89,7 +89,7 @@ func show_skill_choice(slot: int, skill_ids: Array) -> void:
 		var style := _make_button_style(skill_data.get("tags", []))
 		btn.add_theme_stylebox_override("normal", style)
 		var hover := style.duplicate()
-		hover.bg_color = hover.bg_color.lightened(0.15)
+		hover.bg_color = hover.bg_color.lightened(0.3)  # 改善154: ホバー色を強調（0.15→0.3）
 		btn.add_theme_stylebox_override("hover", hover)
 
 		btn.pressed.connect(_on_skill_chosen.bind(slot, skill_id))
@@ -137,7 +137,7 @@ func show_skill_swap(slot: int, skill_ids: Array) -> void:
 		var style := _make_button_style(skill_data.get("tags", []))
 		btn.add_theme_stylebox_override("normal", style)
 		var hover := style.duplicate()
-		hover.bg_color = hover.bg_color.lightened(0.15)
+		hover.bg_color = hover.bg_color.lightened(0.3)  # 改善154: ホバー色を強調（0.15→0.3）
 		btn.add_theme_stylebox_override("hover", hover)
 
 		btn.pressed.connect(_on_skill_chosen.bind(slot, skill_id))
@@ -180,7 +180,7 @@ func show_support_choice(support_ids: Array) -> void:
 		var style := _make_support_style()
 		btn.add_theme_stylebox_override("normal", style)
 		var hover := style.duplicate()
-		hover.bg_color = hover.bg_color.lightened(0.15)
+		hover.bg_color = hover.bg_color.lightened(0.3)  # 改善154: ホバー色を強調（0.15→0.3）
 		btn.add_theme_stylebox_override("hover", hover)
 
 		btn.pressed.connect(_on_support_chosen.bind(sup_id))
@@ -246,7 +246,7 @@ func show_mod_choice(prefix: Dictionary, suffix: Dictionary) -> void:
 		var style := _make_mod_style("prefix")
 		btn.add_theme_stylebox_override("normal", style)
 		var hover := style.duplicate()
-		hover.bg_color = hover.bg_color.lightened(0.15)
+		hover.bg_color = hover.bg_color.lightened(0.3)  # 改善154: ホバー色を強調（0.15→0.3）
 		btn.add_theme_stylebox_override("hover", hover)
 		btn.pressed.connect(_on_mod_chosen.bind(prefix, "prefix"))
 		buttons_container.add_child(btn)
@@ -259,7 +259,7 @@ func show_mod_choice(prefix: Dictionary, suffix: Dictionary) -> void:
 		var style := _make_mod_style("suffix")
 		btn.add_theme_stylebox_override("normal", style)
 		var hover := style.duplicate()
-		hover.bg_color = hover.bg_color.lightened(0.15)
+		hover.bg_color = hover.bg_color.lightened(0.3)  # 改善154: ホバー色を強調（0.15→0.3）
 		btn.add_theme_stylebox_override("hover", hover)
 		btn.pressed.connect(_on_mod_chosen.bind(suffix, "suffix"))
 		buttons_container.add_child(btn)
@@ -362,7 +362,7 @@ func _show_slot_choice(prompt: String, tower: Node2D, slots: Array[int], callbac
 		var style := _make_button_style(tags)
 		btn.add_theme_stylebox_override("normal", style)
 		var hover := style.duplicate()
-		hover.bg_color = hover.bg_color.lightened(0.15)
+		hover.bg_color = hover.bg_color.lightened(0.3)  # 改善154: ホバー色を強調（0.15→0.3）
 		btn.add_theme_stylebox_override("hover", hover)
 
 		btn.pressed.connect(func() -> void:
@@ -390,7 +390,7 @@ func show_preset_choice(presets_list: Array[Dictionary]) -> void:
 		var style := _make_preset_style(preset.get("id", ""))
 		btn.add_theme_stylebox_override("normal", style)
 		var hover := style.duplicate()
-		hover.bg_color = hover.bg_color.lightened(0.15)
+		hover.bg_color = hover.bg_color.lightened(0.3)  # 改善154: ホバー色を強調（0.15→0.3）
 		btn.add_theme_stylebox_override("hover", hover)
 
 		var preset_id: String = preset.get("id", "")
@@ -426,7 +426,7 @@ func show_chip_choice(category_label: String, chip_options: Array[Dictionary]) -
 		var style := _make_chip_style(rarity)
 		btn.add_theme_stylebox_override("normal", style)
 		var hover := style.duplicate()
-		hover.bg_color = hover.bg_color.lightened(0.15)
+		hover.bg_color = hover.bg_color.lightened(0.3)  # 改善154: ホバー色を強調（0.15→0.3）
 		btn.add_theme_stylebox_override("hover", hover)
 
 		var chip_id: String = chip.get("id", "")
@@ -462,7 +462,7 @@ func show_levelup_choice(level: int, options: Array[Dictionary]) -> void:
 		style.set_content_margin_all(10)
 		btn.add_theme_stylebox_override("normal", style)
 		var hover := style.duplicate()
-		hover.bg_color = hover.bg_color.lightened(0.15)
+		hover.bg_color = hover.bg_color.lightened(0.3)  # 改善154: ホバー色を強調（0.15→0.3）
 		btn.add_theme_stylebox_override("hover", hover)
 
 		var opt_id: String = opt.get("id", "")
@@ -477,6 +477,16 @@ func show_levelup_choice(level: int, options: Array[Dictionary]) -> void:
 	get_tree().paused = true
 
 func hide_ui() -> void:
+	# 改善155: 選択後のUI閉じる前に白フラッシュ（「選択が確定した」瞬間を強調）
+	var hf := ColorRect.new()
+	hf.color = Color(1.0, 1.0, 1.0, 0.35)
+	hf.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hf.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hf.z_index = 300
+	add_child(hf)
+	var hft := hf.create_tween()
+	hft.tween_property(hf, "color:a", 0.0, 0.25).set_trans(Tween.TRANS_QUAD)
+	hft.tween_callback(hf.queue_free)
 	visible = false
 
 # --- Auto-link トースト ---

@@ -63,6 +63,30 @@ func _ready() -> void:
 	spawn_tween.tween_property(self, "scale", Vector2(1.0, 1.0), 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	spawn_tween.tween_property(self, "modulate:a", 1.0, 0.18)
 
+	# 改善148: スポーン時の地面波紋（「この場所に敵が現れた」を空間で示す）
+	var sr := get_tree().current_scene
+	if sr:
+		var sp_ring := Polygon2D.new()
+		var sp_pts := PackedVector2Array()
+		var sp_sides := 6 if not is_boss else 12
+		var sp_r := 10.0 if not is_boss else 25.0
+		for _spi in range(sp_sides):
+			sp_pts.append(Vector2(cos(_spi * TAU / sp_sides), sin(_spi * TAU / sp_sides)) * sp_r)
+		sp_ring.polygon = sp_pts
+		# ボスは赤、エリートは金、通常は白
+		var sp_color := Color(1.0, 0.85, 0.3, 0.65) if is_elite else Color(1.0, 1.0, 1.0, 0.45)
+		if is_boss:
+			sp_color = Color(1.0, 0.2, 0.1, 0.75)
+		sp_ring.color = sp_color
+		sp_ring.global_position = global_position
+		sp_ring.z_index = 50
+		sr.add_child(sp_ring)
+		var srt := sp_ring.create_tween()
+		srt.set_parallel(true)
+		srt.tween_property(sp_ring, "scale", Vector2(4.5, 4.5), 0.45).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		srt.tween_property(sp_ring, "modulate:a", 0.0, 0.45)
+		srt.chain().tween_callback(sp_ring.queue_free)
+
 func _install_stylized_visual() -> void:
 	var legacy := get_node_or_null("Visual")
 	if legacy and legacy is CanvasItem:
