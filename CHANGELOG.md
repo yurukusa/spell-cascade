@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.9.4 (2026-02-20)
+
+### Fix: クラッシュ防止ガード多数 — Web環境安定化
+
+ツリー外ノードへの操作で発生する `get_tree()` 系エラーをすべてガード:
+
+- **auto_attack.gd**: `add_child` 前にツリー存在確認（ツリー外なら bullet を解放）
+- **enemy.gd**: `_spawn_entry_flash()` を `init()` から `_ready()` へ移動（ツリー追加後に実行する必要があるため）
+- **player.gd**: `_hit_feedback` コルーチン内でツリー脱退を検知して `time_scale` を復元
+- **sfx.gd**: `play_boss_warning` コルーチンの await 前後でツリー確認
+- **title.gd**: `_transitioning` フラグ追加でダブルクリック/連打による二重シーン遷移を防止
+- **wave_manager.gd**: `_on_enemy_died` コルーチン内の await 前後でツリー確認
+
+これらは特にWeb(HTML5)ビルドでゲーム終了時/シーン遷移時に発生するクラッシュを防ぐ。
+
+---
+
 ## v0.9.3 (2026-02-20)
 
 ### Audio: BGM License Documentation + Intense Track Added

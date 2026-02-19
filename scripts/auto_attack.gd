@@ -92,6 +92,9 @@ func _on_body_entered(body):
 	bullet.set("speed", bullet_speed)
 	bullet.set("damage", bullet_damage)
 
+	if not is_inside_tree() or get_tree().current_scene == null:
+		bullet.queue_free()
+		return
 	get_tree().current_scene.add_child(bullet)
 
 func _create_bullet_visual() -> Node2D:

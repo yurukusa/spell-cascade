@@ -68,6 +68,8 @@ func _ready() -> void:
 	spawn_tween.tween_property(self, "scale", Vector2(1.0, 1.0), 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	spawn_tween.tween_property(self, "modulate:a", 1.0, 0.18)
 
+	# 改善106: エントリーフラッシュ（init()からここへ移動。ツリー追加後に実行する必要がある）
+	_spawn_entry_flash()
 	# 改善148: スポーン時の地面波紋（「この場所に敵が現れた」を空間で示す）
 	var sr := get_tree().current_scene
 	if sr:
@@ -605,8 +607,7 @@ func init(target: Node2D, spd: float = 80.0, health: float = 30.0, dmg: float = 
 	if old_visual:
 		old_visual.queue_free()
 	_install_stylized_visual()
-	# 改善106: スポーン時のエントリーフラッシュ（「敵が来た！」の出現感を強調）
-	_spawn_entry_flash()
+	# 改善106: エントリーフラッシュは_ready()で呼ぶ（init()時はまだツリー外のため）
 
 func set_texture(tex: Texture2D) -> void:
 	var visual := $Visual as Sprite2D
@@ -890,6 +891,8 @@ func _spawn_dying_ring() -> void:
 
 func _spawn_entry_flash() -> void:
 	## 改善106: スポーン時の出現フラッシュ（敵の登場を視覚的にアナウンス）
+	if not is_inside_tree():
+		return
 	var scene_root := get_tree().current_scene
 	if scene_root == null:
 		return

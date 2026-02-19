@@ -379,7 +379,11 @@ func play_boss_warning() -> void:
 	_boss_entrance_player.volume_db = -10.0   # 控えめに（実際の登場より小さく）
 	_boss_entrance_player.play()
 	# 登場時に元に戻す（play_boss_entrance()は1.0で呼ぶ）
+	if not is_inside_tree():
+		return
 	await get_tree().create_timer(2.0).timeout
+	if not is_inside_tree():
+		return
 	_boss_entrance_player.pitch_scale = 1.0
 	_boss_entrance_player.volume_db = -3.0
 

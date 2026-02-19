@@ -154,7 +154,11 @@ func _on_enemy_died(_enemy: Node2D) -> void:
 		wave_cleared.emit(current_wave)
 
 		# 次のWaveまで少し待つ
+		if not is_inside_tree():
+			return
 		await get_tree().create_timer(1.5).timeout
+		if not is_inside_tree():
+			return
 		_next_wave()
 
 func _on_splitter_died(pos: Vector2) -> void:

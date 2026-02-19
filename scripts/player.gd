@@ -63,6 +63,9 @@ func _hit_feedback(amount: float) -> void:
 	# ヒットフリーズ（50ms）— 大ダメージほど長い
 	var freeze_ms := 30 if amount < 15.0 else 50
 	Engine.time_scale = 0.05
+	if not is_inside_tree():
+		Engine.time_scale = 1.0
+		return
 	await get_tree().create_timer(freeze_ms * 0.001 * 0.05).timeout  # real time
 	Engine.time_scale = 1.0
 

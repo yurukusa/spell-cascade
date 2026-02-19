@@ -9,6 +9,7 @@ var volume_slider: HSlider = null
 var fullscreen_check: CheckBox = null
 var _title_label: Label = null
 var _particle_timer := 0.0
+var _transitioning := false  # Web環境でのダブルクリック/連打による二重シーン遷移を防止
 
 func _ready() -> void:
 	# Dark background
@@ -211,12 +212,16 @@ func _style_menu_button(btn: Button, accent: Color) -> void:
 	btn.add_theme_stylebox_override("focus", focus)
 
 func _on_start() -> void:
+	if _transitioning:
+		return
+	_transitioning = true
 	# change_scene_to_file はwebビルドでスレッドローダーが使われ失敗する場合がある。
 	# load() + change_scene_to_packed() を使うと確実に同期ロードされる。
 	var scene: PackedScene = load("res://scenes/game.tscn")
 	if scene != null:
 		get_tree().change_scene_to_packed(scene)
 	else:
+		_transitioning = false
 		push_error("Failed to load game.tscn")
 
 func _on_settings() -> void:
