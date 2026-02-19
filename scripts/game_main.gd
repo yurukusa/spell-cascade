@@ -598,6 +598,10 @@ func _update_distance_display() -> void:
 	distance_label.text = "%dm" % int(distance_m)
 
 func _update_build_display() -> void:
+	# build_label is permanently hidden in production — debug text must not show.
+	# Scene-level visible=false is the primary guard; this is a secondary safety check.
+	if not build_label.visible:
+		return
 	var lines: PackedStringArray = []
 
 	# Behavior Chips表示（"manual"はデータにないので直接表示）
