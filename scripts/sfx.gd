@@ -47,6 +47,9 @@ const DOT_COOLDOWN := 0.35  # 350ms以内は再生しない（連続DoTのノイ
 # 改善178: ゲームオーバーSE（低音下降スイープ + 残響）
 # Why: BGM停止→無音のみでは敗北の「重さ」が伝わらない。"DOOM"感を音で完結させる。
 var _game_over_player: AudioStreamPlayer
+# 改善179: 勝利ファンファーレSE（上昇アルペジオ + 鐘残響）
+# Why: ゲームオーバーに下降音があるなら、勝利に上昇ファンファーレが必要。喜びを音で完結させる。
+var _victory_player: AudioStreamPlayer
 # 改善174: コンボティアアップSE（COMBO=3/RAMPAGE=8/MASSACRE=15/GODLIKE=30）
 # Why: 視覚的なスケールパンチ+リングに対応する音がなかった。達成感を音で確認させる。
 var _combo_tier_players: Array[AudioStreamPlayer] = []
@@ -199,6 +202,12 @@ func _ready() -> void:
 	_game_over_player.volume_db = -2.0  # ゲームオーバーは目立たせる
 	add_child(_game_over_player)
 
+	# 改善179: 勝利ファンファーレSE
+	_victory_player = AudioStreamPlayer.new()
+	_victory_player.stream = _gen_victory()
+	_victory_player.volume_db = -2.0  # 勝利も目立たせる
+	add_child(_victory_player)
+
 	# 改善175: 回復SE (small/large 2段階)
 	_heal_small_player = AudioStreamPlayer.new()
 	_heal_small_player.stream = _gen_heal(false)
@@ -339,6 +348,10 @@ func play_combo_tier(tier: int) -> void:
 ## 改善178: ゲームオーバーSE。BGM停止直後に呼ぶ。
 func play_game_over() -> void:
 	_game_over_player.play()
+
+## 改善179: 勝利ファンファーレSE。BGM停止直後に呼ぶ。
+func play_victory() -> void:
+	_victory_player.play()
 
 ## 改善175: 回復SE。amount >= 50 で大回復音、それ以下で小回復音。
 ## Why: life stealは高頻度なのでHEAL_COOLDOWN(1.2s)でスロットル。
@@ -954,5 +967,44 @@ func _gen_game_over() -> AudioStreamWAV:
 			var echo_env := exp(-echo_t * 5.0)
 			s = echo_env * 0.18 * sin(TAU * freq_end * t)
 			s += echo_env * 0.07 * sin(TAU * freq_end * 0.5 * t)
+		samples[i] = s
+	return _make_stream(samples)
+
+## 改善179: 勝利ファンファーレSE生成
+## C4→E4→G4→C5 上昇アルペジオ (0.5s) + 鐘残響 (0.5s)
+## Why: ゲームオーバーの下降音と対称。「上昇」で勝利・達成を身体で感じさせる。
+func _gen_victory() -> AudioStreamWAV:
+	var fanfare_dur := 0.5
+	var ring_dur := 0.5
+	var total_dur := fanfare_dur + ring_dur
+	var cnt := int(SAMPLE_RATE * total_dur)
+	var samples := PackedFloat32Array()
+	samples.resize(cnt)
+	# C4→E4→G4→C5 (明るい長調の完全終止感)
+	var notes := [261.63, 329.63, 392.0, 523.25]
+	var nd := fanfare_dur / 4.0
+	for i in cnt:
+		var t := float(i) / SAMPLE_RATE
+		var s := 0.0
+		if t < fanfare_dur:
+			var ni := mini(int(t / nd), 3)
+			var nt := t - ni * nd
+			var freq: float = notes[ni]
+			var env := 1.0
+			if nt < 0.008: env = nt / 0.008
+			if ni < 3 and nt > nd - 0.015: env = (nd - nt) / 0.015
+			if ni == 3: env *= exp(-nt * 2.5)  # 最終音はゆっくり減衰
+			# 基音 + 明るい倍音（鐘・グロッケン風）
+			s = env * 0.50 * sin(TAU * freq * t)
+			s += env * 0.22 * sin(TAU * freq * 2.0 * t)
+			s += env * 0.10 * sin(TAU * freq * 3.0 * t)
+			s += env * 0.05 * sin(TAU * freq * 4.0 * t)
+		else:
+			# 鐘残響: C5がゆっくり消えていく
+			var ring_t := t - fanfare_dur
+			var ring_env := exp(-ring_t * 2.8)
+			var freq: float = notes[3]
+			s = ring_env * 0.30 * sin(TAU * freq * t)
+			s += ring_env * 0.12 * sin(TAU * freq * 2.0 * t)
 		samples[i] = s
 	return _make_stream(samples)

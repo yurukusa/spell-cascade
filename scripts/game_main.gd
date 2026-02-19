@@ -2692,6 +2692,7 @@ func _win_game() -> void:
 	game_over = true
 	_reset_time_scale()
 	SFX.stop_bgm()
+	SFX.play_victory()  # 改善179: 上昇ファンファーレで勝利の喜びを音で完結
 	_show_result_screen(true)
 
 func _show_result_screen(is_victory: bool) -> void:
