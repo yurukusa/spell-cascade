@@ -1608,6 +1608,16 @@ func _on_enemy_died(enemy: Node2D) -> void:
 		xpt.tween_property(xp_pip, "modulate:a", 0.0, 0.7).set_delay(0.25)
 		xpt.chain().tween_callback(xp_pip.queue_free)
 
+	# 改善166: upgrade_on_kill_chance mod — kill時にボーナスアップグレードを得る
+	if not upgrade_ui.visible:
+		for atk in get_tree().get_nodes_in_group("tower_attacks"):
+			var s: Dictionary = atk.get("stats") if atk.get("stats") != null else {}
+			var chance: float = s.get("upgrade_on_kill_chance", 0.0)
+			if chance > 0.0 and randf() < chance:
+				upgrade_events_given += 1
+				_show_upgrade_choice()
+				break  # 複数スロットで重複発動しない
+
 	# キルマイルストーン（10, 25, 50, 100, 200キル: 達成感の積み上げ）
 	if kill_count in [10, 25, 50, 100, 200]:
 		_announce_kill_milestone(kill_count)
