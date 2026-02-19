@@ -3,6 +3,7 @@ extends CanvasLayer
 ## BuildUpgradeUI - ビルド判断UI。
 ## スキル選択、サポートリンク選択、Mod選択の3モードを持つ。
 ## 選択中はゲーム一時停止。
+## 改善186: パネル登場アニメーション（スケールイン+フェードイン）
 
 signal upgrade_chosen(data: Dictionary)
 
@@ -10,6 +11,7 @@ var panel: PanelContainer
 var title_label: Label
 var buttons_container: VBoxContainer
 var build_system: Node
+var _overlay: ColorRect = null  # 改善186: アニメーション用参照
 
 func _ready() -> void:
 	layer = 10
@@ -23,6 +25,7 @@ func _build_ui() -> void:
 	overlay.name = "Overlay"
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.color = Color(0, 0, 0, 0.65)
+	_overlay = overlay  # 改善186: アニメーション用に保持
 	add_child(overlay)
 
 	panel = PanelContainer.new()
@@ -95,8 +98,7 @@ func show_skill_choice(slot: int, skill_ids: Array) -> void:
 		btn.pressed.connect(_on_skill_chosen.bind(slot, skill_id))
 		buttons_container.add_child(btn)
 
-	visible = true
-	get_tree().paused = true
+	_show_animated()
 
 func _on_skill_chosen(slot: int, skill_id: String) -> void:
 	SFX.play_ui_select()
@@ -154,8 +156,7 @@ func show_skill_swap(slot: int, skill_ids: Array) -> void:
 	)
 	buttons_container.add_child(skip_btn)
 
-	visible = true
-	get_tree().paused = true
+	_show_animated()
 
 # --- サポート選択 ---
 
@@ -186,8 +187,7 @@ func show_support_choice(support_ids: Array) -> void:
 		btn.pressed.connect(_on_support_chosen.bind(sup_id))
 		buttons_container.add_child(btn)
 
-	visible = true
-	get_tree().paused = true
+	_show_animated()
 
 func _on_support_chosen(support_id: String) -> void:
 	SFX.play_ui_select()
@@ -275,8 +275,7 @@ func show_mod_choice(prefix: Dictionary, suffix: Dictionary) -> void:
 	)
 	buttons_container.add_child(skip_btn)
 
-	visible = true
-	get_tree().paused = true
+	_show_animated()
 
 func _on_mod_chosen(mod_data: Dictionary, mod_type: String) -> void:
 	SFX.play_ui_select()
@@ -397,8 +396,7 @@ func show_preset_choice(presets_list: Array[Dictionary]) -> void:
 		btn.pressed.connect(_on_preset_chosen.bind(preset_id))
 		buttons_container.add_child(btn)
 
-	visible = true
-	get_tree().paused = true
+	_show_animated()
 
 func _on_preset_chosen(preset_id: String) -> void:
 	SFX.play_ui_select()
@@ -433,8 +431,7 @@ func show_chip_choice(category_label: String, chip_options: Array[Dictionary]) -
 		btn.pressed.connect(_on_chip_chosen.bind(chip_id))
 		buttons_container.add_child(btn)
 
-	visible = true
-	get_tree().paused = true
+	_show_animated()
 
 func _on_chip_chosen(chip_id: String) -> void:
 	SFX.play_ui_select()
@@ -473,8 +470,23 @@ func show_levelup_choice(level: int, options: Array[Dictionary]) -> void:
 		)
 		buttons_container.add_child(btn)
 
+	_show_animated()
+
+func _show_animated() -> void:
+	## 改善186: パネルをスケールイン+フェードインで表示
+	## なぜ: 即時ポップインは唐突。アニメーションで「選択の時間が来た」感を演出
+	if _overlay:
+		_overlay.modulate.a = 0.0
+	panel.scale = Vector2(0.85, 0.85)
+	panel.modulate.a = 0.0
 	visible = true
 	get_tree().paused = true
+	var t := create_tween()
+	t.set_parallel(true)
+	if _overlay:
+		t.tween_property(_overlay, "modulate:a", 1.0, 0.18).set_trans(Tween.TRANS_QUAD)
+	t.tween_property(panel, "modulate:a", 1.0, 0.18).set_trans(Tween.TRANS_QUAD)
+	t.tween_property(panel, "scale", Vector2(1.0, 1.0), 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func hide_ui() -> void:
 	# 改善155: 選択後のUI閉じる前に白フラッシュ（「選択が確定した」瞬間を強調）
