@@ -200,6 +200,20 @@ func _draw_rune_circle(parent: Node2D, x: float, y: float, seed_val: int) -> voi
 	glow.color = Color(0.2, 0.1, 0.35, 0.15)
 	parent.add_child(glow)
 
+	# 改善201: ルーンサークルの微光パルス（静的な背景に「生きている」感を与える）
+	# Why: 背景全体が完全静止していてゲーム世界が「死んでいる」。
+	# ルーンが2〜3秒周期でゆっくり呼吸することで魔法的雰囲気を強化する。
+	# サークルごとに周期をずらして同期を避ける（seed_valで個別化）。
+	var pulse_period := 2.0 + float(seed_val % 12) * 0.1  # 2.0〜3.1s の間でバラつく
+	var glow_pulse := glow.create_tween()
+	glow_pulse.set_loops()
+	glow_pulse.tween_property(glow, "modulate:a", 1.8, pulse_period).set_trans(Tween.TRANS_SINE)
+	glow_pulse.tween_property(glow, "modulate:a", 0.4, pulse_period).set_trans(Tween.TRANS_SINE)
+	var ring_pulse := ring.create_tween()
+	ring_pulse.set_loops()
+	ring_pulse.tween_property(ring, "modulate:a", 1.6, pulse_period * 1.05).set_trans(Tween.TRANS_SINE)
+	ring_pulse.tween_property(ring, "modulate:a", 0.35, pulse_period * 1.05).set_trans(Tween.TRANS_SINE)
+
 func _draw_column_stump(parent: Node2D, x: float, y: float) -> void:
 	## 壊れた柱の切り株（暗灰色の八角形）
 	var stump := Polygon2D.new()
