@@ -95,8 +95,25 @@ func show_choices(orb_types: Array) -> void:
 		btn.pressed.connect(_on_orb_chosen.bind(orb_type))
 		buttons_container.add_child(btn)
 
+	# 改善207: パネルポップイン（Wave Clear の達成感をオーブ選択UIの登場でさらに高める）
+	# Why: visible=trueの瞬間表示は「急に止まった」という断絶感。
+	# scale pop + ボタン千鳥入場で「特別な選択の瞬間」を演出。
+	# TWEEN_PAUSE_PROCESS: paused=true後もtweenが動くように明示指定。
+	panel.scale = Vector2(0.7, 0.7)
+	panel.modulate.a = 0.0
 	visible = true
 	get_tree().paused = true
+	var pop := create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	pop.set_parallel(true)
+	pop.tween_property(panel, "modulate:a", 1.0, 0.12)
+	pop.tween_property(panel, "scale", Vector2(1.08, 1.08), 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	pop.chain().tween_property(panel, "scale", Vector2(1.0, 1.0), 0.1).set_trans(Tween.TRANS_QUAD)
+	var btns := buttons_container.get_children()
+	for i in range(btns.size()):
+		btns[i].modulate.a = 0.0
+		var bt := create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		bt.tween_interval(0.12 + i * 0.05)
+		bt.tween_property(btns[i], "modulate:a", 1.0, 0.1)
 
 func hide_ui() -> void:
 	visible = false
