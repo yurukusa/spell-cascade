@@ -1999,11 +1999,16 @@ func _announce_desperate_push() -> void:
 	ann.add_theme_constant_override("shadow_offset_y", 4)
 	ann.custom_minimum_size = Vector2(760, 0)
 	ann.position = Vector2(200, 230)
+	# 改善203: FINAL PUSHスケールパンチイン（STAGE 2/3と同様の登場演出 + より大きく）
+	# Why: STAGE告知に scale 2.0→1.0 があるのに最重要局面の FINAL PUSH にない。
+	# ゲームのクライマックスなので STAGE 告知より誇張した 2.4→1.0 にする。
+	ann.scale = Vector2(2.4, 2.4)
 	ann.z_index = 200
 	ui_layer.add_child(ann)
 	var tween := ann.create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(ann, "position:y", 185.0, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(ann, "scale", Vector2(1.0, 1.0), 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_property(ann, "modulate:a", 0.0, 3.0).set_delay(1.0)
 	tween.chain().tween_callback(ann.queue_free)
 	tower.shake(5.0)
