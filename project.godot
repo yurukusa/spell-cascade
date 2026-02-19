@@ -49,10 +49,10 @@ move_right={
 }
 
 [autoload]
-
+AutoPlayer="*res://scripts/debug/AutoPlayer.gd"
 SaveManager="*res://scripts/save_manager.gd"
 BuildSystem="*res://scripts/build_system.gd"
 SFX="*res://scripts/sfx.gd"
 ;Screenshot="*res://scripts/screenshot.gd"
 ;SpellCascadeAutoTest="*res://scripts/debug/SpellCascadeAutoTest.gd"
-ScreenshotCapture="*res://scripts/debug/ScreenshotCapture.gd"
+;ScreenshotCapture="*res://scripts/debug/ScreenshotCapture.gd"
