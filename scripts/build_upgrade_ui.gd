@@ -502,17 +502,25 @@ func _show_animated() -> void:
 			t.tween_property(btns[i], "modulate:a", 1.0, BTN_FADE_DUR).set_delay(BTN_DELAY_BASE + i * BTN_STAGGER).set_trans(Tween.TRANS_QUAD)
 
 func hide_ui() -> void:
-	# 改善155: 選択後のUI閉じる前に白フラッシュ（「選択が確定した」瞬間を強調）
-	var hf := ColorRect.new()
-	hf.color = Color(1.0, 1.0, 1.0, 0.35)
-	hf.set_anchors_preset(Control.PRESET_FULL_RECT)
-	hf.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hf.z_index = 300
-	add_child(hf)
-	var hft := hf.create_tween()
-	hft.tween_property(hf, "color:a", 0.0, 0.25).set_trans(Tween.TRANS_QUAD)
-	hft.tween_callback(hf.queue_free)
-	visible = false
+	# 改善214: パネル縮小フェードアウト（旧#155の白フラッシュはCanvasLayer invisible後に実行されて
+	# 視覚的に無効だったので、正しい退場アニメーションに差し替え）
+	# ボタンを即無効化してダブルクリック誤操作を防ぐ
+	for btn in buttons_container.get_children():
+		if btn is Control:
+			btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var ht := create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	ht.set_parallel(true)
+	ht.tween_property(panel, "scale", Vector2(0.85, 0.85), 0.14).set_trans(Tween.TRANS_QUAD)
+	ht.tween_property(panel, "modulate:a", 0.0, 0.14).set_trans(Tween.TRANS_QUAD)
+	if _overlay:
+		ht.tween_property(_overlay, "modulate:a", 0.0, 0.14).set_trans(Tween.TRANS_QUAD)
+	ht.chain().tween_callback(func() -> void:
+		visible = false
+		panel.scale = Vector2(1.0, 1.0)
+		panel.modulate.a = 1.0
+		if _overlay:
+			_overlay.modulate.a = 1.0
+	)
 
 # --- Auto-link トースト ---
 
