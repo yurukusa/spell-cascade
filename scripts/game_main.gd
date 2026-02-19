@@ -1153,12 +1153,14 @@ func _spawn_boss() -> void:
 	label.position = Vector2(640 - 200, 120)
 	label.custom_minimum_size = Vector2(400, 0)
 	label.z_index = 200
+	# 改善225: BOSS INCOMING!スケールパンチイン（旧: 1.0→1.3→1.0 BOUNCE → 新: 2.0→1.0 TRANS_BACK）
+	# Why: 旧パターンは「膨らんで戻る」で弱い。ボス到来は最重要の緊張瞬間なので
+	# STAGE2/OVERTIME/CLEARED!等と同様に 2.0→1.0 TRANS_BACK で「一撃感」に統一する。
+	label.scale = Vector2(2.0, 2.0)
 	ui_layer.add_child(label)
 
 	var tween := label.create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(label, "scale", Vector2(1.3, 1.3), 0.3).set_trans(Tween.TRANS_BOUNCE)
-	tween.chain().tween_property(label, "scale", Vector2(1.0, 1.0), 0.2)
+	tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.chain().tween_property(label, "modulate:a", 0.0, 1.5).set_delay(1.0)
 	tween.chain().tween_callback(label.queue_free)
 
