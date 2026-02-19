@@ -2126,10 +2126,16 @@ func _show_combo_break(count: int) -> void:
 	br.custom_minimum_size = Vector2(180, 0)
 	br.position = combo_label_node.position + Vector2(0, 26)
 	br.z_index = 90
+	# 改善228: COMBO BREAKラベルのフェードイン（即時出現の断絶感を除去）
+	# Why: コンボが途切れた瞬間のラベルが「ぱっと出る」と「シェイク→崩壊」演出の流れが
+	# 急すぎる。0.12sのフェードインで登場を滑らかにし、崩壊演出の「重さ」を引き立てる。
+	br.modulate.a = 0.0
 	ui_layer.add_child(br)
 	var tween := br.create_tween()
-	tween.tween_property(br, "modulate:a", 0.0, 1.4).set_delay(0.4)
-	tween.chain().tween_callback(br.queue_free)
+	tween.tween_property(br, "modulate:a", 1.0, 0.12).set_trans(Tween.TRANS_QUAD)
+	tween.tween_interval(0.4)
+	tween.tween_property(br, "modulate:a", 0.0, 1.4)
+	tween.tween_callback(br.queue_free)
 	# 改善130: 高コンボブレーク時のシェイク（15連続以上が途切れた瞬間の喪失感を体感させる）
 	if count >= 15 and is_instance_valid(tower):
 		tower.shake(3.5)
