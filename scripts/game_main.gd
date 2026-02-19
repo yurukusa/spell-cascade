@@ -843,6 +843,17 @@ func _setup_tower_attacks() -> void:
 			stats["projectile_count"] = 1
 			stats["damage"] = int(stats["damage"] * 3.0)
 			stats["synergy_thunder_aoe"] = 80.0
+		# 改善255: chaos_engine — 3+ユニークprefix: 全prefix由来ボーナス×1.5
+		# Why: 多様modを積んだビルドへの報酬。クリット率やフリーズ時間が実感レベルで伸びる。
+		if "chaos_engine" in _active_synergy_ids:
+			for _ce_key in ["crit_chance", "freeze_chance", "freeze_duration",
+							"ghost_chance", "life_steal_pct", "splash_radius",
+							"on_hit_explode_radius", "homing_strength"]:
+				if stats.get(_ce_key, 0.0) > 0.0:
+					stats[_ce_key] = stats[_ce_key] * 1.5
+			# crit_mult: 1.0がベースなのでボーナス部分のみ×1.5
+			if stats.get("crit_mult", 1.0) > 1.0:
+				stats["crit_mult"] = 1.0 + (stats["crit_mult"] - 1.0) * 1.5
 
 		var attack_node := Node2D.new()
 		var attack_script := load("res://scripts/tower_attack.gd")
