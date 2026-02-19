@@ -62,6 +62,7 @@ var _tower_core_poly: Polygon2D = null  # HPで色変化するコア（改善40�
 # Loop 4 追加変数
 var _ambient_ring_timer := 0.0  # 改善109: アンビエントパルスリングタイマー
 var _trail_timer := 0.0  # 改善113: 移動トレイルタイマー
+const TRAIL_INTERVAL := 0.05  # 改善234: 移動トレイル生成間隔（秒）
 var _crush_pulse_timer := 0.0  # 改善108: クラッシュ中のパルスリングタイマー
 var _hp_crit_ring_timer := 0.0  # 改善115: HP危機のグローリングタイマー
 
@@ -865,6 +866,26 @@ func camera_zoom_pulse(amount: float = 0.05, duration: float = 0.3) -> void:
 	zt.tween_property(cam, "zoom", Vector2.ONE * (1.0 + amount), duration * 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	zt.tween_property(cam, "zoom", Vector2.ONE, duration * 0.65).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
+func _spawn_trail_ghost() -> void:
+	## 改善234: 移動トレイルゴースト（高速移動時の残像）
+	## Why: velocity>=100px/sでゴーストを0.05s間隔で生成し「俊敏さ」を視覚化。
+	## タワーの後ろ(z_index=-1)に配置し、0.2sでフェードアウト→queue_free。
+	var ghost := Polygon2D.new()
+	var pts := PackedVector2Array()
+	var sides := 10
+	var radius := 26.0
+	for i in sides:
+		var a := float(i) * TAU / sides
+		pts.append(Vector2(cos(a), sin(a)) * radius)
+	ghost.polygon = pts
+	ghost.color = Color(0.35, 0.75, 1.0, 0.18)
+	ghost.global_position = global_position
+	ghost.z_index = -1  # タワーの後ろに表示（本体より奥）
+	get_parent().add_child(ghost)
+	var tw := ghost.create_tween()
+	tw.tween_property(ghost, "color:a", 0.0, 0.2).set_trans(Tween.TRANS_QUAD)
+	tw.tween_callback(ghost.queue_free)
+
 func _process(delta: float) -> void:
 	if shake_intensity > 0.01:
 		var cam := get_node_or_null("Camera")
@@ -879,3 +900,9 @@ func _process(delta: float) -> void:
 		var cam := get_node_or_null("Camera")
 		if cam and cam is Camera2D:
 			cam.offset = Vector2.ZERO
+	# 改善234: 移動トレイル（高速移動中にゴーストの残像を生成）
+	# Why: 速い移動に「俊敏さ」の視覚フィードバック。残像が消えることで軌跡を示す。
+	_trail_timer -= delta
+	if _trail_timer <= 0.0 and velocity.length() >= 100.0:
+		_trail_timer = TRAIL_INTERVAL
+		_spawn_trail_ghost()
