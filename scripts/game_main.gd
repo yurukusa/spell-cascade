@@ -1809,6 +1809,10 @@ func _update_combo_display() -> void:
 		var tween := combo_label_node.create_tween()
 		tween.tween_property(combo_label_node, "scale", Vector2(1.3, 1.3), 0.08).set_trans(Tween.TRANS_BACK)
 		tween.tween_property(combo_label_node, "scale", Vector2(1.0, 1.0), 0.12)
+		# 改善174: コンボティアアップSE（視覚的スケールパンチに対応する音）
+		# tier 0=3kills, 1=8kills, 2=15kills, 3=30kills
+		var sfx_tier := [3, 8, 15, 30].find(combo_count)
+		SFX.play_combo_tier(sfx_tier)
 		# 改善64: ティアアップ時はタワーにも振動（スクリーン全体で「昇格」を感じる）
 		var shake_lvl := 2.5 if combo_count == 8 else (3.5 if combo_count == 15 else 5.0)
 		if is_instance_valid(tower):

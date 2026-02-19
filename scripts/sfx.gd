@@ -44,6 +44,9 @@ const DAMAGE_COOLDOWN := 0.15  # 被弾SE連続再生を制限（150ms間隔）
 var _dot_player: AudioStreamPlayer
 var _dot_cooldown := 0.0
 const DOT_COOLDOWN := 0.35  # 350ms以内は再生しない（連続DoTのノイズ抑制）
+# 改善174: コンボティアアップSE（COMBO=3/RAMPAGE=8/MASSACRE=15/GODLIKE=30）
+# Why: 視覚的なスケールパンチ+リングに対応する音がなかった。達成感を音で確認させる。
+var _combo_tier_players: Array[AudioStreamPlayer] = []
 
 const SAMPLE_RATE := 22050
 
@@ -180,6 +183,16 @@ func _ready() -> void:
 		add_child(p)
 		_damage_taken_players.append(p)
 
+	# 改善174: コンボティアアップSE — 4段階それぞれ異なる音色
+	var combo_streams := [_gen_combo_tier(0), _gen_combo_tier(1), _gen_combo_tier(2), _gen_combo_tier(3)]
+	var combo_vols := [-6.0, -5.0, -4.0, -2.0]  # GODLIKEほど大きく
+	for i in 4:
+		var p := AudioStreamPlayer.new()
+		p.stream = combo_streams[i]
+		p.volume_db = combo_vols[i]
+		add_child(p)
+		_combo_tier_players.append(p)
+
 func _process(delta: float) -> void:
 	if _low_hp_cooldown > 0.0:
 		_low_hp_cooldown -= delta
@@ -284,6 +297,16 @@ func play_dot_tick(element: String = "fire") -> void:
 	_dot_player.pitch_scale = 1.4 if element == "fire" else 0.8
 	_dot_player.play()
 	_dot_cooldown = DOT_COOLDOWN
+
+## 改善174: コンボティアアップSE
+## tier 0=COMBO(3), 1=RAMPAGE(8), 2=MASSACRE(15), 3=GODLIKE(30)
+## Why: ティア昇格は「報酬の頂点」の瞬間。音がなかったので達成感が半減していた。
+func play_combo_tier(tier: int) -> void:
+	if tier < 0 or tier >= _combo_tier_players.size():
+		return
+	var p := _combo_tier_players[tier]
+	p.pitch_scale = 1.0  # 固定ピッチ（tierごとに設計済み）
+	p.play()
 
 # --- サウンド生成 ---
 
@@ -711,3 +734,92 @@ func _gen_bgm_boss() -> AudioStreamWAV:
 	stream.loop_begin = 0
 	stream.loop_end = count
 	return stream
+
+## 改善174: コンボティアアップSE生成
+## tier 0 (COMBO×3): 短い2音上昇 (E5→A5, 0.12s×2=0.24s) — 「最初の達成」を明るく
+## tier 1 (RAMPAGE×8): 力強い和音スタブ (C5+G5同時, 0.3s) — 「危なくなってきた」緊張感
+## tier 2 (MASSACRE×15): 3音劇的上昇 (A4→E5→A5, 0.15s×3=0.45s) — 「壊れてる！」の爽快感
+## tier 3 (GODLIKE×30): 4音ファンファーレ (C5→G5→C6→E6, 0.1s×4+余韻=0.55s) — 最高の報酬音
+func _gen_combo_tier(tier: int) -> AudioStreamWAV:
+	match tier:
+		0:  # COMBO: E5(659)→A5(880) 2音 短いアクセント
+			var dur := 0.24
+			var cnt := int(SAMPLE_RATE * dur)
+			var samples := PackedFloat32Array()
+			samples.resize(cnt)
+			var notes := [659.25, 880.0]
+			var nd := dur / 2.0
+			for i in cnt:
+				var t := float(i) / SAMPLE_RATE
+				var ni := mini(int(t / nd), 1)
+				var nt := t - ni * nd
+				var freq: float = notes[ni]
+				var env := 1.0
+				if nt < 0.005: env = nt / 0.005
+				elif nt > nd - 0.02: env = (nd - nt) / 0.02
+				var s := env * 0.35 * sin(TAU * freq * t)
+				s += env * 0.12 * sin(TAU * freq * 2.0 * t)
+				samples[i] = s
+			return _make_stream(samples)
+		1:  # RAMPAGE: C5+G5 同時和音 (0.3s急速減衰) — 力強い一撃感
+			var dur := 0.3
+			var cnt := int(SAMPLE_RATE * dur)
+			var samples := PackedFloat32Array()
+			samples.resize(cnt)
+			for i in cnt:
+				var t := float(i) / SAMPLE_RATE
+				var env := exp(-t * 8.0)
+				if t < 0.004: env = t / 0.004
+				var s := env * 0.4 * sin(TAU * 523.25 * t)   # C5
+				s += env * 0.3 * sin(TAU * 783.99 * t)       # G5
+				s += env * 0.15 * sin(TAU * 1046.5 * t)      # C6 (倍音)
+				samples[i] = s
+			return _make_stream(samples)
+		2:  # MASSACRE: A4→E5→A5 3音劇的上昇 (0.45s) — 爽快感
+			var dur := 0.45
+			var cnt := int(SAMPLE_RATE * dur)
+			var samples := PackedFloat32Array()
+			samples.resize(cnt)
+			var notes := [440.0, 659.25, 880.0]
+			var nd := dur / 3.0
+			for i in cnt:
+				var t := float(i) / SAMPLE_RATE
+				var ni := mini(int(t / nd), 2)
+				var nt := t - ni * nd
+				var freq: float = notes[ni]
+				var env := 1.0
+				if nt < 0.004: env = nt / 0.004
+				elif nt > nd - 0.015: env = (nd - nt) / 0.015
+				if ni == 2: env *= exp(-nt * 5.0)
+				var s := env * 0.38 * sin(TAU * freq * t)
+				s += env * 0.14 * sin(TAU * freq * 2.0 * t)
+				s += env * 0.06 * sin(TAU * freq * 3.0 * t)
+				samples[i] = s
+			return _make_stream(samples)
+		3:  # GODLIKE: C5→G5→C6→E6 4音ファンファーレ (0.55s) — 最高報酬音
+			var dur := 0.55
+			var cnt := int(SAMPLE_RATE * dur)
+			var samples := PackedFloat32Array()
+			samples.resize(cnt)
+			var notes := [523.25, 783.99, 1046.5, 1318.5]  # C5, G5, C6, E6
+			var nd := 0.10
+			for i in cnt:
+				var t := float(i) / SAMPLE_RATE
+				var ni := mini(int(t / nd), 3)
+				var nt := t - ni * nd
+				var freq: float = notes[ni]
+				var env := 1.0
+				if nt < 0.004: env = nt / 0.004
+				if ni < 3 and nt > nd - 0.012: env = (nd - nt) / 0.012
+				if ni == 3: env *= exp(-nt * 4.0)
+				var global_env := 1.0
+				if t > dur - 0.06: global_env = (dur - t) / 0.06
+				var s := global_env * env * 0.42 * sin(TAU * freq * t)
+				s += global_env * env * 0.18 * sin(TAU * freq * 2.0 * t)
+				s += global_env * env * 0.08 * sin(TAU * freq * 3.0 * t)
+				samples[i] = s
+			return _make_stream(samples)
+	# フォールバック: 空のストリーム
+	var samples_fb := PackedFloat32Array()
+	samples_fb.resize(100)
+	return _make_stream(samples_fb)
