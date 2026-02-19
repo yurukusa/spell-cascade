@@ -1653,18 +1653,28 @@ func _spawn_enemy() -> void:
 	var speed_val := 75.0 + distance_m * 0.15 + run_time * 0.25
 	var dmg_val := 14.0 + distance_m * 0.03  # v0.3: 10→14（HP500に対して体感できるダメージ）
 
-	# 敵タイプ選択: ステージ別ゲーティング（v0.3.2）
-	# Stage 1: normal only / Stage 2: +swarmer / Stage 3: +tank
+	# 敵タイプ選択: ステージ別ゲーティング（#247: splitter/healer解禁）
+	# Stage 1: normal only / Stage 2: +swarmer(25%) / Stage 3: +tank(15%)
+	# Stage 4: +splitter(10%) / Stage 5: +healer(8%)
+	# Why: splitter/healerはenemy.gdに完全実装済みだが出現条件がなかった。
+	# Stage 4+で少量出現させ、プレイヤーに戦術的多様性を提供する。
 	var type_roll := randf()
 	var etype := "normal"
-	if current_stage >= 2 and type_roll < 0.25:
-		etype = "swarmer"
-	elif current_stage >= 3 and type_roll >= 0.25 and type_roll < 0.40:
+	if current_stage >= 5 and type_roll < 0.08:
+		etype = "healer"
+	elif current_stage >= 4 and type_roll < 0.18:
+		etype = "splitter"
+	elif current_stage >= 3 and type_roll < 0.33:
 		etype = "tank"
+	elif current_stage >= 2 and type_roll < 0.55:
+		etype = "swarmer"
 
 	enemy.init(tower, speed_val, hp_val, dmg_val, etype)
 	enemy.add_to_group("enemies")
 	enemy.died.connect(_on_enemy_died)
+	# 改善247: splitter死亡時のswarmer分裂を接続
+	if etype == "splitter":
+		enemy.split_on_death.connect(_on_splitter_split)
 	enemies_alive += 1
 	add_child(enemy)
 
@@ -1859,6 +1869,19 @@ func _on_enemy_died(enemy: Node2D) -> void:
 	# 全敵撃破通知（改善45: ウェーブ完了の達成感）
 	if enemies_alive <= 0:
 		_show_area_cleared()
+
+func _on_splitter_split(pos: Vector2) -> void:
+	## 改善247: splitter死亡時に2体のswarmerをスポーン（分裂ギミック）
+	## Why: split_on_death シグナルはenemy.gdに実装済みだったが接続されていなかった。
+	for i in range(2):
+		var s_enemy := preload("res://scenes/enemy.tscn").instantiate()
+		var spread := Vector2(cos(i * PI), sin(i * PI)) * 40.0
+		s_enemy.global_position = pos + spread
+		s_enemy.init(tower, 120.0, 12.0, 6.0, "swarmer")
+		s_enemy.add_to_group("enemies")
+		s_enemy.died.connect(_on_enemy_died)
+		enemies_alive += 1
+		add_child(s_enemy)
 
 func _show_area_cleared() -> void:
 	## 全敵撃破時のフラッシュ + "CLEARED!" テキスト（改善45）
