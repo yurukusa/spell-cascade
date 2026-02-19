@@ -1334,9 +1334,32 @@ func _on_body_entered(body):
 	if is_crit and crit_freeze_duration > 0.0 and \"speed\" in body:
 		var orig_spd: float = body.speed
 		body.speed = 0.0
+		# 改善168: 凍結ティント＋氷晶パーティクル（スロー同様の視覚フィードバック）
+		if \"modulate\" in body:
+			body.modulate = Color(0.4, 0.75, 1.3, 1.0)  # 深い氷ブルー（スローより濃い）
+		if scene_root:
+			for _ci in range(8):
+				var crystal := Polygon2D.new()
+				var crystal_pts := PackedVector2Array()
+				for _cpi in range(6):
+					crystal_pts.append(Vector2(cos(_cpi * TAU / 6.0), sin(_cpi * TAU / 6.0)) * 4.5)
+				crystal.polygon = crystal_pts
+				crystal.color = Color(0.7, 0.9, 1.0, 0.9)
+				var ca := randf() * TAU
+				var cr := randf_range(10.0, 22.0)
+				crystal.global_position = body.global_position + Vector2(cos(ca), sin(ca)) * cr
+				crystal.z_index = 95
+				scene_root.add_child(crystal)
+				var crt := crystal.create_tween()
+				crt.set_parallel(true)
+				crt.tween_property(crystal, \"scale\", Vector2(2.5, 2.5), 0.5).set_trans(Tween.TRANS_QUAD)
+				crt.tween_property(crystal, \"modulate:a\", 0.0, 0.5).set_delay(0.15)
+				crt.chain().tween_callback(crystal.queue_free)
 		get_tree().create_timer(crit_freeze_duration).timeout.connect(func():
 			if is_instance_valid(body):
 				body.speed = orig_spd
+				if \"modulate\" in body:
+					body.modulate = Color.WHITE
 		)
 
 	# 雷チェイン（modから。supportのchainとは別系統）
