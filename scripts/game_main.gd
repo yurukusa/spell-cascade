@@ -1908,6 +1908,42 @@ func _on_enemy_died(enemy: Node2D) -> void:
 			sht.tween_property(sh_ring, "modulate:a", 0.0, 0.4)
 			sht.chain().tween_callback(sh_ring.queue_free)
 
+	# 改善253: plague_bearer シナジー — poison_nova+spread: 毒状態で死んだ敵が毒雲を残す
+	# Why: 戦場に毒の地雷を作る。area denial + passive DPS でマップコントロールが成立。
+	if "plague_bearer" in _active_synergy_ids and is_instance_valid(enemy):
+		var _has_poison := false
+		if "_dots" in enemy:
+			for _d in enemy._dots:
+				if _d.get("element", "") == "poison":
+					_has_poison = true
+					break
+		if _has_poison:
+			var cloud_center := enemy.global_position
+			var cloud_radius := 40.0
+			var pb_root := get_tree().current_scene
+			if pb_root:
+				# 毒雲ビジュアル: 緑色の膨張ディスクが3秒かけて消える
+				var cloud_vis := Polygon2D.new()
+				var cv_pts := PackedVector2Array()
+				for _cvi in range(16):
+					cv_pts.append(Vector2(cos(_cvi * TAU / 16.0), sin(_cvi * TAU / 16.0)) * cloud_radius)
+				cloud_vis.polygon = cv_pts
+				cloud_vis.color = Color(0.2, 0.85, 0.25, 0.35)
+				cloud_vis.global_position = cloud_center
+				cloud_vis.z_index = 2
+				pb_root.add_child(cloud_vis)
+				var cvt := cloud_vis.create_tween()
+				cvt.tween_property(cloud_vis, "modulate:a", 0.0, 3.0)
+				cvt.chain().tween_callback(cloud_vis.queue_free)
+			# 3秒間、毎秒2ダメージ（radius 40px）
+			for _ptick in range(1, 4):
+				get_tree().create_timer(float(_ptick), true, false, true).timeout.connect(func():
+					for pe in get_tree().get_nodes_in_group("enemies"):
+						if is_instance_valid(pe) and cloud_center.distance_to(pe.global_position) <= cloud_radius:
+							if pe.has_method("take_damage"):
+								pe.take_damage(2)
+				)
+
 	# キルマイルストーン（10, 25, 50, 100, 200キル: 達成感の積み上げ）
 	if kill_count in [10, 25, 50, 100, 200]:
 		_announce_kill_milestone(kill_count)
