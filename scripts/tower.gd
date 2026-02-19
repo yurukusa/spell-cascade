@@ -567,6 +567,10 @@ func heal(amount: float) -> void:
 
 func _spawn_heal_vfx(amount: float) -> void:
 	## 回復時の緑フラッシュ + "+N HP" テキスト（G-10: ダメージモーション回復版）
+	# 改善175: 回復SE — life stealは頻度が高いのでSFX側でthrottleする
+	var _sfx := get_node_or_null("/root/SFX")
+	if _sfx and _sfx.has_method("play_heal"):
+		_sfx.play_heal(amount)
 	var scene_root := get_tree().current_scene
 	if scene_root == null:
 		return

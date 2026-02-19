@@ -47,6 +47,13 @@ const DOT_COOLDOWN := 0.35  # 350ms以内は再生しない（連続DoTのノイ
 # 改善174: コンボティアアップSE（COMBO=3/RAMPAGE=8/MASSACRE=15/GODLIKE=30）
 # Why: 視覚的なスケールパンチ+リングに対応する音がなかった。達成感を音で確認させる。
 var _combo_tier_players: Array[AudioStreamPlayer] = []
+# 改善175: 回復SE（small/large 2段階、1.2sクールダウン）
+# Why: heal VFXはあるが音がなかった。life stealは高頻度なのでスロットル必須。
+var _heal_small_player: AudioStreamPlayer
+var _heal_large_player: AudioStreamPlayer
+var _heal_cooldown := 0.0
+const HEAL_COOLDOWN := 1.2  # 1.2s以内は再生しない（life steal連打抑制）
+const HEAL_LARGE_THRESHOLD := 50.0  # 大回復SFXの閾値
 
 const SAMPLE_RATE := 22050
 
@@ -183,6 +190,16 @@ func _ready() -> void:
 		add_child(p)
 		_damage_taken_players.append(p)
 
+	# 改善175: 回復SE (small/large 2段階)
+	_heal_small_player = AudioStreamPlayer.new()
+	_heal_small_player.stream = _gen_heal(false)
+	_heal_small_player.volume_db = -8.0  # 控えめ: 回復は常時SFXにならないよう
+	add_child(_heal_small_player)
+	_heal_large_player = AudioStreamPlayer.new()
+	_heal_large_player.stream = _gen_heal(true)
+	_heal_large_player.volume_db = -5.0  # 大回復はもう少し大きく
+	add_child(_heal_large_player)
+
 	# 改善174: コンボティアアップSE — 4段階それぞれ異なる音色
 	var combo_streams := [_gen_combo_tier(0), _gen_combo_tier(1), _gen_combo_tier(2), _gen_combo_tier(3)]
 	var combo_vols := [-6.0, -5.0, -4.0, -2.0]  # GODLIKEほど大きく
@@ -200,6 +217,8 @@ func _process(delta: float) -> void:
 		_damage_cooldown -= delta
 	if _dot_cooldown > 0.0:  # 改善172: DoTクールダウン管理
 		_dot_cooldown -= delta
+	if _heal_cooldown > 0.0:  # 改善175: 回復SEクールダウン管理
+		_heal_cooldown -= delta
 	# XP回収ストリークのピッチは時間で減衰（0.5s何も拾わないとリセット）
 	if _xp_pitch_streak > 0.0:
 		_xp_pitch_streak = maxf(_xp_pitch_streak - delta * 0.8, 0.0)
@@ -307,6 +326,21 @@ func play_combo_tier(tier: int) -> void:
 	var p := _combo_tier_players[tier]
 	p.pitch_scale = 1.0  # 固定ピッチ（tierごとに設計済み）
 	p.play()
+
+## 改善175: 回復SE。amount >= 50 で大回復音、それ以下で小回復音。
+## Why: life stealは高頻度なのでHEAL_COOLDOWN(1.2s)でスロットル。
+## large heal（ボス撃破回復/shrine/50+）は常に再生（クールダウンリセット）。
+func play_heal(amount: float) -> void:
+	if amount >= HEAL_LARGE_THRESHOLD:
+		# 大回復は優先再生（クールダウンを無視してリセット）
+		_heal_large_player.pitch_scale = randf_range(0.95, 1.05)
+		_heal_large_player.play()
+		_heal_cooldown = HEAL_COOLDOWN
+	elif _heal_cooldown <= 0.0:
+		# 小回復はクールダウン制限付き
+		_heal_small_player.pitch_scale = randf_range(0.9, 1.1)
+		_heal_small_player.play()
+		_heal_cooldown = HEAL_COOLDOWN
 
 # --- サウンド生成 ---
 
@@ -823,3 +857,53 @@ func _gen_combo_tier(tier: int) -> AudioStreamWAV:
 	var samples_fb := PackedFloat32Array()
 	samples_fb.resize(100)
 	return _make_stream(samples_fb)
+
+## 改善175: 回復SE生成
+## small: C5→E5 柔らかい2音上昇 (0.2s) — 優しいlife steal回復感
+## large: C5→G5→C6 温かい和音アルペジオ (0.35s) — ボス撃破/shrine大回復の喜び
+func _gen_heal(large: bool) -> AudioStreamWAV:
+	if large:
+		var dur := 0.35
+		var cnt := int(SAMPLE_RATE * dur)
+		var samples := PackedFloat32Array()
+		samples.resize(cnt)
+		var notes := [523.25, 783.99, 1046.5]  # C5, G5, C6
+		var nd := dur / 3.0
+		for i in cnt:
+			var t := float(i) / SAMPLE_RATE
+			var ni := mini(int(t / nd), 2)
+			var nt := t - ni * nd
+			var freq: float = notes[ni]
+			var env := 1.0
+			if nt < 0.006: env = nt / 0.006
+			elif nt > nd - 0.018: env = (nd - nt) / 0.018
+			if ni == 2: env *= exp(-nt * 4.5)
+			var global_env := 1.0
+			if t > dur - 0.05: global_env = (dur - t) / 0.05
+			var s := global_env * env * 0.38 * sin(TAU * freq * t)
+			# 第3倍音でグロッケン風の音色（医療・回復の爽やかさ）
+			s += global_env * env * 0.14 * sin(TAU * freq * 2.0 * t)
+			s += global_env * env * 0.05 * sin(TAU * freq * 3.0 * t)
+			samples[i] = s
+		return _make_stream(samples)
+	else:
+		# small: C5→E5 2音 (0.2s) — 最小限の回復フィードバック
+		var dur := 0.2
+		var cnt := int(SAMPLE_RATE * dur)
+		var samples := PackedFloat32Array()
+		samples.resize(cnt)
+		var notes := [523.25, 659.25]  # C5, E5
+		var nd := dur / 2.0
+		for i in cnt:
+			var t := float(i) / SAMPLE_RATE
+			var ni := mini(int(t / nd), 1)
+			var nt := t - ni * nd
+			var freq: float = notes[ni]
+			var env := 1.0
+			if nt < 0.005: env = nt / 0.005
+			elif nt > nd - 0.015: env = (nd - nt) / 0.015
+			if ni == 1: env *= exp(-nt * 6.0)
+			var s := env * 0.28 * sin(TAU * freq * t)
+			s += env * 0.10 * sin(TAU * freq * 2.0 * t)
+			samples[i] = s
+		return _make_stream(samples)
