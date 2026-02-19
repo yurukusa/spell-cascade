@@ -1513,7 +1513,12 @@ func _spawn_damage_number(amount: float, is_crit: bool = false) -> void:
 				srt.chain().tween_callback(sp_ring.queue_free)
 			split_on_death.emit(global_position)
 		died.emit(self)
-		call_deferred("queue_free")
+		# 改善236: 死亡フェードアウト（0.3sで消えることで「倒した」余韻を作る）
+		# Why: call_deferred(queue_free)は即時消滅で「ポップ」感がある。
+		# コリジョンは既に無効化済み（上記）なので重複ヒットなし。
+		var dte := create_tween()
+		dte.tween_property(self, "modulate:a", 0.0, 0.3).set_trans(Tween.TRANS_QUAD)
+		dte.tween_callback(queue_free)
 
 func _spawn_drops() -> void:
 	var scene_root := get_tree().current_scene
