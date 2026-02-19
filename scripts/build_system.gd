@@ -177,6 +177,21 @@ func calculate_module_stats(module: TowerModule) -> Dictionary:
 		"ghost_chance": 0.0,
 	}
 
+	# bugfix: skills.jsonのon_hitディクトをフラットstatキーに変換
+	# Why: on_hitは"slow"/"dot_damage"等のネスト構造で書かれているが、
+	# _create_projectile()はon_hit_slow/add_dot等のフラットキーしか読まない。
+	# この変換がないとice_shardのスロー・poison_novaのDoTが一切機能しない。
+	var skill_on_hit: Dictionary = skill_data.get("on_hit", {})
+	if skill_on_hit.has("slow"):
+		stats["on_hit_slow"] = skill_on_hit["slow"]
+		stats["on_hit_slow_duration"] = skill_on_hit.get("slow_duration", 1.0)
+	if skill_on_hit.has("dot_damage"):
+		stats["add_dot"] = {
+			"damage": skill_on_hit["dot_damage"],
+			"duration": skill_on_hit.get("dot_duration", 3.0),
+			"element": skill_on_hit.get("element", "poison")
+		}
+
 	# サポート適用（挙動変化）
 	for sup_id in module.support_ids:
 		var sup_data: Dictionary = supports.get(sup_id, {})

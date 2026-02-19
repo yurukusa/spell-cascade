@@ -80,6 +80,41 @@
       "visual": "circle_orange",
       "area_radius": 80,
       "meteor_delay": 0.8
+    },
+    {
+      "id": "void_bolt",
+      "name": "Void Bolt",
+      "tags": ["arcane", "projectile", "spell"],
+      "base_damage": 38,
+      "base_cooldown": 2.5,
+      "base_range": 380,
+      "description": "Slow, heavy bolt that pierces all enemies in a line.",
+      "visual": "circle_purple",
+      "pierce": true
+    },
+    {
+      "id": "storm_burst",
+      "name": "Storm Burst",
+      "tags": ["lightning", "projectile", "spell"],
+      "base_damage": 7,
+      "base_cooldown": 0.4,
+      "base_range": 210,
+      "description": "Unleashes 5 lightning bolts in a wide arc. Low damage, high rate.",
+      "visual": "circle_yellow",
+      "projectile_count": 5,
+      "spread_angle": 80
+    },
+    {
+      "id": "winter_nova",
+      "name": "Winter Nova",
+      "tags": ["cold", "area", "spell"],
+      "base_damage": 10,
+      "base_cooldown": 2.2,
+      "base_range": 190,
+      "description": "Erupts ice shards in all directions. Slows hit enemies for 2s.",
+      "visual": "circle_blue",
+      "area_radius": 100,
+      "on_hit": {"slow": 0.35, "slow_duration": 2.0}
     }
   ]
 }
