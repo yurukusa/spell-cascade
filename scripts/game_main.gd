@@ -2730,13 +2730,16 @@ func _spawn_levelup_vfx() -> void:
 	lv_label.add_theme_constant_override("shadow_offset_y", 2)
 	lv_label.z_index = 200
 	lv_label.global_position = tower.global_position + Vector2(-60, -80)
+	# 改善231: ワールド空間"LEVEL UP!"ラベルのスケールパンチイン（旧: 1.0→1.4→1.0 → 新: 1.6→1.0 TRANS_BACK）
+	# Why: 旧パターンは「膨らんで戻る」。1.6→1.0 TRANS_BACK に変えてUIオーバーレイのLEVEL UP!
+	# (#230)と同様の「スタンプ感」に統一。また parallel 3ステップに整理して可読性も上げる。
+	lv_label.scale = Vector2(1.6, 1.6)
 	add_child(lv_label)
 	var lv_tween := lv_label.create_tween()
 	lv_tween.set_parallel(true)
 	lv_tween.tween_property(lv_label, "global_position:y", lv_label.global_position.y - 60, 0.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	lv_tween.tween_property(lv_label, "scale", Vector2(1.4, 1.4), 0.12).set_trans(Tween.TRANS_BACK)
-	lv_tween.chain().tween_property(lv_label, "scale", Vector2(1.0, 1.0), 0.1)
-	lv_tween.chain().tween_property(lv_label, "modulate:a", 0.0, 0.4).set_delay(0.3)
+	lv_tween.tween_property(lv_label, "scale", Vector2(1.0, 1.0), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	lv_tween.tween_property(lv_label, "modulate:a", 0.0, 0.4).set_delay(0.5)
 	lv_tween.chain().tween_callback(lv_label.queue_free)
 
 func _show_pressure_label() -> void:
