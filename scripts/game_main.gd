@@ -1841,6 +1841,8 @@ func _announce_stage(stage: int) -> void:
 	var colors := [Color.WHITE, Color(1.0, 0.6, 0.15, 1.0), Color(1.0, 0.18, 0.1, 1.0)]
 	if stage < 1 or stage >= msgs.size() + 1:
 		return
+	# 改善182: ステージ警告SE (stage2=0=SURGE, stage3=1=CRISIS)
+	SFX.play_stage_alert(stage - 2)  # stage2→0, stage3→1
 	var ann := Label.new()
 	ann.text = msgs[stage - 1] if stage > 1 else ""
 	if ann.text.is_empty():
@@ -1878,6 +1880,7 @@ func _announce_stage(stage: int) -> void:
 
 func _announce_desperate_push() -> void:
 	## デスパレートプッシュ告知: 最後15秒の総力戦を伝える（H-1: 緊張の頂点）
+	SFX.play_stage_alert(2)  # 改善182: FINAL PUSH急速サイレン
 	var ann := Label.new()
 	ann.text = "FINAL PUSH!"
 	ann.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

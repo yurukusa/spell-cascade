@@ -56,6 +56,9 @@ var _boss_kill_player: AudioStreamPlayer
 # 改善181: ボスフェーズ移行SFX（不協和スウェル + 金属打撃）
 # Why: フェーズ移行は視覚・振動あり、音なし。「まだ続くのか」という恐怖感を音で演出。
 var _boss_phase_player: AudioStreamPlayer
+# 改善182: ステージ警告SFX（SURGE/CRISIS/FINAL PUSH — 3段階緊張音）
+# Why: ステージ遷移は視覚+振動あり、音なし。「局面が変わった」を耳でも確認させる。
+var _stage_alert_players: Array[AudioStreamPlayer] = []
 # 改善174: コンボティアアップSE（COMBO=3/RAMPAGE=8/MASSACRE=15/GODLIKE=30）
 # Why: 視覚的なスケールパンチ+リングに対応する音がなかった。達成感を音で確認させる。
 var _combo_tier_players: Array[AudioStreamPlayer] = []
@@ -226,6 +229,15 @@ func _ready() -> void:
 	_boss_phase_player.volume_db = -3.0
 	add_child(_boss_phase_player)
 
+	# 改善182: ステージ警告SFX (0=SURGE, 1=CRISIS, 2=FINAL PUSH)
+	var alert_vols := [-5.0, -3.0, -2.0]
+	for ai in 3:
+		var ap := AudioStreamPlayer.new()
+		ap.stream = _gen_stage_alert(ai)
+		ap.volume_db = alert_vols[ai]
+		add_child(ap)
+		_stage_alert_players.append(ap)
+
 	# 改善175: 回復SE (small/large 2段階)
 	_heal_small_player = AudioStreamPlayer.new()
 	_heal_small_player.stream = _gen_heal(false)
@@ -378,6 +390,12 @@ func play_boss_kill() -> void:
 ## 改善181: ボスフェーズ移行SE。_on_boss_phase_changed()から呼ぶ。
 func play_boss_phase() -> void:
 	_boss_phase_player.play()
+
+## 改善182: ステージ警告SE。level: 0=SURGE, 1=CRISIS, 2=FINAL PUSH
+func play_stage_alert(level: int) -> void:
+	if level < 0 or level >= _stage_alert_players.size():
+		return
+	_stage_alert_players[level].play()
 
 ## 改善175: 回復SE。amount >= 50 で大回復音、それ以下で小回復音。
 ## Why: life stealは高頻度なのでHEAL_COOLDOWN(1.2s)でスロットル。
@@ -1119,3 +1137,67 @@ func _gen_boss_phase() -> AudioStreamWAV:
 			s += renv * 0.10 * sin(TAU * 110.0 * t)
 		samples[i] = s
 	return _make_stream(samples)
+
+## 改善182: ステージ警告SE生成
+## level 0=SURGE: 橙色の上昇2音クラクション (0.3s)
+## level 1=CRISIS: 赤い3音急速アラーム (0.35s)
+## level 2=FINAL PUSH: 4音急速サイレン + ハーシュトランジェント (0.4s)
+func _gen_stage_alert(level: int) -> AudioStreamWAV:
+	match level:
+		0:  # SURGE: 2音上昇クラクション (Bb4→F5)
+			var dur := 0.30
+			var cnt := int(SAMPLE_RATE * dur)
+			var samples := PackedFloat32Array()
+			samples.resize(cnt)
+			var notes := [466.16, 698.46]  # Bb4, F5
+			var nd := dur / 2.0
+			for i in cnt:
+				var t := float(i) / SAMPLE_RATE
+				var ni := mini(int(t / nd), 1)
+				var nt := t - ni * nd
+				var freq: float = notes[ni]
+				var env := 1.0
+				if nt < 0.005: env = nt / 0.005
+				elif nt > nd - 0.02: env = (nd - nt) / 0.02
+				samples[i] = env * 0.55 * sin(TAU * freq * t) + env * 0.20 * sin(TAU * freq * 2.0 * t)
+			return _make_stream(samples)
+		1:  # CRISIS: 3音急速アラーム (A4→C5→A4 反復感)
+			var dur := 0.35
+			var cnt := int(SAMPLE_RATE * dur)
+			var samples := PackedFloat32Array()
+			samples.resize(cnt)
+			var notes := [440.0, 523.25, 440.0]  # A4, C5, A4
+			var nd := dur / 3.0
+			for i in cnt:
+				var t := float(i) / SAMPLE_RATE
+				var ni := mini(int(t / nd), 2)
+				var nt := t - ni * nd
+				var freq: float = notes[ni]
+				var env := 1.0
+				if nt < 0.004: env = nt / 0.004
+				elif nt > nd - 0.015: env = (nd - nt) / 0.015
+				samples[i] = env * 0.60 * sin(TAU * freq * t) + env * 0.22 * sin(TAU * freq * 2.0 * t)
+			return _make_stream(samples)
+		2:  # FINAL PUSH: 4音急速サイレン (D5→A5→D5→A5 急速二重反復)
+			var dur := 0.40
+			var cnt := int(SAMPLE_RATE * dur)
+			var samples := PackedFloat32Array()
+			samples.resize(cnt)
+			var notes := [587.33, 880.0, 587.33, 880.0]  # D5, A5, D5, A5
+			var nd := dur / 4.0
+			for i in cnt:
+				var t := float(i) / SAMPLE_RATE
+				var ni := mini(int(t / nd), 3)
+				var nt := t - ni * nd
+				var freq: float = notes[ni]
+				var env := 1.0
+				if nt < 0.003: env = nt / 0.003
+				elif nt > nd - 0.01: env = (nd - nt) / 0.01
+				# 末尾にわずかな減衰（最後の音が一番大きい）
+				var global_boost := 0.8 + 0.2 * (float(ni) / 3.0)
+				samples[i] = global_boost * (env * 0.55 * sin(TAU * freq * t) + env * 0.25 * sin(TAU * freq * 2.0 * t))
+			return _make_stream(samples)
+	# フォールバック
+	var fb := PackedFloat32Array()
+	fb.resize(100)
+	return _make_stream(fb)
