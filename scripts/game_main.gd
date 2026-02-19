@@ -1139,7 +1139,9 @@ func _on_boss_died(_enemy: Node2D) -> void:
 	_do_hitstop(0.08)
 	_flash_tower_kill_glow()
 
-	# ボス撃破のお祝い表示
+	# 改善200: ボス撃破のお祝い表示 — スケールポップイン追加
+	# Why: 「BOSS INCOMING!」は TRANS_BOUNCE でポップインするのに、「BOSS DEFEATED!」は瞬時表示のみ。
+	# 最高潮の達成感シーンにこそ入場演出が必要。TRANS_BACK でジューシーなポップイン。
 	var label := Label.new()
 	label.text = "BOSS DEFEATED! / ボス撃破！"
 	label.add_theme_font_size_override("font_size", 36)
@@ -1151,11 +1153,15 @@ func _on_boss_died(_enemy: Node2D) -> void:
 	label.position = Vector2(640 - 200, 120)
 	label.custom_minimum_size = Vector2(400, 0)
 	label.z_index = 200
+	label.scale = Vector2(0.3, 0.3)
 	ui_layer.add_child(label)
 
 	var tween := label.create_tween()
-	tween.tween_property(label, "modulate:a", 0.0, 2.0).set_delay(1.5)
-	tween.chain().tween_callback(label.queue_free)
+	tween.tween_property(label, "scale", Vector2(1.25, 1.25), 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1).set_trans(Tween.TRANS_QUAD)
+	tween.tween_interval(1.3)
+	tween.tween_property(label, "modulate:a", 0.0, 1.5)
+	tween.tween_callback(label.queue_free)
 
 	# 改善122: ボス撃破の黄金フラッシュ（最高の達成感を全画面で演出）
 	var boss_flash := ColorRect.new()
