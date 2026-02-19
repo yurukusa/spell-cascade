@@ -239,9 +239,16 @@ func _equip_auto_aim() -> void:
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.global_position = global_position + Vector2(-120, -50)
 	label.z_index = 200
+	# 改善206: AUTO AIMチップ取得ラベルにスケールポップイン（「ゲームが変わる瞬間」を強調）
+	# Why: ゲーム最大の転換点なのにラベルが静かに浮かぶだけで存在感がない。
+	label.scale = Vector2(0.2, 0.2)
 	scene_root.add_child(label)
 
 	var announce_tween := label.create_tween()
+	# スケールポップ（TRANS_BACK でばね感）
+	announce_tween.tween_property(label, "scale", Vector2(1.6, 1.6), 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	announce_tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1).set_trans(Tween.TRANS_QUAD)
+	# その後: 浮上 + フェードアウトを並行
 	announce_tween.set_parallel(true)
 	announce_tween.tween_property(label, "global_position:y", label.global_position.y - 60.0, 1.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	announce_tween.tween_property(label, "modulate:a", 0.0, 1.5).set_delay(0.8)
@@ -284,9 +291,13 @@ func _equip_auto_move() -> void:
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.global_position = global_position + Vector2(-140, -60)
 	label.z_index = 200
+	# 改善206: AUTO MOVEチップ取得ラベルにスケールポップイン（AUTO AIMと対称。ゲームが変わる瞬間）
+	label.scale = Vector2(0.2, 0.2)
 	scene_root.add_child(label)
 
 	var announce_tween := label.create_tween()
+	announce_tween.tween_property(label, "scale", Vector2(1.8, 1.8), 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	announce_tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1).set_trans(Tween.TRANS_QUAD)
 	announce_tween.set_parallel(true)
 	announce_tween.tween_property(label, "global_position:y", label.global_position.y - 80.0, 2.0).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	announce_tween.tween_property(label, "modulate:a", 0.0, 2.0).set_delay(1.0)
