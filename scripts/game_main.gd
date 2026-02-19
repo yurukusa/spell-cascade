@@ -1709,6 +1709,13 @@ func _show_area_cleared() -> void:
 
 func _announce_kill_milestone(count: int) -> void:
 	## キルマイルストーン告知（J-8: 達成を大きく演出）
+	# 改善183: キルマイルストーンSFX（既存コンボ音を段階的に使用してコスト0で強化）
+	match count:
+		10:   SFX.play_level_up()         # 小さな達成
+		25:   SFX.play_combo_tier(1)      # RAMPAGE相当（中達成）
+		50:   SFX.play_combo_tier(2)      # MASSACRE相当（大達成）
+		100:  SFX.play_combo_tier(3)      # GODLIKE相当（最大達成）
+		200:  SFX.play_wave_clear()       # 超達成: ウェーブクリア音で差別化
 	var milestone_texts := {10: "10 KILLS!", 25: "25 KILLS!", 50: "MASSACRE x50!", 100: "SLAUGHTERER x100!", 200: "DESTROYER x200!"}
 	var milestone_colors := {10: Color(0.7, 0.9, 0.3, 1.0), 25: Color(1.0, 0.75, 0.2, 1.0), 50: Color(1.0, 0.5, 0.1, 1.0), 100: Color(1.0, 0.25, 0.8, 1.0), 200: Color(0.6, 0.2, 1.0, 1.0)}
 	var msg: String = milestone_texts.get(count, "%d KILLS!" % count)
