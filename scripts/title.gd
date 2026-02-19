@@ -50,13 +50,23 @@ func _ready() -> void:
 	title_tween.tween_property(title, "scale", Vector2(1.0, 1.0), 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	title_tween.chain().tween_callback(_start_title_breathing)
 
+	# 改善219: サブタイトル＋ボタンの千鳥フェードイン（タイトルアニメーション完了後に順次登場）
+	# Why: タイトルが0.5sのスケールイン演出を持つのに、サブタイトルとボタンは即時表示で
+	# 「タイトルだけ演出があって残りは雑」という断絶感があった。
+	# サブタイトル0.55s→Start 0.75s→Settings 0.90s→Quit 1.05sで
+	# 画面全体が「開幕のロール」として統一感を持って登場するようにする。
+
 	# Subtitle
 	var sub := Label.new()
 	sub.text = "Build. Survive. Cascade."
 	sub.add_theme_font_size_override("font_size", 16)
 	sub.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7, 0.8))
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub.modulate.a = 0.0
 	vbox.add_child(sub)
+	var sub_tw := sub.create_tween()
+	sub_tw.tween_interval(0.55)
+	sub_tw.tween_property(sub, "modulate:a", 1.0, 0.3).set_trans(Tween.TRANS_QUAD)
 
 	# Spacer
 	var spacer := Control.new()
@@ -68,21 +78,33 @@ func _ready() -> void:
 	start_btn.text = "Start Game"
 	start_btn.custom_minimum_size = Vector2(200, 40)
 	start_btn.pressed.connect(_on_start)
+	start_btn.modulate.a = 0.0
 	vbox.add_child(start_btn)
+	var s_tw := start_btn.create_tween()
+	s_tw.tween_interval(0.75)
+	s_tw.tween_property(start_btn, "modulate:a", 1.0, 0.2).set_trans(Tween.TRANS_QUAD)
 
 	# Settings button
 	var settings_btn := Button.new()
 	settings_btn.text = "Settings"
 	settings_btn.custom_minimum_size = Vector2(200, 40)
 	settings_btn.pressed.connect(_on_settings)
+	settings_btn.modulate.a = 0.0
 	vbox.add_child(settings_btn)
+	var set_tw := settings_btn.create_tween()
+	set_tw.tween_interval(0.9)
+	set_tw.tween_property(settings_btn, "modulate:a", 1.0, 0.2).set_trans(Tween.TRANS_QUAD)
 
 	# Quit button
 	var quit_btn := Button.new()
 	quit_btn.text = "Quit"
 	quit_btn.custom_minimum_size = Vector2(200, 40)
 	quit_btn.pressed.connect(_on_quit)
+	quit_btn.modulate.a = 0.0
 	vbox.add_child(quit_btn)
+	var q_tw := quit_btn.create_tween()
+	q_tw.tween_interval(1.05)
+	q_tw.tween_property(quit_btn, "modulate:a", 1.0, 0.2).set_trans(Tween.TRANS_QUAD)
 
 	# Build settings panel (hidden)
 	_build_settings_panel()
