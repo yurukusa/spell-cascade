@@ -40,6 +40,10 @@ const LOW_HP_INTERVAL := 2.0
 var _bgm_playing := false
 var _damage_cooldown := 0.0
 const DAMAGE_COOLDOWN := 0.15  # 被弾SE連続再生を制限（150ms間隔）
+# 改善172: DoT tick SE（多数の敵が同時DoT時でも過剰にならないようglobal throttle）
+var _dot_player: AudioStreamPlayer
+var _dot_cooldown := 0.0
+const DOT_COOLDOWN := 0.35  # 350ms以内は再生しない（連続DoTのノイズ抑制）
 
 const SAMPLE_RATE := 22050
 
@@ -88,6 +92,12 @@ func _ready() -> void:
 	_low_hp_player.stream = _gen_low_hp()
 	_low_hp_player.volume_db = -4.0
 	add_child(_low_hp_player)
+
+	# 改善172: DoT tick SE（柔らかいジジジ音）
+	_dot_player = AudioStreamPlayer.new()
+	_dot_player.stream = _gen_dot()
+	_dot_player.volume_db = -14.0  # 控えめ — DoTは補助フィードバック
+	add_child(_dot_player)
 
 	# Level Up: pyfxr WAV (upgrade_acquired) があればそれ、なければ procedural
 	var lvl_stream: AudioStream = _try_load_wav("upgrade_acquired.wav")
@@ -175,6 +185,8 @@ func _process(delta: float) -> void:
 		_low_hp_cooldown -= delta
 	if _damage_cooldown > 0.0:
 		_damage_cooldown -= delta
+	if _dot_cooldown > 0.0:  # 改善172: DoTクールダウン管理
+		_dot_cooldown -= delta
 	# XP回収ストリークのピッチは時間で減衰（0.5s何も拾わないとリセット）
 	if _xp_pitch_streak > 0.0:
 		_xp_pitch_streak = maxf(_xp_pitch_streak - delta * 0.8, 0.0)
@@ -264,6 +276,15 @@ func play_low_hp_warning() -> void:
 		_low_hp_player.play()
 		_low_hp_cooldown = LOW_HP_INTERVAL
 
+## 改善172: DoT tick SE。fire=高め(680Hz)、poison=低め(320Hz)
+func play_dot_tick(element: String = "fire") -> void:
+	if _dot_cooldown > 0.0:
+		return
+	# 属性でピッチを変える（fire: 高め, poison: 低め）
+	_dot_player.pitch_scale = 1.4 if element == "fire" else 0.8
+	_dot_player.play()
+	_dot_cooldown = DOT_COOLDOWN
+
 # --- サウンド生成 ---
 
 func _make_stream(samples: PackedFloat32Array) -> AudioStreamWAV:
@@ -280,6 +301,23 @@ func _make_stream(samples: PackedFloat32Array) -> AudioStreamWAV:
 		bytes[i * 2 + 1] = (val >> 8) & 0xFF
 	stream.data = bytes
 	return stream
+
+## 改善172: DoT tick — ジジジというノイズバースト (0.06s)
+## fire: pitch_scale=1.4でより高くシャープ、poison: pitch_scale=0.8で低く重い
+func _gen_dot() -> AudioStreamWAV:
+	var dur := 0.06
+	var count := int(SAMPLE_RATE * dur)
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	for i in count:
+		var t := float(i) / SAMPLE_RATE
+		var frac := t / dur
+		var env := (1.0 - frac) * (1.0 - frac)  # 急速減衰
+		# 基音(480Hz)にノイズを重ねた「ジジ」音
+		var base := sin(TAU * 480.0 * t) * 0.4
+		var noise := (randf() * 2.0 - 1.0) * 0.6
+		samples[i] = env * (base + noise) * 0.45
+	return _make_stream(samples)
 
 ## Shot: 下降スイープチャープ (0.08s)
 func _gen_shot() -> AudioStreamWAV:

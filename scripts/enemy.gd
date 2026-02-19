@@ -612,12 +612,19 @@ func _physics_process(delta: float) -> void:
 		if _dot_tick_timer >= 1.0:
 			_dot_tick_timer -= 1.0
 			var i := _dots.size() - 1
+			var _sfx_element := ""  # 改善172: tick音用に最初のDoT elementを記録
 			while i >= 0:
 				_dots[i]["duration"] -= 1.0
 				take_damage(_dots[i]["damage"])
+				if _sfx_element.is_empty():
+					_sfx_element = _dots[i].get("element", "fire")
 				if _dots[i]["duration"] <= 0.0:
 					_dots.remove_at(i)
 				i -= 1
+			# 改善172: DoT tick SE — global throttleで過剰再生を防ぐ
+			var _sfx := get_node_or_null("/root/SFX")
+			if _sfx and _sfx.has_method("play_dot_tick") and not _sfx_element.is_empty():
+				_sfx.play_dot_tick(_sfx_element)
 			# 改善170: DoT終了後ティントリセット（スロー/凍結と干渉しないよう _dots 空のみ）
 			if _dots.is_empty():
 				modulate = Color.WHITE
