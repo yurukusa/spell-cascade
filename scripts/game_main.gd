@@ -1943,6 +1943,7 @@ func _show_combo_break(count: int) -> void:
 
 var hp_bar_last_value := -1.0  # heal flash検出用
 var _hp_danger_tween: Tween = null  # 低HP時のパルスtween（重複防止）
+var _berserker_tween: Tween = null  # 改善173: berserker発動中の橙パルス
 
 func _on_tower_damaged(current: float, max_val: float) -> void:
 	# Heal flash（HP増加を検出）
@@ -2035,6 +2036,29 @@ func _on_tower_damaged(current: float, max_val: float) -> void:
 
 	# ビネット更新（改善35）
 	_update_vignette(pct)
+
+	# 改善173: berserker発動視覚インジケーター
+	# berserker modが装備中かつHP<50%の時、タワービジュアルに橙パルスを表示
+	var bz_threshold := 0.0
+	for atk in get_tree().get_nodes_in_group("tower_attacks"):
+		var s: Dictionary = atk.get("stats") if atk.get("stats") != null else {}
+		var bt: float = s.get("berserker_threshold", 0.0)
+		if bt > bz_threshold:
+			bz_threshold = bt
+	var tower_visual := tower.get_node_or_null("Visual") as Node2D
+	if tower_visual and bz_threshold > 0.0:
+		var berserker_active := pct < bz_threshold
+		if berserker_active:
+			if _berserker_tween == null or not _berserker_tween.is_running():
+				_berserker_tween = tower_visual.create_tween()
+				_berserker_tween.set_loops()
+				_berserker_tween.tween_property(tower_visual, "modulate", Color(1.5, 0.7, 0.2, 1.0), 0.5).set_trans(Tween.TRANS_SINE)
+				_berserker_tween.tween_property(tower_visual, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.5).set_trans(Tween.TRANS_SINE)
+		else:
+			if _berserker_tween != null and _berserker_tween.is_running():
+				_berserker_tween.kill()
+				_berserker_tween = null
+				tower_visual.modulate = Color.WHITE
 
 func _flash_hp_bar_damage() -> void:
 	## 被弾時のバー白フラッシュ（ダメージ感）
