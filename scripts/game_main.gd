@@ -1297,9 +1297,17 @@ func _show_boss_reward_shrine() -> void:
 
 func _on_boss_reward_chosen(idx: int) -> void:
 	## ボス撃破報酬の適用
+	# 改善223: スライドダウン退場（#194入場と対称）
+	# Why: shrine_ui.queue_free()は即時消滅で断絶感。_dismiss_shrine()と同様に
+	# スライドダウン+フェードで「選択完了」の演出を追加する。
 	if shrine_ui and is_instance_valid(shrine_ui):
-		shrine_ui.queue_free()
+		var ui := shrine_ui
 		shrine_ui = null
+		var exit_t := ui.create_tween()
+		exit_t.set_parallel(true)
+		exit_t.tween_property(ui, "modulate:a", 0.0, 0.25).set_trans(Tween.TRANS_QUAD)
+		exit_t.tween_property(ui, "position:y", 100.0, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		exit_t.chain().tween_callback(ui.queue_free)
 	shrine_timer = 0.0
 	match idx:
 		0:  # TRANSCENDENCE（超越）: ダメージ +30% + 追加弾 +1
