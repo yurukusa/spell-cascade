@@ -667,6 +667,9 @@ func _create_projectile(direction: Vector2) -> void:
 	bullet.set("life_steal_pct", stats.get("life_steal_pct", 0.0))
 	bullet.set("ghost_bullet", randf() < stats.get("ghost_chance", 0.0))
 	bullet.set("crit_freeze_duration", stats.get("crit_freeze_duration", 0.0))
+	# 改善243: freeze mod（freezing/frostbound）を弾に伝播。on_hitバグと同様の欠落だった
+	bullet.set("freeze_chance", stats.get("freeze_chance", 0.0))
+	bullet.set("freeze_duration", stats.get("freeze_duration", 0.0))
 	bullet.set("crit_chance", stats.get("crit_chance", 0.0))
 	bullet.set("crit_mult", stats.get("crit_mult", 1.0))
 	# 改善169: add_dot を弾に伝播（Burning/Toxic/of_Decay mod）
@@ -1091,6 +1094,8 @@ var on_hit_slow_duration := 0.0
 var life_steal_pct := 0.0
 var ghost_bullet := false
 var crit_freeze_duration := 0.0
+var freeze_chance := 0.0  # 改善243: modからの確率凍結（freezing/frostbound）
+var freeze_duration := 0.0
 var crit_chance := 0.0
 var crit_mult := 1.0
 var add_dot := {}  # 改善169: DoT設定 {damage, duration, element}
@@ -1370,6 +1375,38 @@ func _on_body_entered(body):
 			if is_instance_valid(body):
 				body.speed = orig_spd
 				if \"modulate\" in body:
+					body.modulate = Color.WHITE
+		)
+
+	# 改善243: modからの確率凍結（freezing/frostbound）。crit条件なしで発動する確率的凍結。
+	# Why: crit_freeze_duration はcrit時のみ発動。freeze_chance は通常hitでも確率凍結できる別枠。
+	if freeze_chance > 0.0 and randf() < freeze_chance and "speed" in body:
+		var orig_fspd: float = body.speed
+		body.speed = 0.0
+		if "modulate" in body:
+			body.modulate = Color(0.4, 0.75, 1.3, 1.0)  # 深い氷ブルー
+		if scene_root:
+			for _fzi in range(8):
+				var fz_crystal := Polygon2D.new()
+				var fz_pts := PackedVector2Array()
+				for _fzp in range(6):
+					fz_pts.append(Vector2(cos(_fzp * TAU / 6.0), sin(_fzp * TAU / 6.0)) * 4.5)
+				fz_crystal.polygon = fz_pts
+				fz_crystal.color = Color(0.7, 0.9, 1.0, 0.9)
+				var fza := randf() * TAU
+				var fzr := randf_range(10.0, 22.0)
+				fz_crystal.global_position = body.global_position + Vector2(cos(fza), sin(fza)) * fzr
+				fz_crystal.z_index = 95
+				scene_root.add_child(fz_crystal)
+				var fzt := fz_crystal.create_tween()
+				fzt.set_parallel(true)
+				fzt.tween_property(fz_crystal, "scale", Vector2(2.5, 2.5), 0.5).set_trans(Tween.TRANS_QUAD)
+				fzt.tween_property(fz_crystal, "modulate:a", 0.0, 0.5).set_delay(0.15)
+				fzt.chain().tween_callback(fz_crystal.queue_free)
+		get_tree().create_timer(freeze_duration).timeout.connect(func():
+			if is_instance_valid(body):
+				body.speed = orig_fspd
+				if "modulate" in body:
 					body.modulate = Color.WHITE
 		)
 
