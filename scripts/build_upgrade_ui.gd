@@ -12,6 +12,7 @@ var title_label: Label
 var buttons_container: VBoxContainer
 var build_system: Node
 var _overlay: ColorRect = null  # 改善186: アニメーション用参照
+var _build_info_label: Label = null  # 改善248: 現在ビルド表示
 
 func _ready() -> void:
 	layer = 10
@@ -57,6 +58,16 @@ func _build_ui() -> void:
 	title_label.add_theme_constant_override("shadow_offset_x", 1)
 	title_label.add_theme_constant_override("shadow_offset_y", 1)
 	vbox.add_child(title_label)
+
+	# 改善248: 現在ビルド表示（スキル+mod一覧を選択前に確認できる）
+	# Why: どのオーブを選ぶべきか判断するには現在のビルドが見えないといけない。
+	_build_info_label = Label.new()
+	_build_info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_build_info_label.add_theme_font_size_override("font_size", 11)
+	_build_info_label.add_theme_color_override("font_color", Color(0.65, 0.62, 0.75, 0.9))
+	_build_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_build_info_label.custom_minimum_size = Vector2(380, 0)
+	vbox.add_child(_build_info_label)
 
 	buttons_container = VBoxContainer.new()
 	buttons_container.add_theme_constant_override("separation", 8)
@@ -472,10 +483,40 @@ func show_levelup_choice(level: int, options: Array[Dictionary]) -> void:
 
 	_show_animated()
 
+func _refresh_build_display() -> void:
+	## 改善248: 現在のスキル/mod/サポート一覧を1行で表示
+	if _build_info_label == null:
+		return
+	var tower := get_tree().current_scene.get_node_or_null("Tower")
+	if tower == null or not tower.has_method("get_filled_modules"):
+		_build_info_label.text = ""
+		return
+	var filled: Array = tower.get_filled_modules()
+	if filled.is_empty():
+		_build_info_label.text = ""
+		return
+	var lines: Array[String] = []
+	for i in filled.size():
+		var m = filled[i]
+		var skill_name: String = build_system.skills.get(m.skill_id, {}).get("name", m.skill_id)
+		var parts: Array[String] = [skill_name]
+		if not m.prefix.is_empty():
+			parts.append("[%s]" % m.prefix.get("name", "?"))
+		if not m.suffix.is_empty():
+			parts.append("+%s" % m.suffix.get("name", "?"))
+		if not m.support_ids.is_empty():
+			var sup_names: Array[String] = []
+			for sid in m.support_ids:
+				sup_names.append(build_system.supports.get(sid, {}).get("name", sid))
+			parts.append("(%s)" % ", ".join(sup_names))
+		lines.append("• " + " ".join(parts))
+	_build_info_label.text = "\n".join(lines)
+
 func _show_animated() -> void:
 	## 改善186: パネルをスケールイン+フェードインで表示
 	## なぜ: 即時ポップインは唐突。アニメーションで「選択の時間が来た」感を演出
 	## 改善195: 各ボタンを70msずつ遅らせてフェードイン（カードを配る演出）
+	_refresh_build_display()
 	if _overlay:
 		_overlay.modulate.a = 0.0
 	panel.scale = Vector2(0.85, 0.85)
