@@ -66,6 +66,8 @@ var boss_warning_shown := false
 
 # 画面ビネット（低HP時の周辺暗化: 改善35）
 var _vignette: ColorRect = null
+var _vignette_pulse_tween: Tween = null  # 改善211: 低HP鼓動パルス制御
+var _vignette_critical := false  # 改善211: クリティカル状態フラグ（初入検知）
 
 # ボスHP臨界パルス（改善86/98: <15%でラベルとバーが赤く点滅）
 var _boss_hp_crit_tween: Tween = null
@@ -2257,9 +2259,24 @@ func _update_vignette(hp_pct: float) -> void:
 		return
 	if hp_pct > 0.30:
 		_vignette.color.a = 0.0
+		# 改善211: クリティカル離脱 → パルス停止・modulate戻す
+		if _vignette_critical:
+			_vignette_critical = false
+			if _vignette_pulse_tween and _vignette_pulse_tween.is_running():
+				_vignette_pulse_tween.kill()
+			_vignette.modulate.a = 1.0
 	else:
 		var intensity := (0.30 - hp_pct) / 0.30 * 0.42
 		_vignette.color = Color(0.0, 0.0, 0.0, intensity)
+		# 改善211: 低HP鼓動パルス（「もうすぐ死ぬ」緊張感をリズムで体感させる）
+		# Why: 静的な暗化より動きのあるパルスの方が「危険」を脳に強く刻む。
+		# 初入時のみ開始し、ループ継続。HP回復で自動停止。
+		if not _vignette_critical:
+			_vignette_critical = true
+			_vignette_pulse_tween = _vignette.create_tween()
+			_vignette_pulse_tween.set_loops()
+			_vignette_pulse_tween.tween_property(_vignette, "modulate:a", 0.4, 0.55).set_trans(Tween.TRANS_SINE)
+			_vignette_pulse_tween.tween_property(_vignette, "modulate:a", 1.0, 0.38).set_trans(Tween.TRANS_SINE)
 
 func _on_xp_gained(total_xp: int, current_level: int) -> void:
 	var next_xp: int = tower.get_xp_for_next_level()
