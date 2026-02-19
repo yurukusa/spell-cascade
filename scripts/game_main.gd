@@ -1799,10 +1799,13 @@ func _show_area_cleared() -> void:
 	lbl.position = Vector2(640 - 120, 250)
 	lbl.custom_minimum_size = Vector2(240, 0)
 	lbl.z_index = 200
+	# 改善222: CLEARED!スケールパンチイン（MILESTONE/OVERTIME等と一貫した「制圧の一撃」）
+	# Why: 旧パターンの1.0→1.2→1.0はSTAGE 2やOVERTIMEの2.0→1.0と比べ存在感が薄かった。
+	# エリア制圧は明確な達成なので scale 2.0→1.0 TRANS_BACK で「決めた！」を体感させる。
+	lbl.scale = Vector2(2.0, 2.0)
 	ui_layer.add_child(lbl)
 	var tween := lbl.create_tween()
-	tween.tween_property(lbl, "scale", Vector2(1.2, 1.2), 0.1).set_trans(Tween.TRANS_BACK)
-	tween.chain().tween_property(lbl, "scale", Vector2(1.0, 1.0), 0.08)
+	tween.tween_property(lbl, "scale", Vector2(1.0, 1.0), 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.chain().tween_interval(0.8)
 	tween.chain().tween_property(lbl, "modulate:a", 0.0, 0.4)
 	tween.chain().tween_callback(lbl.queue_free)
