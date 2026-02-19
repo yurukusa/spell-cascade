@@ -73,7 +73,13 @@ func _ready() -> void:
 	_build_settings_panel()
 
 func _on_start() -> void:
-	get_tree().change_scene_to_file("res://scenes/game.tscn")
+	# change_scene_to_file はwebビルドでスレッドローダーが使われ失敗する場合がある。
+	# load() + change_scene_to_packed() を使うと確実に同期ロードされる。
+	var scene: PackedScene = load("res://scenes/game.tscn")
+	if scene != null:
+		get_tree().change_scene_to_packed(scene)
+	else:
+		push_error("Failed to load game.tscn")
 
 func _on_settings() -> void:
 	settings_panel.visible = not settings_panel.visible
