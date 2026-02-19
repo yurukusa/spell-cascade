@@ -983,6 +983,30 @@ func _boss_phase_transition() -> void:
 	var body_tween := create_tween()
 	body_tween.tween_property(self, "modulate", Color.WHITE, 0.4)
 
+	# 改善199: フェーズ移行アナウンスラベル（フェーズ変化を「ドラマ」として演出）
+	# Why: リングと点滅だけでは「何かが起きた」感が弱い。大きなテキストでフェーズ転換の重大さを伝える。
+	var announce_text := "— PHASE 2 —" if boss_phase == 2 else "— BERSERK! —"
+	var announce_color := Color(1.0, 0.55, 0.1, 1.0) if boss_phase == 2 else Color(1.0, 0.15, 0.1, 1.0)
+	var announce := Label.new()
+	announce.text = announce_text
+	announce.add_theme_font_size_override("font_size", 28)
+	announce.add_theme_color_override("font_color", announce_color)
+	announce.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 1.0))
+	announce.add_theme_constant_override("shadow_offset_x", 3)
+	announce.add_theme_constant_override("shadow_offset_y", 3)
+	announce.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	announce.custom_minimum_size = Vector2(240, 0)
+	announce.global_position = global_position + Vector2(-120, -90)
+	announce.z_index = 200
+	scene_root.add_child(announce)
+	announce.scale = Vector2(0.0, 0.0)
+	var at := announce.create_tween()
+	at.tween_property(announce, "scale", Vector2(1.3, 1.3), 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	at.tween_property(announce, "scale", Vector2(1.0, 1.0), 0.1).set_trans(Tween.TRANS_QUAD)
+	at.tween_interval(1.1)
+	at.tween_property(announce, "modulate:a", 0.0, 0.45)
+	at.tween_callback(announce.queue_free)
+
 func _boss_process(delta: float) -> void:
 	## ボス専用AI: chase → 攻撃 → cooldown のループ（フェーズ対応）
 
