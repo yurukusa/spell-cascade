@@ -1303,6 +1303,18 @@ func take_damage(amount: float, is_crit: bool = false) -> void:
 	# ヒットスタッガー: 大ダメージほど長く（改善36）
 	_stagger_timer = 0.28 if is_crit else 0.18
 
+	# ノックバック: 攻撃で敵をタワーから押し出す（ダメージに比例、ボスは無効）
+	# Why: スタッガー(速度低下)だけでは「攻撃の手応え」が足りない。
+	# 物理的な押し出しで「殴った感」を追加。ボスは動じないので除外。
+	if not is_boss and is_instance_valid(player):
+		var kb_dir := (global_position - player.global_position).normalized()
+		var kb_force := clampf(amount * 0.6, 3.0, 18.0)
+		if is_crit:
+			kb_force *= 1.5
+		if enemy_type == "tank":
+			kb_force *= 0.4  # タンクは重いので弱ノックバック
+		position += kb_dir * kb_force
+
 	# ミニHPバー更新（scale.xでHPを幅として表現: G-10 + J-7）
 	# 改善51: 初弾で表示（全HP時は非表示にして「無傷」と「傷あり」を区別）
 	if _enemy_hp_bar != null and is_instance_valid(_enemy_hp_bar) and not _enemy_hp_bar.visible:

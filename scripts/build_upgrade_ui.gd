@@ -102,9 +102,7 @@ func show_skill_choice(slot: int, skill_ids: Array) -> void:
 
 		var style := _make_button_style(skill_data.get("tags", []))
 		btn.add_theme_stylebox_override("normal", style)
-		var hover := style.duplicate()
-		hover.bg_color = hover.bg_color.lightened(0.3)  # 改善154: ホバー色を強調（0.15→0.3）
-		btn.add_theme_stylebox_override("hover", hover)
+		_apply_button_feedback(btn, style)
 
 		btn.pressed.connect(_on_skill_chosen.bind(slot, skill_id))
 		buttons_container.add_child(btn)
@@ -149,9 +147,7 @@ func show_skill_swap(slot: int, skill_ids: Array) -> void:
 
 		var style := _make_button_style(skill_data.get("tags", []))
 		btn.add_theme_stylebox_override("normal", style)
-		var hover := style.duplicate()
-		hover.bg_color = hover.bg_color.lightened(0.3)  # 改善154: ホバー色を強調（0.15→0.3）
-		btn.add_theme_stylebox_override("hover", hover)
+		_apply_button_feedback(btn, style)
 
 		btn.pressed.connect(_on_skill_chosen.bind(slot, skill_id))
 		buttons_container.add_child(btn)
@@ -191,9 +187,7 @@ func show_support_choice(support_ids: Array) -> void:
 
 		var style := _make_support_style()
 		btn.add_theme_stylebox_override("normal", style)
-		var hover := style.duplicate()
-		hover.bg_color = hover.bg_color.lightened(0.3)  # 改善154: ホバー色を強調（0.15→0.3）
-		btn.add_theme_stylebox_override("hover", hover)
+		_apply_button_feedback(btn, style)
 
 		btn.pressed.connect(_on_support_chosen.bind(sup_id))
 		buttons_container.add_child(btn)
@@ -256,9 +250,7 @@ func show_mod_choice(prefix: Dictionary, suffix: Dictionary) -> void:
 		btn.add_theme_font_size_override("font_size", 14)
 		var style := _make_mod_style("prefix")
 		btn.add_theme_stylebox_override("normal", style)
-		var hover := style.duplicate()
-		hover.bg_color = hover.bg_color.lightened(0.3)  # 改善154: ホバー色を強調（0.15→0.3）
-		btn.add_theme_stylebox_override("hover", hover)
+		_apply_button_feedback(btn, style)
 		btn.pressed.connect(_on_mod_chosen.bind(prefix, "prefix"))
 		buttons_container.add_child(btn)
 
@@ -269,9 +261,7 @@ func show_mod_choice(prefix: Dictionary, suffix: Dictionary) -> void:
 		btn.add_theme_font_size_override("font_size", 14)
 		var style := _make_mod_style("suffix")
 		btn.add_theme_stylebox_override("normal", style)
-		var hover := style.duplicate()
-		hover.bg_color = hover.bg_color.lightened(0.3)  # 改善154: ホバー色を強調（0.15→0.3）
-		btn.add_theme_stylebox_override("hover", hover)
+		_apply_button_feedback(btn, style)
 		btn.pressed.connect(_on_mod_chosen.bind(suffix, "suffix"))
 		buttons_container.add_child(btn)
 
@@ -371,9 +361,7 @@ func _show_slot_choice(prompt: String, tower: Node2D, slots: Array[int], callbac
 		var tags: Array = stats.get("tags", [])
 		var style := _make_button_style(tags)
 		btn.add_theme_stylebox_override("normal", style)
-		var hover := style.duplicate()
-		hover.bg_color = hover.bg_color.lightened(0.3)  # 改善154: ホバー色を強調（0.15→0.3）
-		btn.add_theme_stylebox_override("hover", hover)
+		_apply_button_feedback(btn, style)
 
 		btn.pressed.connect(func() -> void:
 			get_tree().paused = false
@@ -399,9 +387,7 @@ func show_preset_choice(presets_list: Array[Dictionary]) -> void:
 
 		var style := _make_preset_style(preset.get("id", ""))
 		btn.add_theme_stylebox_override("normal", style)
-		var hover := style.duplicate()
-		hover.bg_color = hover.bg_color.lightened(0.3)  # 改善154: ホバー色を強調（0.15→0.3）
-		btn.add_theme_stylebox_override("hover", hover)
+		_apply_button_feedback(btn, style)
 
 		var preset_id: String = preset.get("id", "")
 		btn.pressed.connect(_on_preset_chosen.bind(preset_id))
@@ -434,9 +420,7 @@ func show_chip_choice(category_label: String, chip_options: Array[Dictionary]) -
 
 		var style := _make_chip_style(rarity)
 		btn.add_theme_stylebox_override("normal", style)
-		var hover := style.duplicate()
-		hover.bg_color = hover.bg_color.lightened(0.3)  # 改善154: ホバー色を強調（0.15→0.3）
-		btn.add_theme_stylebox_override("hover", hover)
+		_apply_button_feedback(btn, style)
 
 		var chip_id: String = chip.get("id", "")
 		btn.pressed.connect(_on_chip_chosen.bind(chip_id))
@@ -469,9 +453,7 @@ func show_levelup_choice(level: int, options: Array[Dictionary]) -> void:
 		style.set_corner_radius_all(5)
 		style.set_content_margin_all(10)
 		btn.add_theme_stylebox_override("normal", style)
-		var hover := style.duplicate()
-		hover.bg_color = hover.bg_color.lightened(0.3)  # 改善154: ホバー色を強調（0.15→0.3）
-		btn.add_theme_stylebox_override("hover", hover)
+		_apply_button_feedback(btn, style)
 
 		var opt_id: String = opt.get("id", "")
 		btn.pressed.connect(func() -> void:
@@ -617,6 +599,27 @@ func _make_button_style(tags: Array) -> StyleBoxFlat:
 	style.set_corner_radius_all(5)
 	style.set_content_margin_all(10)
 	return style
+
+## ボタンにhover+pressed+クリックアニメーションを一括適用
+## Why: hover(明るく)だけでは「押した」手応えがない。pressed(暗く収縮)で確実な操作感を追加。
+func _apply_button_feedback(btn: Button, base_style: StyleBoxFlat) -> void:
+	var hover := base_style.duplicate()
+	hover.bg_color = hover.bg_color.lightened(0.3)
+	btn.add_theme_stylebox_override("hover", hover)
+
+	var pressed_st := base_style.duplicate()
+	pressed_st.bg_color = pressed_st.bg_color.darkened(0.2)
+	pressed_st.border_color = pressed_st.border_color.lightened(0.5)
+	pressed_st.set_border_width_all(2)
+	btn.add_theme_stylebox_override("pressed", pressed_st)
+
+	# button_downでスケールパンチ（pressed前に発火。UI非表示後の空振りを防止）
+	btn.button_down.connect(func():
+		if is_instance_valid(btn):
+			var t := btn.create_tween()
+			t.tween_property(btn, "scale", Vector2(0.95, 0.95), 0.04).set_trans(Tween.TRANS_QUAD)
+			t.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.08).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	)
 
 func _make_support_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()

@@ -73,6 +73,8 @@ var _vignette_critical := false  # 改善211: クリティカル状態フラグ�
 var _boss_hp_crit_tween: Tween = null
 # 改善240: HPバーのスムーズトランジション（即時ジャンプをtweenで滑らか化）
 var _hp_bar_tween: Tween = null
+# ボスHPバーのスムーズトランジション（タワーHPバーと同じ原則で滑らか化）
+var _boss_hp_bar_tween: Tween = null
 
 # コンボタイマーバー（改善100: コンボウィンドウの残り時間を視覚化）
 var _combo_timer_bar: ProgressBar = null
@@ -854,6 +856,11 @@ func _setup_tower_attacks() -> void:
 			# crit_mult: 1.0がベースなのでボーナス部分のみ×1.5
 			if stats.get("crit_mult", 1.0) > 1.0:
 				stats["crit_mult"] = 1.0 + (stats["crit_mult"] - 1.0) * 1.5
+		# 改善258: summoners_pact — summon_wisp+trigger: ウィスプ消滅→後継ウィスプ召喚（最大8体）
+		# Why: summon_wispスロットのtower_attack.gdがwisp消滅時に再召喚するかを判定するため、
+		# statsにフラグを渡す。現役wisp数チェックはtree group "wisps" で行う。
+		if "summoners_pact" in _active_synergy_ids:
+			stats["synergy_summoners_pact"] = true
 
 		var attack_node := Node2D.new()
 		var attack_script := load("res://scripts/tower_attack.gd")
@@ -930,7 +937,7 @@ func _update_cd_bars() -> void:
 			# 白い閃光でフィードバックを与え、次の一撃のタイミングを直感的に教える。
 			var was_full: bool = idx < _cd_bar_was_full.size() and _cd_bar_was_full[idx]
 			if new_val >= 1.0 and not was_full:
-				var flash := _cd_bars[idx].create_tween()
+				var flash: Tween = _cd_bars[idx].create_tween()
 				flash.tween_property(_cd_bars[idx], "modulate", Color(2.5, 2.5, 2.5, 1.0), 0.04)
 				flash.tween_property(_cd_bars[idx], "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.25).set_trans(Tween.TRANS_EXPO)
 			if idx < _cd_bar_was_full.size():
@@ -1478,7 +1485,12 @@ func _remove_boss_hp_bar() -> void:
 
 func _on_boss_hp_changed(current: float, max_val: float) -> void:
 	if boss_hp_bar:
-		boss_hp_bar.value = current
+		# ボスHPバーもtweenで滑らか化（タワーHPバーと同じ原則: 改善240準拠）
+		# Why: 直接セットは「ガクッ」と跳ぶ。tweenでダメージの「流れ」が見える
+		if _boss_hp_bar_tween != null:
+			_boss_hp_bar_tween.kill()
+		_boss_hp_bar_tween = create_tween()
+		_boss_hp_bar_tween.tween_property(boss_hp_bar, "value", current, 0.2).set_trans(Tween.TRANS_SINE)
 		# HP割合でバー色変化（紫→赤）
 		var pct := current / max_val
 		var fill := boss_hp_bar.get_theme_stylebox("fill") as StyleBoxFlat
@@ -1736,8 +1748,22 @@ func _on_enemy_died(enemy: Node2D) -> void:
 		var kc_tween := kc_lbl.create_tween()
 		kc_tween.tween_property(kc_lbl, "scale", Vector2(1.2, 1.2), 0.06).set_trans(Tween.TRANS_BACK)
 		kc_tween.tween_property(kc_lbl, "scale", Vector2(1.0, 1.0), 0.09)
-	# 小さなシェイク（爽快感）
-	tower.shake(2.0)
+	# 敵タイプ別シェイク強度（重い敵ほど大きく揺れて「倒した重み」を体感）
+	# Why: 全キルで同じshake(2.0)だとswarmerもtankも同じ手応え。タイプ別にすることで
+	# swarmerは軽い「パリン」、tankは重い「ドスン」、bossは「ズドォン」と使い分ける。
+	var kill_shake := 1.5  # swarmerなど軽い敵
+	if is_instance_valid(enemy):
+		var etype: String = enemy.get("enemy_type") if "enemy_type" in enemy else ""
+		match etype:
+			"tank": kill_shake = 4.0
+			"boss": kill_shake = 8.0
+			"splitter": kill_shake = 3.0
+			"shooter": kill_shake = 2.5
+			"healer": kill_shake = 2.0
+			_: kill_shake = 1.5
+		if "is_elite" in enemy and enemy.is_elite:
+			kill_shake *= 1.4
+	tower.shake(kill_shake)
 	# コンボカウント
 	combo_count += 1
 	combo_timer = COMBO_WINDOW
@@ -1822,6 +1848,61 @@ func _on_enemy_died(enemy: Node2D) -> void:
 		brt.tween_property(big_ring, "scale", Vector2(5.5, 5.5), 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		brt.tween_property(big_ring, "modulate:a", 0.0, 0.4)
 		brt.chain().tween_callback(big_ring.queue_free)
+
+	# デスデブリ: 敵タイプ別の破片がはじけ飛ぶ（死亡の「重さ」と「爽快感」を同時に演出）
+	# Why: フェードアウト+デスリングだけでは「消えた」だけ。破片が飛ぶと「破壊した」になる。
+	# 破片数はタイプ別: swarmer=3(軽い)、tank=8(重い)、boss=12(豪華)
+	if is_instance_valid(enemy):
+		var deb_etype: String = enemy.get("enemy_type") if "enemy_type" in enemy else ""
+		var deb_count := 4  # デフォルト
+		var deb_color := Color(0.9, 0.3, 0.2, 0.85)  # 赤系
+		var deb_dist := 25.0  # 飛散距離
+		match deb_etype:
+			"swarmer":
+				deb_count = 3
+				deb_color = Color(0.4, 0.85, 0.3, 0.8)
+				deb_dist = 18.0
+			"tank":
+				deb_count = 8
+				deb_color = Color(0.5, 0.6, 0.7, 0.85)
+				deb_dist = 35.0
+			"shooter":
+				deb_count = 5
+				deb_color = Color(0.3, 0.6, 1.0, 0.8)
+				deb_dist = 28.0
+			"healer":
+				deb_count = 4
+				deb_color = Color(0.9, 0.4, 0.7, 0.8)
+				deb_dist = 22.0
+			"splitter":
+				deb_count = 6
+				deb_color = Color(0.6, 0.3, 0.9, 0.8)
+				deb_dist = 30.0
+		if "is_elite" in enemy and enemy.is_elite:
+			deb_count += 3
+			deb_dist *= 1.3
+		var deb_pos: Vector2 = enemy.global_position
+		for _di in range(deb_count):
+			var deb := Polygon2D.new()
+			var deb_size := randf_range(1.5, 3.5)
+			deb.polygon = PackedVector2Array([
+				Vector2(-deb_size, -deb_size * 0.5),
+				Vector2(deb_size, 0),
+				Vector2(-deb_size * 0.5, deb_size),
+			])
+			deb.color = deb_color
+			deb.global_position = deb_pos
+			deb.rotation = randf() * TAU
+			deb.z_index = 87
+			add_child(deb)
+			var deb_angle := randf() * TAU
+			var deb_target := deb_pos + Vector2(cos(deb_angle), sin(deb_angle)) * randf_range(deb_dist * 0.5, deb_dist)
+			var deb_tw := deb.create_tween()
+			deb_tw.set_parallel(true)
+			deb_tw.tween_property(deb, "global_position", deb_target, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			deb_tw.tween_property(deb, "rotation", deb.rotation + randf_range(-PI, PI), 0.3)
+			deb_tw.tween_property(deb, "modulate:a", 0.0, 0.3).set_delay(0.1)
+			deb_tw.chain().tween_callback(deb.queue_free)
 
 	# 改善159: 高XP敵（xp_value≥2）にフローティング"+N XP"ピップ（XP獲得量の即時確認）
 	if is_instance_valid(enemy) and "xp_value" in enemy and enemy.xp_value >= 2:
