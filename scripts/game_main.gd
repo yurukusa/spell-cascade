@@ -48,6 +48,7 @@ var _boss_hp_root: Control = null  # 改善187: 全ボスHP UI要素のコンテ
 # 改善189: スロット別クールダウンバー（スキルのリチャージ状態を可視化）
 var _cd_bar_container: Control = null
 var _cd_bars: Array = []  # slot_index → ProgressBar or null
+var _cd_bar_was_full: Array = []  # 改善210: 満タン遷移検知用（閃光の二重発火防止）
 
 # Hitstop リエントラント管理（複数同時呼び出しで早期復帰を防止）
 var _hitstop_depth := 0
@@ -815,6 +816,7 @@ func _rebuild_cd_bars() -> void:
 		_cd_bar_container.queue_free()
 	_cd_bar_container = null
 	_cd_bars.clear()
+	_cd_bar_was_full.clear()  # 改善210
 
 	_cd_bar_container = Control.new()
 	_cd_bar_container.name = "CDBarsContainer"
@@ -831,6 +833,7 @@ func _rebuild_cd_bars() -> void:
 
 	for i in range(tower.max_slots):
 		_cd_bars.append(null)
+		_cd_bar_was_full.append(false)  # 改善210
 		if tower.get_module(i) == null:
 			continue
 
@@ -867,7 +870,18 @@ func _update_cd_bars() -> void:
 			var cooldown: float = atk.stats.get("cooldown", 1.0)
 			if "cooldown_mult" in tower:
 				cooldown *= tower.cooldown_mult
-			_cd_bars[idx].value = clampf(atk.timer / maxf(cooldown, 0.001), 0.0, 1.0)
+			var new_val := clampf(atk.timer / maxf(cooldown, 0.001), 0.0, 1.0)
+			_cd_bars[idx].value = new_val
+			# 改善210: CDバー満タン瞬間の閃光（<1.0→1.0 遷移時のみ。毎フレーム発火しない）
+			# Why: 小さなバーは「撃てる」状態を色だけで伝えにくい。
+			# 白い閃光でフィードバックを与え、次の一撃のタイミングを直感的に教える。
+			var was_full: bool = idx < _cd_bar_was_full.size() and _cd_bar_was_full[idx]
+			if new_val >= 1.0 and not was_full:
+				var flash := _cd_bars[idx].create_tween()
+				flash.tween_property(_cd_bars[idx], "modulate", Color(2.5, 2.5, 2.5, 1.0), 0.04)
+				flash.tween_property(_cd_bars[idx], "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.25).set_trans(Tween.TRANS_EXPO)
+			if idx < _cd_bar_was_full.size():
+				_cd_bar_was_full[idx] = new_val >= 1.0
 
 # --- 敵スポーン ---
 
