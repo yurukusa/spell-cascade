@@ -15,6 +15,20 @@ Expected result: avg_levelup_interval ~7.8–8.5s (passes min_avg_interval: 8.0)
 
 This also reduces the "upgrade feast in first 3 minutes" problem noted in playtest_log.
 
+### Balance: Dead Zone Fix (120-225s) — Spawn Acceleration Reduced
+
+**Problem**: playtest_log identified 120-225s as a dead zone where enemy scaling outpaced upgrade arrival.
+With XP thresholds ×1.5 (above), the dead zone worsened further — players spent longer between upgrades
+while enemy spawn rate continued to accelerate at 0.002/s.
+
+**Fix**: Spawn acceleration coefficient reduced from 0.002 → 0.0012 (−40%):
+- Before at 120s: maxf(1.0 − 0.24, 0.4) / stage_spawn = 0.475s per spawn
+- After  at 120s: maxf(1.0 − 0.144, 0.4) / stage_spawn = 0.535s per spawn (+13% breathing room)
+- Before at 225s: maxf(1.0 − 0.45, 0.4) / stage_spawn = 0.344s per spawn
+- After  at 225s: maxf(1.0 − 0.27, 0.4) / stage_spawn = 0.456s per spawn (+33% breathing room)
+
+Expected result: Difficulty Curve dimension improves 3/5 → 4/5 (GAME_QUALITY_FRAMEWORK target).
+
 ---
 
 ## v0.9.2 (2026-02-20)

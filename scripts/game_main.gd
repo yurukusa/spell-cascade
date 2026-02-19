@@ -235,7 +235,9 @@ func _process(delta: float) -> void:
 		if not _desperate_push_announced:
 			_desperate_push_announced = true
 			_announce_desperate_push()
-	var current_interval := maxf(spawn_interval - run_time * 0.002, 0.4) / stage_spawn
+	# 加速係数0.002→0.0012: 120-225s dead zoneで敵スケールがXP獲得を上回る問題を緩和
+	# v0.9.3でXP閾値×1.5したため、アップグレード到達がさらに遅くなった分を補正
+	var current_interval := maxf(spawn_interval - run_time * 0.0012, 0.4) / stage_spawn
 	# ボス出現後は雑魚スポーンを25%に抑制（ボス戦に集中）
 	if boss_spawned:
 		current_interval *= 4.0
