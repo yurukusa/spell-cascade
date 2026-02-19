@@ -1502,13 +1502,14 @@ func _on_boss_phase_changed(phase: int, _hp_pct: float) -> void:
 	label.position = Vector2(490, 150)
 	label.custom_minimum_size = Vector2(300, 0)
 	label.z_index = 200
-	label.modulate.a = 0.0
+	# 改善218: 画面上部PHASE Nラベルのスケールパンチイン（#212の世界座標ポップと対称した演出）
+	# Why: 世界座標phase_txtが0.3→1.4のポップを持つのに、画面中央ラベルはフェードイン+微小バウンスで
+	# 「フェーズ移行の重み」が伝わらなかった。scale 1.8→1.0 TRANS_BACKで統一感を出す。
+	label.scale = Vector2(1.8, 1.8)
 	ui_layer.add_child(label)
 
 	var text_tween := label.create_tween()
-	text_tween.tween_property(label, "modulate:a", 1.0, 0.1)
-	text_tween.tween_property(label, "scale", Vector2(1.2, 1.2), 0.1).set_trans(Tween.TRANS_BACK)
-	text_tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1)
+	text_tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	text_tween.tween_property(label, "modulate:a", 0.0, 0.8).set_delay(0.5)
 	text_tween.tween_callback(label.queue_free)
 
