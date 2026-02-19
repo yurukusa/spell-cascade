@@ -1459,8 +1459,15 @@ func _on_boss_phase_changed(phase: int, _hp_pct: float) -> void:
 	phase_txt.add_theme_constant_override("shadow_offset_y", 2)
 	phase_txt.z_index = 201
 	phase_txt.global_position = tower.global_position + Vector2(-60, -120)
+	# 改善212: PHASE Nスケールポップイン（フェーズ移行の「衝撃」を登場演出で最大化）
+	# Why: 画面フラッシュ+シェイクがあるのに、テキスト自体がただ出るだけでは締まらない。
+	# スケールパンチで「局面が変わった」瞬間を一撃で印象付ける。
+	phase_txt.scale = Vector2(0.3, 0.3)
 	add_child(phase_txt)
 	var pt_tween := phase_txt.create_tween()
+	# スケールポップ（sequential先行: pop後に浮上フェードを並行開始）
+	pt_tween.tween_property(phase_txt, "scale", Vector2(1.4, 1.4), 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	pt_tween.tween_property(phase_txt, "scale", Vector2(1.0, 1.0), 0.12).set_trans(Tween.TRANS_QUAD)
 	pt_tween.set_parallel(true)
 	pt_tween.tween_property(phase_txt, "global_position:y", phase_txt.global_position.y - 50, 1.0).set_trans(Tween.TRANS_QUAD)
 	pt_tween.tween_property(phase_txt, "modulate:a", 0.0, 1.0).set_delay(0.5)
