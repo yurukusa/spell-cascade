@@ -1305,6 +1305,7 @@ func _on_boss_hp_changed(current: float, max_val: float) -> void:
 				boss_hp_bar.modulate = Color.WHITE
 
 func _on_boss_phase_changed(phase: int, _hp_pct: float) -> void:
+	SFX.play_boss_phase()  # 改善181: フェーズ移行の恐怖感を音で演出
 	if boss_phase_label:
 		boss_phase_label.text = "Phase %d" % phase
 		# フェーズ移行時のラベルフラッシュ

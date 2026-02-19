@@ -53,6 +53,9 @@ var _victory_player: AudioStreamPlayer
 # 改善180: ボス撃破専用SFX（爆発 + 残響クレッシェンド）
 # Why: play_wave_clear()はウェーブ終了と同じ音。ボス撃破は最大の達成感なので専用音が必要。
 var _boss_kill_player: AudioStreamPlayer
+# 改善181: ボスフェーズ移行SFX（不協和スウェル + 金属打撃）
+# Why: フェーズ移行は視覚・振動あり、音なし。「まだ続くのか」という恐怖感を音で演出。
+var _boss_phase_player: AudioStreamPlayer
 # 改善174: コンボティアアップSE（COMBO=3/RAMPAGE=8/MASSACRE=15/GODLIKE=30）
 # Why: 視覚的なスケールパンチ+リングに対応する音がなかった。達成感を音で確認させる。
 var _combo_tier_players: Array[AudioStreamPlayer] = []
@@ -217,6 +220,12 @@ func _ready() -> void:
 	_boss_kill_player.volume_db = -1.0  # ゲーム最大のイベント — 最も目立たせる
 	add_child(_boss_kill_player)
 
+	# 改善181: ボスフェーズ移行SFX
+	_boss_phase_player = AudioStreamPlayer.new()
+	_boss_phase_player.stream = _gen_boss_phase()
+	_boss_phase_player.volume_db = -3.0
+	add_child(_boss_phase_player)
+
 	# 改善175: 回復SE (small/large 2段階)
 	_heal_small_player = AudioStreamPlayer.new()
 	_heal_small_player.stream = _gen_heal(false)
@@ -365,6 +374,10 @@ func play_victory() -> void:
 ## 改善180: ボス撃破SE。_on_boss_died()から呼ぶ。wave_clearより重厚に。
 func play_boss_kill() -> void:
 	_boss_kill_player.play()
+
+## 改善181: ボスフェーズ移行SE。_on_boss_phase_changed()から呼ぶ。
+func play_boss_phase() -> void:
+	_boss_phase_player.play()
 
 ## 改善175: 回復SE。amount >= 50 で大回復音、それ以下で小回復音。
 ## Why: life stealは高頻度なのでHEAL_COOLDOWN(1.2s)でスロットル。
@@ -1067,5 +1080,42 @@ func _gen_boss_kill() -> AudioStreamWAV:
 			var freq: float = flare_notes[3]
 			s = renv * 0.25 * sin(TAU * freq * t)
 			s += renv * 0.10 * sin(TAU * freq * 2.0 * t)
+		samples[i] = s
+	return _make_stream(samples)
+
+## 改善181: ボスフェーズ移行SE生成
+## 不協和スウェル上昇 (0.3s) + 金属打撃インパクト (0.1s) + 残響 (0.3s)
+## Why: 「まだ続くのか」という恐怖感。ボス登場(bass_entrance)とは違う脅威感が必要。
+func _gen_boss_phase() -> AudioStreamWAV:
+	var swell_dur := 0.3
+	var hit_dur := 0.1
+	var ring_dur := 0.3
+	var total_dur := swell_dur + hit_dur + ring_dur
+	var cnt := int(SAMPLE_RATE * total_dur)
+	var samples := PackedFloat32Array()
+	samples.resize(cnt)
+	for i in cnt:
+		var t := float(i) / SAMPLE_RATE
+		var s := 0.0
+		if t < swell_dur:
+			# 不協和スウェル: tritone (A4 + Eb5) がクレッシェンドで上昇
+			var progress := t / swell_dur
+			var env := progress  # 徐々に大きくなる
+			s = env * 0.35 * sin(TAU * 440.0 * t)      # A4
+			s += env * 0.30 * sin(TAU * 622.25 * t)    # Eb5 (tritone — 不協和)
+			s += env * 0.15 * sin(TAU * 880.0 * t)     # A5 (overtone)
+		elif t < swell_dur + hit_dur:
+			# 金属打撃: 短い高域インパクト
+			var ht := t - swell_dur
+			var henv := exp(-ht * 40.0)
+			s = henv * 0.65 * sin(TAU * 220.0 * t)     # A3 — 重い金属感
+			s += henv * 0.30 * sin(TAU * 110.0 * t)    # A2 — さらに低い基音
+			s += henv * 0.20 * sin(TAU * 440.0 * t)    # A4 — 倍音
+		else:
+			# 残響: A3が静かに消えていく
+			var rt := t - swell_dur - hit_dur
+			var renv := exp(-rt * 8.0)
+			s = renv * 0.20 * sin(TAU * 220.0 * t)
+			s += renv * 0.10 * sin(TAU * 110.0 * t)
 		samples[i] = s
 	return _make_stream(samples)
