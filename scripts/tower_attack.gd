@@ -662,6 +662,10 @@ func _create_projectile(direction: Vector2) -> void:
 	bullet.set("lightning_chain_dmg_pct", stats.get("lightning_chain_dmg_pct", 0.5))
 	bullet.set("on_hit_explode_radius", stats.get("on_hit_explode_radius", 0.0))
 	bullet.set("on_hit_explode_dmg_pct", stats.get("on_hit_explode_dmg_pct", 0.0))
+	# 改善244: splash/leeching mod を弾に伝播
+	bullet.set("splash_radius", stats.get("splash_radius", 0.0))
+	bullet.set("splash_damage_pct", stats.get("splash_damage_pct", 0.0))
+	bullet.set("life_on_hit", stats.get("life_on_hit", 0.0))
 	bullet.set("on_hit_slow", stats.get("on_hit_slow", 0.0))
 	bullet.set("on_hit_slow_duration", stats.get("on_hit_slow_duration", 0.0))
 	bullet.set("life_steal_pct", stats.get("life_steal_pct", 0.0))
@@ -1089,6 +1093,9 @@ var lightning_chain_range := 60.0
 var lightning_chain_dmg_pct := 0.5
 var on_hit_explode_radius := 0.0
 var on_hit_explode_dmg_pct := 0.0
+var splash_radius := 0.0  # 改善244: of_splashing mod — hit時の周囲AoE
+var splash_damage_pct := 0.0
+var life_on_hit := 0.0  # 改善244: of_leeching mod — hit時のHP回復
 var on_hit_slow := 0.0
 var on_hit_slow_duration := 0.0
 var life_steal_pct := 0.0
@@ -1312,6 +1319,32 @@ func _on_body_entered(body):
 			ert.tween_property(exp_ring, \"scale\", Vector2(2.5, 2.5), 0.3).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 			ert.tween_property(exp_ring, \"modulate:a\", 0.0, 0.3)
 			ert.chain().tween_callback(exp_ring.queue_free)
+
+	# 改善244: of_splashing — hit時の周囲スプラッシュダメージ（on_hit_explodeの冷静版）
+	# Why: on_hit_explodeはオレンジ爆発。splashは水色でより静かなAoE。別ビジュアルで区別。
+	if splash_radius > 0.0:
+		_do_aoe(global_position, splash_radius, int(float(final_damage) * splash_damage_pct))
+		var sp_root := get_tree().current_scene
+		if sp_root:
+			var sp_ring := Polygon2D.new()
+			var sp_pts := PackedVector2Array()
+			for _si in range(16):
+				sp_pts.append(Vector2(cos(_si * TAU / 16.0), sin(_si * TAU / 16.0)) * splash_radius * 0.35)
+			sp_ring.polygon = sp_pts
+			sp_ring.color = Color(0.2, 0.7, 1.0, 0.45)
+			sp_ring.global_position = global_position
+			sp_ring.z_index = 88
+			sp_root.add_child(sp_ring)
+			var srt := sp_ring.create_tween()
+			srt.set_parallel(true)
+			srt.tween_property(sp_ring, \"scale\", Vector2(2.2, 2.2), 0.25).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+			srt.tween_property(sp_ring, \"modulate:a\", 0.0, 0.25)
+			srt.chain().tween_callback(sp_ring.queue_free)
+
+	# 改善244: of_leeching — hit時のHP回復（2HP/hit）
+	# Why: life_steal_pct は最終ダメージ比例。life_on_hit は固定量。性質が異なる別効果。
+	if life_on_hit > 0.0 and tower != null and is_instance_valid(tower):
+		tower.heal(life_on_hit)
 
 	# on_hitスロー + 氷ブルーティント（スロー中であることを視覚的に示す）
 	if on_hit_slow > 0.0 and \"speed\" in body:

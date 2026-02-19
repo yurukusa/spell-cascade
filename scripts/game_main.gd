@@ -1806,6 +1806,52 @@ func _on_enemy_died(enemy: Node2D) -> void:
 				_show_upgrade_choice()
 				break  # 複数スロットで重複発動しない
 
+	# 改善244: hp_on_kill mod (vampiric) — kill時にHPを回復
+	# Why: 全tower_attackのstatsを走査して最大値を使う（複数スロットで重複回復しない）
+	var max_hok := 0
+	for atk in get_tree().get_nodes_in_group("tower_attacks"):
+		var s_hok: Dictionary = atk.get("stats") if atk.get("stats") != null else {}
+		max_hok = max(max_hok, s_hok.get("hp_on_kill", 0))
+	if max_hok > 0:
+		tower.heal(float(max_hok))
+
+	# 改善244: on_kill_explode mod (explosive/of_annihilation) — kill時にAoE爆発
+	# Why: 複数スロットがある場合、最大半径のもの1つだけ爆発させる（スタック爆発は過剰）
+	var max_okr := 0.0
+	var max_okd := 0.0
+	var max_okdmg := 0
+	for atk in get_tree().get_nodes_in_group("tower_attacks"):
+		var s_ok: Dictionary = atk.get("stats") if atk.get("stats") != null else {}
+		var okr: float = s_ok.get("on_kill_explode_radius", 0.0)
+		if okr > max_okr:
+			max_okr = okr
+			max_okd = s_ok.get("on_kill_explode_dmg_pct", 0.3)
+			max_okdmg = s_ok.get("damage", 20)
+	if max_okr > 0.0 and is_instance_valid(enemy):
+		var exp_center := enemy.global_position
+		for e in get_tree().get_nodes_in_group("enemies"):
+			if is_instance_valid(e) and e != enemy:
+				if exp_center.distance_to(e.global_position) < max_okr:
+					if e.has_method("take_damage"):
+						e.take_damage(int(float(max_okdmg) * max_okd))
+		# 爆発リングビジュアル（橙色: on_hit_explodeと同色系で「爆発」を統一）
+		var okr_root := get_tree().current_scene
+		if okr_root:
+			var okr_ring := Polygon2D.new()
+			var okr_pts := PackedVector2Array()
+			for _oi in range(20):
+				okr_pts.append(Vector2(cos(_oi * TAU / 20.0), sin(_oi * TAU / 20.0)) * max_okr * 0.35)
+			okr_ring.polygon = okr_pts
+			okr_ring.color = Color(1.0, 0.45, 0.1, 0.65)
+			okr_ring.global_position = exp_center
+			okr_ring.z_index = 89
+			okr_root.add_child(okr_ring)
+			var okt := okr_ring.create_tween()
+			okt.set_parallel(true)
+			okt.tween_property(okr_ring, "scale", Vector2(2.8, 2.8), 0.35).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+			okt.tween_property(okr_ring, "modulate:a", 0.0, 0.35)
+			okt.chain().tween_callback(okr_ring.queue_free)
+
 	# キルマイルストーン（10, 25, 50, 100, 200キル: 達成感の積み上げ）
 	if kill_count in [10, 25, 50, 100, 200]:
 		_announce_kill_milestone(kill_count)
