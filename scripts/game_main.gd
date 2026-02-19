@@ -2685,6 +2685,7 @@ func _on_tower_destroyed() -> void:
 	game_over = true
 	_reset_time_scale()
 	SFX.stop_bgm()
+	SFX.play_game_over()  # 改善178: 下降スイープで敗北の重さを演出
 	_show_result_screen(false)
 
 func _win_game() -> void:

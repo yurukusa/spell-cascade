@@ -44,6 +44,9 @@ const DAMAGE_COOLDOWN := 0.15  # 被弾SE連続再生を制限（150ms間隔）
 var _dot_player: AudioStreamPlayer
 var _dot_cooldown := 0.0
 const DOT_COOLDOWN := 0.35  # 350ms以内は再生しない（連続DoTのノイズ抑制）
+# 改善178: ゲームオーバーSE（低音下降スイープ + 残響）
+# Why: BGM停止→無音のみでは敗北の「重さ」が伝わらない。"DOOM"感を音で完結させる。
+var _game_over_player: AudioStreamPlayer
 # 改善174: コンボティアアップSE（COMBO=3/RAMPAGE=8/MASSACRE=15/GODLIKE=30）
 # Why: 視覚的なスケールパンチ+リングに対応する音がなかった。達成感を音で確認させる。
 var _combo_tier_players: Array[AudioStreamPlayer] = []
@@ -190,6 +193,12 @@ func _ready() -> void:
 		add_child(p)
 		_damage_taken_players.append(p)
 
+	# 改善178: ゲームオーバーSE
+	_game_over_player = AudioStreamPlayer.new()
+	_game_over_player.stream = _gen_game_over()
+	_game_over_player.volume_db = -2.0  # ゲームオーバーは目立たせる
+	add_child(_game_over_player)
+
 	# 改善175: 回復SE (small/large 2段階)
 	_heal_small_player = AudioStreamPlayer.new()
 	_heal_small_player.stream = _gen_heal(false)
@@ -326,6 +335,10 @@ func play_combo_tier(tier: int) -> void:
 	var p := _combo_tier_players[tier]
 	p.pitch_scale = 1.0  # 固定ピッチ（tierごとに設計済み）
 	p.play()
+
+## 改善178: ゲームオーバーSE。BGM停止直後に呼ぶ。
+func play_game_over() -> void:
+	_game_over_player.play()
 
 ## 改善175: 回復SE。amount >= 50 で大回復音、それ以下で小回復音。
 ## Why: life stealは高頻度なのでHEAL_COOLDOWN(1.2s)でスロットル。
@@ -907,3 +920,39 @@ func _gen_heal(large: bool) -> AudioStreamWAV:
 			s += env * 0.10 * sin(TAU * freq * 2.0 * t)
 			samples[i] = s
 		return _make_stream(samples)
+
+## 改善178: ゲームオーバーSE生成
+## 低音下降スイープ (600Hz→80Hz, 0.6s) + 残響シミュ (0.4s)
+## Why: BGM停止後の無音は演出機会の損失。下降音で「失墜」を体で感じさせる。
+func _gen_game_over() -> AudioStreamWAV:
+	var sweep_dur := 0.6
+	var echo_dur := 0.4
+	var total_dur := sweep_dur + echo_dur
+	var cnt := int(SAMPLE_RATE * total_dur)
+	var samples := PackedFloat32Array()
+	samples.resize(cnt)
+	var freq_start := 600.0
+	var freq_end := 80.0
+	for i in cnt:
+		var t := float(i) / SAMPLE_RATE
+		var s := 0.0
+		if t < sweep_dur:
+			# 指数的に下降（線形より「落下」感が強い）
+			var progress := t / sweep_dur
+			var freq := freq_start * pow(freq_end / freq_start, progress)
+			# エンベロープ: 即アタック、末尾で減衰
+			var env := 1.0
+			if t < 0.01: env = t / 0.01
+			if t > sweep_dur - 0.05: env = (sweep_dur - t) / 0.05
+			# 基音 + 低倍音で重厚さを出す
+			s = env * 0.55 * sin(TAU * freq * t)
+			s += env * 0.20 * sin(TAU * freq * 0.5 * t)
+			s += env * 0.12 * sin(TAU * freq * 2.0 * t)
+		else:
+			# 残響: 80Hzの余韻が静かに消えていく
+			var echo_t := t - sweep_dur
+			var echo_env := exp(-echo_t * 5.0)
+			s = echo_env * 0.18 * sin(TAU * freq_end * t)
+			s += echo_env * 0.07 * sin(TAU * freq_end * 0.5 * t)
+		samples[i] = s
+	return _make_stream(samples)
