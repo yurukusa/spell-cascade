@@ -1960,6 +1960,12 @@ func _on_enemy_died(enemy: Node2D) -> void:
 								pe.take_damage(2)
 				)
 
+	# 改善256: death_spiral シナジー — orbit+trigger: kill時に周回死の玉が増殖（最大5個）
+	# Why: kill→orb→kill→orb のself-sustaining vortex。orbit buildへの最大報酬。
+	if "death_spiral" in _active_synergy_ids:
+		if get_tree().get_nodes_in_group("death_spiral_orbs").size() < 5:
+			_spawn_death_spiral_orb()
+
 	# キルマイルストーン（10, 25, 50, 100, 200キル: 達成感の積み上げ）
 	if kill_count in [10, 25, 50, 100, 200]:
 		_announce_kill_milestone(kill_count)
@@ -1967,6 +1973,85 @@ func _on_enemy_died(enemy: Node2D) -> void:
 	# 全敵撃破通知（改善45: ウェーブ完了の達成感）
 	if enemies_alive <= 0:
 		_show_area_cleared()
+
+func _spawn_death_spiral_orb() -> void:
+	## 改善256: death_spiralシナジー — killごとに周回オーブを1個追加（最大5個同時）
+	## Why: orkbit supportと組み合わせると、フィールドが死の渦に変わる。
+	var orb := Area2D.new()
+	orb.name = "DeathSpiralOrb"
+	orb.add_to_group("death_spiral_orbs")
+	# 衝突設定（bulletレイヤー=2, enemyマスク=4）
+	orb.collision_layer = 2
+	orb.collision_mask = 4
+	# 球体ビジュアル（紫: arcane/orbit系の色）
+	var vis := Polygon2D.new()
+	var pts := PackedVector2Array()
+	for _dsi in range(8):
+		var _dsa := float(_dsi) * TAU / 8.0
+		pts.append(Vector2(cos(_dsa), sin(_dsa)) * 7.0)
+	vis.polygon = pts
+	vis.color = Color(0.6, 0.15, 1.0, 0.9)
+	orb.add_child(vis)
+	# 衝突形状
+	var col := CollisionShape2D.new()
+	var shape := CircleShape2D.new()
+	shape.radius = 7.0
+	col.shape = shape
+	orb.add_child(col)
+	# 開始角度: 既存orbと等間隔に分散
+	var existing_count := get_tree().get_nodes_in_group("death_spiral_orbs").size()
+	var start_angle := float(existing_count) * TAU / 5.0
+	# スクリプト適用
+	var ds_script := GDScript.new()
+	ds_script.source_code = _death_spiral_orb_script()
+	ds_script.reload()
+	orb.set_script(ds_script)
+	orb.set("_angle", start_angle)
+	add_child(orb)
+
+func _death_spiral_orb_script() -> String:
+	return """extends Area2D
+
+var _angle := 0.0
+var _life := 0.0
+const LIFETIME := 8.0
+const ORBIT_RADIUS := 65.0
+const ORBIT_SPEED := 3.0
+const DAMAGE := 18
+var _hit_cd := {}
+
+func _ready():
+	monitoring = true
+	body_entered.connect(_on_hit)
+
+func _process(delta):
+	_life += delta
+	if _life >= LIFETIME:
+		queue_free()
+		return
+	if LIFETIME - _life < 2.0:
+		modulate.a = (LIFETIME - _life) / 2.0
+	var tw := get_tree().current_scene.get_node_or_null(\"Tower\")
+	if not is_instance_valid(tw):
+		queue_free()
+		return
+	_angle += ORBIT_SPEED * delta
+	global_position = tw.global_position + Vector2(cos(_angle), sin(_angle)) * ORBIT_RADIUS
+	var to_erase := []
+	for k in _hit_cd:
+		_hit_cd[k] -= delta
+		if _hit_cd[k] <= 0.0:
+			to_erase.append(k)
+	for k in to_erase:
+		_hit_cd.erase(k)
+
+func _on_hit(body):
+	if not is_instance_valid(body) or body in _hit_cd:
+		return
+	if body.has_method(\"take_damage\"):
+		body.take_damage(DAMAGE)
+		_hit_cd[body] = 1.0
+"""
 
 func _on_splitter_split(pos: Vector2) -> void:
 	## 改善247: splitter死亡時に2体のswarmerをスポーン（分裂ギミック）
