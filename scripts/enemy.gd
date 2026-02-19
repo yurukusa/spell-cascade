@@ -54,9 +54,11 @@ var heal_amount := 2.0  # HP/s
 var _near_death_spark_timer := 0.0
 var _boss_aura_poly: Polygon2D = null  # 改善113: フェーズ別オーラ色変更用
 var _boss_charge_trail_timer := 0.0  # 改善135: チャージ中の軌跡ドットタイマー
+var _drift_phase := 0.0  # 改善241: 個体ごとのドリフト位相オフセット（スポーン時にランダム化）
 
 func _ready() -> void:
 	hp = max_hp
+	_drift_phase = randf() * TAU  # 改善241: 個体ごとにランダムな位相でドリフトがバラける
 	_install_stylized_visual()
 	# スポーンイン: 小さく→大きくスケールアニメ（ポップ感、H-1原則: Make it Pop）
 	scale = Vector2(0.1, 0.1)
@@ -635,7 +637,21 @@ func _melee_process(delta: float) -> void:
 
 	if dist > 30.0:
 		var direction := (player.global_position - global_position).normalized()
-		velocity = direction * speed
+		# 改善241: 自然な動きドリフト（直線→サイン波ドリフトで「生き物」感）
+		# Why: 全敵が完全直線移動だと「AI製」感が出る。微小な横揺れで有機的な印象に。
+		# 位相はスポーン時にランダム化（_drift_phase）→敵群がバラバラに揺れる。
+		# tankは重さを出すため小さめ(0.15)。splitterは独自wobbleがあるので対象外。
+		var drift_mag := 0.0
+		if enemy_type == "normal" or enemy_type == "swarmer":
+			drift_mag = 0.28
+		elif enemy_type == "tank":
+			drift_mag = 0.12
+		if drift_mag > 0.0:
+			var perp := Vector2(-direction.y, direction.x)
+			var drift := perp * sin(Time.get_ticks_msec() * 0.0009 + _drift_phase) * drift_mag
+			velocity = (direction + drift).normalized() * speed
+		else:
+			velocity = direction * speed
 		move_and_slide()
 	else:
 		velocity = Vector2.ZERO
