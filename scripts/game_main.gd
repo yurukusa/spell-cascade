@@ -1384,9 +1384,15 @@ func _create_boss_hp_bar(boss: Node2D) -> void:
 	boss_phase_label.add_theme_constant_override("shadow_offset_y", 1)
 	_boss_hp_root.add_child(boss_phase_label)
 
-	# フェードイン: ボス登場を劇的に演出（0.5sかけて出現）
-	var fade_t := _boss_hp_root.create_tween()
-	fade_t.tween_property(_boss_hp_root, "modulate:a", 1.0, 0.5).set_trans(Tween.TRANS_QUAD)
+	# 改善220: ボスHPバーの上スライドイン + フェードイン（HPバー自体が「降臨」する演出）
+	# Why: 0.5sの単純フェードインは「UIが浮かんだ」感。上から-40pxスライドで
+	# 「ボスHPバーが画面上部に降りてくる」= ボス到来の重厚感を視覚的に強化。
+	# TRANS_BACKの軽いオーバーシュートで「着地感」を演出。
+	_boss_hp_root.position.y = -40.0
+	var slide_t := _boss_hp_root.create_tween()
+	slide_t.set_parallel(true)
+	slide_t.tween_property(_boss_hp_root, "position:y", 0.0, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	slide_t.tween_property(_boss_hp_root, "modulate:a", 1.0, 0.4).set_trans(Tween.TRANS_QUAD)
 
 func _remove_boss_hp_bar() -> void:
 	## 改善187: rootを消すだけで全要素（bar/labels/markers）を一括解放
