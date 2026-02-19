@@ -2834,13 +2834,14 @@ func _show_milestone(meters: int) -> void:
 	label.position = Vector2(640 - 150, 200)
 	label.custom_minimum_size = Vector2(300, 0)
 	label.z_index = 200
-	label.modulate.a = 0.0
+	# 改善217: 距離マイルストーンのスケールパンチイン（STAGE/OVERTIME等と一貫した「到達の一撃」）
+	# Why: フェードイン+微小バウンス（1.0→1.15）は他の告知ラベルと比べて存在感が薄かった。
+	# 100m/200m/300m達成は明確な節目なので scale 2.0→1.0 TRANS_BACK で「到達した！」を体感させる。
+	label.scale = Vector2(2.0, 2.0)
 	ui_layer.add_child(label)
 
 	var tween := label.create_tween()
-	tween.tween_property(label, "modulate:a", 1.0, 0.15)
-	tween.tween_property(label, "scale", Vector2(1.15, 1.15), 0.1).set_trans(Tween.TRANS_BACK)
-	tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1)
+	tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_interval(1.0)
 	tween.tween_property(label, "modulate:a", 0.0, 0.5)
 	tween.tween_callback(label.queue_free)
