@@ -2,6 +2,20 @@
 
 ## v0.9.3 (2026-02-20)
 
+### Audio: BGM License Documentation + Intense Track Added
+
+**battle.mp3** (already present, license now documented):
+- DST "Tower Defense Theme" — CC0 1.0 (Public Domain)
+- MD5 verified match to https://opengameart.org/content/tower-defense-theme
+- Used: gameplay BGM, Wave 1–15, normal state
+
+**battle_intense.mp3** (newly added):
+- DST "Return of Tower Defense Theme" — CC0 1.0 (Public Domain)
+- Source: https://opengameart.org/content/return-of-tower-defense-theme
+- Used: Wave 16+, HP<25%, Stage 3 (sfx.gd already handled switching, was falling back to procedural)
+
+THIRDPARTY.md updated with both entries including source URLs and MD5 for battle.mp3.
+
 ### Balance: XP Curve Rebalance — pacing_warn Fix
 
 **Problem**: quality-gate reported avg_levelup_interval = 5.2s (threshold: min 8.0s).

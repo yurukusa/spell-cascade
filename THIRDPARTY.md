@@ -29,3 +29,26 @@ Full license text: https://creativecommons.org/publicdomain/zero/1.0/
 - **License**: SIL Open Font License 1.1
 - **Copyright**: (c) Google Inc.
 - **Bundled with**: Godot Engine (used as default UI font)
+
+## Tower Defense Theme (DST)
+
+- **Source**: https://opengameart.org/content/tower-defense-theme
+- **Author**: DST (OpenGameArt.org contributor)
+- **License**: CC0 1.0 Universal (Public Domain Dedication)
+- **File**: `assets/music/battle.mp3`
+- **Use**: Main gameplay BGM loop (Wave 1–15, normal state)
+- **MD5**: b1edb72b4b0bbff11c401b92683626e2 (verified 2026-02-20)
+
+To the extent possible under law, DST has waived all copyright and related or
+neighboring rights to this music. Full license: https://creativecommons.org/publicdomain/zero/1.0/
+
+## Return of Tower Defense Theme (DST)
+
+- **Source**: https://opengameart.org/content/return-of-tower-defense-theme
+- **Author**: DST (OpenGameArt.org contributor)
+- **License**: CC0 1.0 Universal (Public Domain Dedication)
+- **File**: `assets/music/battle_intense.mp3`
+- **Use**: Intense BGM loop (Wave 16+, HP<25%, Stage 3)
+
+To the extent possible under law, DST has waived all copyright and related or
+neighboring rights to this music. Full license: https://creativecommons.org/publicdomain/zero/1.0/
