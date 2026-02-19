@@ -3689,8 +3689,8 @@ func _save_unlocked_chips() -> void:
 		var chip_id: String = build_system.equipped_chips[category]
 		if save_mgr.unlock_chip(category, chip_id):
 			newly_unlocked.append("%s: %s" % [category, chip_id])
-	if newly_unlocked.size() > 0:
-		print("Chip Vault: unlocked ", ", ".join(newly_unlocked))
+	if newly_unlocked.size() > 0 and OS.is_debug_build():
+		push_warning("Chip Vault: unlocked " + ", ".join(newly_unlocked))
 
 func _do_hitstop(duration: float) -> void:
 	## 一瞬のタイムスケール低下で「重い手応え」を演出

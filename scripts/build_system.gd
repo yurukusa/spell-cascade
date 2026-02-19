@@ -41,10 +41,12 @@ func _apply_saved_chips() -> void:
 			equipped_chips[category] = chip_id
 			if chip_id != "manual" and chip_id != "manual_aim" and chip_id != "auto_cast":
 				applied.append("%s=%s" % [category, chip_id])
-	if applied.size() > 0:
-		print("Chip Vault loaded: ", ", ".join(applied))
-	else:
-		print("Chip Vault: no saved unlocks (fresh start)")
+	# Chip Vault状態はデバッグビルドのみログ出力（本番printは削除）
+	if OS.is_debug_build():
+		if applied.size() > 0:
+			push_warning("Chip Vault loaded: " + ", ".join(applied))
+		else:
+			push_warning("Chip Vault: no saved unlocks (fresh start)")
 
 func _load_data() -> void:
 	skills = _load_json("res://data/skills.json", "skills", "id")
