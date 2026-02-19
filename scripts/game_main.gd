@@ -2837,6 +2837,8 @@ func _show_result_screen(is_victory: bool) -> void:
 	title.add_theme_constant_override("shadow_offset_y", 3)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.modulate.a = 0.0
+	# 改善191: スケールパンチイン（小さくからじゃなくて大きくから縮む「パンチ感」）
+	title.scale = Vector2(1.35, 1.35)
 	vbox.add_child(title)
 
 	# 区切り線
@@ -2989,6 +2991,10 @@ func _show_result_screen(is_victory: bool) -> void:
 	cta_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cta_lbl.modulate.a = 0.0
 	vbox.add_child(cta_lbl)
+
+	# 改善191: タイトルのスケールパンチイン（1.35→1.0 TRANS_BACK、フェードと並行）
+	var title_punch := title.create_tween()
+	title_punch.tween_property(title, "scale", Vector2(1.0, 1.0), 0.4).set_delay(0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 	# 順番にフェードインするアニメーション
 	var anim := create_tween()
