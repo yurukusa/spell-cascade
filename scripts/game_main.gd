@@ -1850,11 +1850,17 @@ func _announce_kill_milestone(count: int) -> void:
 	ann.add_theme_constant_override("shadow_offset_y", 3)
 	ann.custom_minimum_size = Vector2(760, 0)
 	ann.position = Vector2(200, 300)
+	# 改善205: キルマイルストーンスケールポップイン（STAGE告知・FINAL PUSHとの一貫性）
+	# Why: position slide は既にあるが、scale pop がなく「ステージ告知より存在感が薄い」矛盾。
+	# カウントが大きいほど初期スケールを大きくして達成感を段階的に強調する。
+	var entry_scale := 1.6 + minf(float(count) / 100.0, 0.6)  # 10kill=1.7 ～ 100kill+=2.2
+	ann.scale = Vector2(entry_scale, entry_scale)
 	ann.z_index = 180
 	ui_layer.add_child(ann)
 	var tween := ann.create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(ann, "position:y", 265.0, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(ann, "scale", Vector2(1.0, 1.0), 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_property(ann, "modulate:a", 0.0, 2.0).set_delay(0.7)
 	tween.chain().tween_callback(ann.queue_free)
 
