@@ -127,6 +127,22 @@
         "_game_change": "Mod diversity pays off. Freeze harder, burn longer, crit bigger. Jack of all trades becomes master of all."
       },
       "discovery_hint": "Embrace chaos. Mix everything."
+    },
+    {
+      "id": "summoners_pact",
+      "name": "Summoner's Pact",
+      "description": "Summon Wisp skill + Trigger support: Expired wisps summon replacements. Self-sustaining familiar army (max 8).",
+      "condition": {
+        "type": "skill_support_combo",
+        "required_skill": "summon_wisp",
+        "required_supports": ["trigger"]
+      },
+      "effect": {
+        "wisp_death_spawns_wisp": true,
+        "max_wisp_army": 8,
+        "_game_change": "Wisps multiply. One becomes many. The army sustains itself forever."
+      },
+      "discovery_hint": "What if a wisp's death was just a beginning?"
     }
   ]
 }
