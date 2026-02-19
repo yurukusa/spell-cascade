@@ -52,3 +52,15 @@ neighboring rights to this music. Full license: https://creativecommons.org/publ
 
 To the extent possible under law, DST has waived all copyright and related or
 neighboring rights to this music. Full license: https://creativecommons.org/publicdomain/zero/1.0/
+
+## Tower Defense Theme 3 (DST)
+
+- **Source**: https://opengameart.org/content/tower-defense-theme-3
+- **Author**: DST (OpenGameArt.org contributor)
+- **License**: CC0 1.0 Universal (Public Domain Dedication)
+- **File**: `assets/music/battle_boss.mp3`
+- **Use**: Boss BGM loop (Boss wave phase)
+- **MD5**: d13c71204b5fad4723d66a5372f3e64f (verified 2026-02-20)
+
+To the extent possible under law, DST has waived all copyright and related or
+neighboring rights to this music. Full license: https://creativecommons.org/publicdomain/zero/1.0/
