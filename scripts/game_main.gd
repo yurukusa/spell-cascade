@@ -835,6 +835,9 @@ func _setup_tower_attacks() -> void:
 		# 改善251: frozen_storm — ice_shard+chain: チェイン全ヒットで凍結
 		if "frozen_storm" in _active_synergy_ids:
 			stats["synergy_chain_freeze"] = 1.0
+		# 改善252: chain_reaction — chain+fork: チェインバウンスごとにforkも発動
+		if "chain_reaction" in _active_synergy_ids:
+			stats["synergy_chain_reaction"] = true
 
 		var attack_node := Node2D.new()
 		var attack_script := load("res://scripts/tower_attack.gd")

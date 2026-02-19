@@ -675,6 +675,7 @@ func _create_projectile(direction: Vector2) -> void:
 	bullet.set("freeze_chance", stats.get("freeze_chance", 0.0))
 	bullet.set("freeze_duration", stats.get("freeze_duration", 0.0))
 	bullet.set("synergy_chain_freeze", stats.get("synergy_chain_freeze", 0.0))
+	bullet.set("synergy_chain_reaction", stats.get("synergy_chain_reaction", false))
 	bullet.set("crit_chance", stats.get("crit_chance", 0.0))
 	bullet.set("crit_mult", stats.get("crit_mult", 1.0))
 	# 改善169: add_dot を弾に伝播（Burning/Toxic/of_Decay mod）
@@ -1104,6 +1105,7 @@ var ghost_bullet := false
 var crit_freeze_duration := 0.0
 var freeze_chance := 0.0  # 改善243: modからの確率凍結（freezing/frostbound）
 var synergy_chain_freeze := 0.0  # 改善251: frozen_stormシナジー — 全ヒットで凍結
+var synergy_chain_reaction := false  # 改善252: chain_reactionシナジー — chainバウンスごとにfork生成
 var freeze_duration := 0.0
 var crit_chance := 0.0
 var crit_mult := 1.0
@@ -1553,6 +1555,9 @@ func _on_body_entered(body):
 				arc_tw.tween_property(arc, \"modulate:a\", 0.0, 0.22)
 				arc_tw.chain().tween_callback(arc.queue_free)
 			direction = (next.global_position - global_position).normalized()
+			# 改善252: chain_reaction — chainバウンスごとにfork弾を召喚。1発が波及爆発に。
+			if synergy_chain_reaction:
+				_do_fork(body)
 			return  # 弾は消えない
 
 	# Fork: 分裂
