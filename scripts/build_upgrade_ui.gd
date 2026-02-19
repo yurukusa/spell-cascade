@@ -541,13 +541,16 @@ func _show_auto_link_toast(item_name: String, slot_num: int, skill_name: String)
 	_toast_label.position = Vector2(10, 80)
 	_toast_label.z_index = 100
 
+	# 改善227: AUTO-LINKEDトーストのフェードイン（即時表示の断絶感を除去）
+	# Why: 0.15sのフェードインで自然な登場にし、0.7s後にフェードアウト（合計0.9s）。
+	_toast_label.modulate.a = 0.0
 	# CanvasLayerに直接追加（UIが非表示でも見える）
 	add_child(_toast_label)
 
-	# 0.8秒後にフェードアウト
 	var tween := create_tween()
 	tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
-	tween.tween_interval(0.6)
+	tween.tween_property(_toast_label, "modulate:a", 1.0, 0.15)
+	tween.tween_interval(0.55)
 	tween.tween_property(_toast_label, "modulate:a", 0.0, 0.2)
 	tween.tween_callback(_toast_label.queue_free)
 
