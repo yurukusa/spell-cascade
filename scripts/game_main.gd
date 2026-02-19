@@ -2365,7 +2365,13 @@ func _on_xp_gained(total_xp: int, current_level: int) -> void:
 func _on_crush_changed(active: bool, count: int) -> void:
 	if active:
 		crush_label.text = "SURROUNDED x%d" % count
+		# 改善229: CRUSH状態ラベルのフェードイン（visible=trueの即時出現を改善）
+		# Why: 「包囲された！」という危機はシェイク+赤フラッシュで既に伝わるが、
+		# ラベル自体が唐突に現れると流れが断絶する。0.15sフェードインで自然に溶け込む。
+		crush_label.modulate.a = 0.0
 		crush_label.visible = true
+		var cl_in := crush_label.create_tween()
+		cl_in.tween_property(crush_label, "modulate:a", 1.0, 0.15).set_trans(Tween.TRANS_QUAD)
 		# 包囲開始: 警告シェイク + 改善188 CRUSH SE
 		SFX.play_crush_start()
 		tower.shake(4.0)
