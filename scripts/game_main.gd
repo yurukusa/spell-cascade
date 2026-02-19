@@ -1047,7 +1047,7 @@ func _on_boss_died(_enemy: Node2D) -> void:
 	enemies_alive -= 1
 	kill_count += 1
 	tower.enemy_killed.emit()
-	SFX.play_wave_clear()
+	SFX.play_boss_kill()  # 改善180: ボス専用SFX（爆発+上昇フレア）
 	# ボス撃破: 大きなシェイク
 	tower.shake(8.0)
 	# コンボ: ボスは+3カウント

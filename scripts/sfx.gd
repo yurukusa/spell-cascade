@@ -50,6 +50,9 @@ var _game_over_player: AudioStreamPlayer
 # 改善179: 勝利ファンファーレSE（上昇アルペジオ + 鐘残響）
 # Why: ゲームオーバーに下降音があるなら、勝利に上昇ファンファーレが必要。喜びを音で完結させる。
 var _victory_player: AudioStreamPlayer
+# 改善180: ボス撃破専用SFX（爆発 + 残響クレッシェンド）
+# Why: play_wave_clear()はウェーブ終了と同じ音。ボス撃破は最大の達成感なので専用音が必要。
+var _boss_kill_player: AudioStreamPlayer
 # 改善174: コンボティアアップSE（COMBO=3/RAMPAGE=8/MASSACRE=15/GODLIKE=30）
 # Why: 視覚的なスケールパンチ+リングに対応する音がなかった。達成感を音で確認させる。
 var _combo_tier_players: Array[AudioStreamPlayer] = []
@@ -208,6 +211,12 @@ func _ready() -> void:
 	_victory_player.volume_db = -2.0  # 勝利も目立たせる
 	add_child(_victory_player)
 
+	# 改善180: ボス撃破専用SFX
+	_boss_kill_player = AudioStreamPlayer.new()
+	_boss_kill_player.stream = _gen_boss_kill()
+	_boss_kill_player.volume_db = -1.0  # ゲーム最大のイベント — 最も目立たせる
+	add_child(_boss_kill_player)
+
 	# 改善175: 回復SE (small/large 2段階)
 	_heal_small_player = AudioStreamPlayer.new()
 	_heal_small_player.stream = _gen_heal(false)
@@ -352,6 +361,10 @@ func play_game_over() -> void:
 ## 改善179: 勝利ファンファーレSE。BGM停止直後に呼ぶ。
 func play_victory() -> void:
 	_victory_player.play()
+
+## 改善180: ボス撃破SE。_on_boss_died()から呼ぶ。wave_clearより重厚に。
+func play_boss_kill() -> void:
+	_boss_kill_player.play()
 
 ## 改善175: 回復SE。amount >= 50 で大回復音、それ以下で小回復音。
 ## Why: life stealは高頻度なのでHEAL_COOLDOWN(1.2s)でスロットル。
@@ -1006,5 +1019,53 @@ func _gen_victory() -> AudioStreamWAV:
 			var freq: float = notes[3]
 			s = ring_env * 0.30 * sin(TAU * freq * t)
 			s += ring_env * 0.12 * sin(TAU * freq * 2.0 * t)
+		samples[i] = s
+	return _make_stream(samples)
+
+## 改善180: ボス撃破SE生成
+## 低音爆発(0.15s) + 上昇フレア G4→B4→D5→G5 (0.5s) + 余韻(0.35s)
+## Why: wave_clearの短い音と違い、爆発感+達成感の2段構えで「ボスを倒した」感を確定させる。
+func _gen_boss_kill() -> AudioStreamWAV:
+	var boom_dur := 0.15
+	var flare_dur := 0.5
+	var ring_dur := 0.35
+	var total_dur := boom_dur + flare_dur + ring_dur
+	var cnt := int(SAMPLE_RATE * total_dur)
+	var samples := PackedFloat32Array()
+	samples.resize(cnt)
+	# G4→B4→D5→G5 — 長調勝利コード (booming triumphant)
+	var flare_notes := [392.0, 493.88, 587.33, 783.99]
+	var fnd := flare_dur / 4.0
+	for i in cnt:
+		var t := float(i) / SAMPLE_RATE
+		var s := 0.0
+		if t < boom_dur:
+			# 爆発: 低音ノイズバースト (80Hz + detuned 95Hz)
+			var boom_env := exp(-t * 18.0)
+			s = boom_env * 0.70 * sin(TAU * 80.0 * t)
+			s += boom_env * 0.35 * sin(TAU * 95.0 * t)
+			s += boom_env * 0.20 * sin(TAU * 160.0 * t)
+		elif t < boom_dur + flare_dur:
+			# 上昇フレア: 4音アルペジオ
+			var ft := t - boom_dur
+			var ni := mini(int(ft / fnd), 3)
+			var nt := ft - ni * fnd
+			var freq: float = flare_notes[ni]
+			var env := 1.0
+			if nt < 0.006: env = nt / 0.006
+			if ni < 3 and nt > fnd - 0.012: env = (fnd - nt) / 0.012
+			if ni == 3: env *= exp(-nt * 3.0)
+			# 豊かな倍音構成で「金属的な勝利音」
+			s = env * 0.48 * sin(TAU * freq * t)
+			s += env * 0.22 * sin(TAU * freq * 2.0 * t)
+			s += env * 0.10 * sin(TAU * freq * 3.0 * t)
+			s += env * 0.05 * sin(TAU * freq * 4.0 * t)
+		else:
+			# 余韻: G5が消えていく
+			var rt := t - boom_dur - flare_dur
+			var renv := exp(-rt * 3.5)
+			var freq: float = flare_notes[3]
+			s = renv * 0.25 * sin(TAU * freq * t)
+			s += renv * 0.10 * sin(TAU * freq * 2.0 * t)
 		samples[i] = s
 	return _make_stream(samples)
