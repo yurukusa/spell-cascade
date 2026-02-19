@@ -18,6 +18,9 @@ var _enemy_hp_bar_bg: Polygon2D = null  # HPバー背景（改善51: 全HP時は
 var _stagger_timer := 0.0  # ヒットスタッガー: ダメージ後の一時的速度低下（改善36）
 var _shoot_warned := false  # シューター: 射撃前警告済みフラグ（改善39）
 var _boss_core_poly: Polygon2D = null  # ボスコア: Phase 3の高速パルス用（改善50）
+# 改善169: DoTシステム — {damage, duration, element, timer} の配列
+var _dots: Array = []
+var _dot_tick_timer := 0.0
 
 # Boss用
 var is_boss := false
@@ -603,6 +606,19 @@ func _physics_process(delta: float) -> void:
 					st.tween_property(sp, "modulate:a", 0.0, 0.28)
 					st.chain().tween_callback(sp.queue_free)
 
+	# 改善169: DoT tick（1秒ごとにダメージを与える）
+	if not _dots.is_empty():
+		_dot_tick_timer += delta
+		if _dot_tick_timer >= 1.0:
+			_dot_tick_timer -= 1.0
+			var i := _dots.size() - 1
+			while i >= 0:
+				_dots[i]["duration"] -= 1.0
+				take_damage(_dots[i]["damage"])
+				if _dots[i]["duration"] <= 0.0:
+					_dots.remove_at(i)
+				i -= 1
+
 func _melee_process(delta: float) -> void:
 	## 通常/swarmer/tank/splitter共通: 接近→メレー
 	var dist := global_position.distance_to(player.global_position)
@@ -1185,6 +1201,19 @@ func _on_body_entered(body):
 	set_deferred(\"monitoring\", false)
 	call_deferred(\"queue_free\")
 """
+
+func apply_dot(damage: float, duration: float, element: String) -> void:
+	# 改善169: DoT適用。poison はスタック、fire は上書き（同element最大1スタック）
+	if element == "poison":
+		_dots.append({"damage": damage, "duration": duration, "element": element})
+	else:
+		# fire等: 既存の同elementを上書き（高い方を残す）
+		for i in range(_dots.size()):
+			if _dots[i]["element"] == element:
+				_dots[i]["damage"] = maxf(_dots[i]["damage"], damage)
+				_dots[i]["duration"] = maxf(_dots[i]["duration"], duration)
+				return
+		_dots.append({"damage": damage, "duration": duration, "element": element})
 
 func take_damage(amount: float, is_crit: bool = false) -> void:
 	# フェーズ移行中の無敵

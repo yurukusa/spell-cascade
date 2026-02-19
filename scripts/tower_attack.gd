@@ -669,6 +669,8 @@ func _create_projectile(direction: Vector2) -> void:
 	bullet.set("crit_freeze_duration", stats.get("crit_freeze_duration", 0.0))
 	bullet.set("crit_chance", stats.get("crit_chance", 0.0))
 	bullet.set("crit_mult", stats.get("crit_mult", 1.0))
+	# 改善169: add_dot を弾に伝播（Burning/Toxic/of_Decay mod）
+	bullet.set("add_dot", stats.get("add_dot", {}))
 	# トレイル色を弾タイプに合わせる（スキル識別性向上: J-7 色による区分）
 	var tc := _get_bullet_color()
 	bullet.set("trail_color", Color(tc.r, tc.g, tc.b, 0.55))
@@ -1091,6 +1093,7 @@ var ghost_bullet := false
 var crit_freeze_duration := 0.0
 var crit_chance := 0.0
 var crit_mult := 1.0
+var add_dot := {}  # 改善169: DoT設定 {damage, duration, element}
 var trail_color := Color(0.9, 0.9, 1.0, 0.65)  # 弾のトレイル色（外部からset可）
 var tags := []  # 改善119: タイプタグ（fire/lightning/cold等。インパクト色分けに使用）
 var _trail_timer := 0.0  # トレイル間隔タイマー
@@ -1168,6 +1171,14 @@ func _on_body_entered(body):
 
 	body.take_damage(final_damage, is_crit)
 	hit_enemies.append(body)
+
+	# 改善169: DoT適用（Burning/Toxic/of_Decay mod）
+	if not add_dot.is_empty() and body.has_method("apply_dot"):
+		body.apply_dot(
+			add_dot.get("damage", 0.0),
+			add_dot.get("duration", 1.0),
+			add_dot.get("element", "fire")
+		)
 
 	# インパクトエフェクト（H-6: Hit Marks — ヒット確認の視覚記号）
 	# 弾着点に小さなリングを展開して「当たった」感を強化
