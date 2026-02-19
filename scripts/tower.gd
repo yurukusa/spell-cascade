@@ -815,6 +815,9 @@ func get_xp_for_next_level() -> int:
 var shake_intensity := 0.0
 var shake_decay := 8.0  # 減衰速度
 var _cam_lead_offset := Vector2.ZERO  # 改善235: 照準方向への先読みオフセット
+# 改善239: Perlinノイズシェイク（ランダム毎フレームより滑らかで映画的なシェイク）
+var _shake_noise := FastNoiseLite.new()
+var _shake_time := 0.0
 
 # 低HP持続グロー（25%以下で赤いパルスリング）
 var _low_hp_glow: Polygon2D = null
@@ -894,9 +897,13 @@ func _process(delta: float) -> void:
 	_cam_lead_offset = _cam_lead_offset.lerp(facing_dir * 60.0, delta * 5.0)
 	var cam := get_node_or_null("Camera")
 	if shake_intensity > 0.01:
+		# 改善239: Perlinノイズシェイク（毎フレームrandom→連続ノイズで映画的な滑らかさ）
+		# Why: randf_rangeは「ガタガタ」。ノイズは「ぶるぶる」。衝撃の余韻がより自然。
+		# X/Yを異なるノイズ座標でサンプリングすることで独立した振れになる。
+		_shake_time += delta
 		var shake_off := Vector2(
-			randf_range(-shake_intensity, shake_intensity),
-			randf_range(-shake_intensity, shake_intensity)
+			_shake_noise.get_noise_2d(_shake_time * 60.0, 0.0) * shake_intensity,
+			_shake_noise.get_noise_2d(0.0, _shake_time * 60.0) * shake_intensity
 		)
 		if cam and cam is Camera2D:
 			cam.offset = _cam_lead_offset + shake_off
