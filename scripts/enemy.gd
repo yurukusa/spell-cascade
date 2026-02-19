@@ -17,7 +17,7 @@ var _enemy_hp_bar: Polygon2D = null  # ミニHPバー（ゲームプレイ可読
 var _enemy_hp_bar_bg: Polygon2D = null  # HPバー背景（改善51: 全HP時は非表示）
 var _stagger_timer := 0.0  # ヒットスタッガー: ダメージ後の一時的速度低下（改善36）
 var _shoot_warned := false  # シューター: 射撃前警告済みフラグ（改善39）
-var _boss_core_poly: Polygon2D = null  # ボスコア: Phase 3の高速パルス用（改善50）
+var _boss_core_poly: Node2D = null  # ボスコア: Phase 3の高速パルス用（Sprite2D or Polygon2D）
 # 改善169: DoTシステム — {damage, duration, element, timer} の配列
 var _dots: Array = []
 var _dot_tick_timer := 0.0
@@ -1008,7 +1008,7 @@ func _boss_phase_transition() -> void:
 				core_tween.set_loops()
 				core_tween.tween_property(_boss_core_poly, "scale", Vector2(1.5, 1.5), 0.18).set_trans(Tween.TRANS_SINE)
 				core_tween.tween_property(_boss_core_poly, "scale", Vector2(0.9, 0.9), 0.18).set_trans(Tween.TRANS_SINE)
-				_boss_core_poly.color = Color(1.0, 0.4, 0.1, 1.0)  # 金→赤橙（危機感）
+				_boss_core_poly.modulate = Color(1.0, 0.4, 0.1, 1.0)  # 金→赤橙（危機感）
 
 	# 改善113: フェーズ移行でオーラ色変更（Phase2=橙、Phase3=赤: 脅威レベルを視覚で即伝達）
 	if _boss_aura_poly != null and is_instance_valid(_boss_aura_poly):
@@ -1346,6 +1346,13 @@ func take_damage(amount: float, is_crit: bool = false) -> void:
 	hp -= amount
 	_spawn_damage_number(amount, is_crit)
 	SFX.play_hit()
+
+	# ヒットフラッシュ: 被弾時に白フラッシュ50ms（P1ビジュアルポリッシュ）
+	# Why: VS系の標準的フィードバック。攻撃が当たったことを即座に視覚化
+	modulate = Color(3.0, 3.0, 3.0, 1.0)
+	var hit_flash_tween := create_tween()
+	hit_flash_tween.tween_property(self, "modulate", Color.WHITE, 0.05)
+
 	# 改善162: ダメージ累計をgame_mainに通知（リザルト画面でDamage Dealt表示用）
 	var gm := get_parent()
 	if gm and gm.has_method("record_damage"):

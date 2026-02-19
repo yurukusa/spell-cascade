@@ -36,7 +36,8 @@ func _ready() -> void:
 	spawn_tween.tween_property(self, "scale", Vector2(1.0, 1.0), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _create_visual() -> void:
-	var color := Color(0.3, 0.9, 0.4, 0.9)  # 緑XPオーブ
+	# P1ポリッシュ: XPオーブを鮮やかな青紫に変更（背景と補色関係で常に目立つ）
+	var color := Color(0.4, 0.6, 1.0, 0.95)  # 青紫XPオーブ
 	if orb_type == "chip":
 		color = Color(0.9, 0.7, 0.2, 0.9)  # 金色チップドロップ
 	elif orb_type == "chip_move":
@@ -49,15 +50,16 @@ func _create_visual() -> void:
 	# 改善143: 高XP値オーブ（xp_value>=3）は1.5倍サイズ＋8角形（ボスや強敵のXPドロップを目立たせる）
 	var sides := 4 if orb_type == "hp" else (8 if xp_value >= 3 else 6)
 	var size_mult := 1.5 if (orb_type == "xp" and xp_value >= 3) else 1.0
-	var glow_radius := 14.0 if orb_type == "hp" else 10.0 * size_mult
-	var core_radius := 7.0 if orb_type == "hp" else 5.0 * size_mult
+	# XPオーブのグロー拡大（P1: 視認性向上）
+	var glow_radius := 14.0 if orb_type == "hp" else 14.0 * size_mult
+	var core_radius := 7.0 if orb_type == "hp" else 6.0 * size_mult
 	var glow := Polygon2D.new()
 	var glow_pts: PackedVector2Array = []
 	for i in range(sides):
 		var a := i * TAU / sides
 		glow_pts.append(Vector2(cos(a), sin(a)) * glow_radius)
 	glow.polygon = glow_pts
-	glow.color = Color(color.r, color.g, color.b, 0.25)
+	glow.color = Color(color.r, color.g, color.b, 0.4)
 	add_child(glow)
 
 	# コア
@@ -120,8 +122,8 @@ func _process(delta: float) -> void:
 				_trail_timer = 0.06  # 最大16/秒
 				_emit_trail_dot()
 	else:
-		# 範囲外: ゆっくり浮遊
-		position.y += sin(lifetime * 3.0) * 0.3
+		# 範囲外: ゆっくり浮遊（P1: ボブ幅を拡大して「拾えるもの」感を強調）
+		position.y += sin(lifetime * 3.0) * 0.8
 
 func _emit_trail_dot() -> void:
 	## 吸引中のトレイル点（オーブが飛ぶ感触を強化: H-1 Make it Pop）
@@ -136,7 +138,7 @@ func _emit_trail_dot() -> void:
 		dot_pts.append(Vector2(cos(a), sin(a)) * 2.5)
 	dot.polygon = dot_pts
 	dot.global_position = global_position
-	var dot_color := Color(0.3, 0.9, 0.4, 0.55)  # XP: 緑
+	var dot_color := Color(0.5, 0.65, 1.0, 0.55)  # XP: 青紫
 	if orb_type == "hp":
 		dot_color = Color(1.0, 0.28, 0.3, 0.55)  # HP: 赤
 	elif orb_type in ["chip", "chip_move"]:
@@ -175,7 +177,7 @@ func _on_collected() -> void:
 	elif orb_type in ["chip", "chip_move"]:
 		collect_color = Color(1.0, 0.88, 0.25, 0.8)
 	else:
-		collect_color = Color(0.4, 1.0, 0.55, 0.8)  # XP: 緑
+		collect_color = Color(0.5, 0.65, 1.0, 0.8)  # XP: 青紫
 
 	var flash := Polygon2D.new()
 	var pts: PackedVector2Array = []

@@ -365,6 +365,8 @@ func _style_hud() -> void:
 	var text_color := Color(0.9, 0.88, 0.95, 1.0)  # high contrast vs dark BG
 	var dim_text := Color(0.6, 0.55, 0.7, 1.0)
 
+	# ピクセルフォント: project.godotの[gui] theme/custom で全Label/Buttonに適用済み
+
 	# HP Bar: cyan fill on dark background
 	var bar_bg := StyleBoxFlat.new()
 	bar_bg.bg_color = Color(0.06, 0.04, 0.12, 0.9)
