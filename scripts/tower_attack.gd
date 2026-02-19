@@ -691,9 +691,10 @@ func _create_projectile(direction: Vector2) -> void:
 	bullet.collision_mask = 4
 
 	# projectile_size_mult: 弾サイズ拡大
-	# v0.9: base 2x scale — bullets were too small to read against backgrounds.
+	# v0.9.1: base 3x scale — 2x was still hard to track during chaotic combat.
+	# 3x gives clear bullet silhouettes on the Kenney stone floor backgrounds.
 	# Additional projectile_size_mult from mods stacks on top.
-	var size_mult: float = 2.0 * stats.get("projectile_size_mult", 1.0)
+	var size_mult: float = 3.0 * stats.get("projectile_size_mult", 1.0)
 	bullet.scale = Vector2(size_mult, size_mult)
 
 	get_tree().current_scene.add_child(bullet)

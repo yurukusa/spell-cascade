@@ -359,140 +359,234 @@ func _update_timer_display() -> void:
 		t10.tween_property(timer_label, "scale", Vector2(1.0, 1.0), 0.1).set_trans(Tween.TRANS_QUAD)
 
 func _style_hud() -> void:
-	## Design Lock v1: semantic colors, min 16px text, 4.5:1 contrast
-	var bg_color := Color(0.05, 0.02, 0.1, 1.0)  # match clear color
+	## v0.9.1 UI Reskin: Kenney 9-slice panels, larger bars, polished layout.
+	## Why: raw Godot ProgressBars/Labels scream "prototype". Panel backgrounds
+	## give structure and make HUD elements feel intentional and designed.
 	var player_cyan := Color(0.35, 0.75, 1.0, 1.0)
 	var text_color := Color(0.9, 0.88, 0.95, 1.0)  # high contrast vs dark BG
 	var dim_text := Color(0.6, 0.55, 0.7, 1.0)
 
+	# --- HUD Panel Backgrounds (Kenney pixel-ui-pack 9-Slice) ---
+	# Top bar: dark panel strip spanning the full width behind HP/wave/timer
+	var top_panel := NinePatchRect.new()
+	top_panel.name = "TopHUDPanel"
+	var panel_tex: Texture2D = load("res://assets/sprites/kenney/pixel-ui-pack/9-Slice/space_inlay.png")
+	if panel_tex:
+		top_panel.texture = panel_tex
+		top_panel.patch_margin_left = 5
+		top_panel.patch_margin_right = 5
+		top_panel.patch_margin_top = 5
+		top_panel.patch_margin_bottom = 5
+		top_panel.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	top_panel.position = Vector2(0, 0)
+	top_panel.size = Vector2(1280, 58)
+	# Dark tint: dungeon aesthetic, semi-transparent so gameplay peeks through
+	top_panel.modulate = Color(0.08, 0.06, 0.12, 0.88)
+	top_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui_layer.add_child(top_panel)
+	ui_layer.move_child(top_panel, 0)  # Behind all other UI elements
+
+	# Bottom border line for the top panel (subtle separation)
+	var top_border := ColorRect.new()
+	top_border.name = "TopPanelBorder"
+	top_border.position = Vector2(0, 57)
+	top_border.size = Vector2(1280, 1)
+	top_border.color = Color(0.25, 0.2, 0.4, 0.6)
+	top_border.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui_layer.add_child(top_border)
+	ui_layer.move_child(top_border, 1)
+
+	# Left info panel (behind HP bar, kill count, distance)
+	var left_panel := NinePatchRect.new()
+	left_panel.name = "LeftInfoPanel"
+	if panel_tex:
+		left_panel.texture = panel_tex
+		left_panel.patch_margin_left = 5
+		left_panel.patch_margin_right = 5
+		left_panel.patch_margin_top = 5
+		left_panel.patch_margin_bottom = 5
+		left_panel.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	left_panel.position = Vector2(8, 62)
+	left_panel.size = Vector2(300, 46)
+	left_panel.modulate = Color(0.06, 0.04, 0.1, 0.75)
+	left_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui_layer.add_child(left_panel)
+	ui_layer.move_child(left_panel, 2)
+
+	# Right info panel (behind combo counter)
+	var right_panel := NinePatchRect.new()
+	right_panel.name = "RightInfoPanel"
+	if panel_tex:
+		right_panel.texture = panel_tex
+		right_panel.patch_margin_left = 5
+		right_panel.patch_margin_right = 5
+		right_panel.patch_margin_top = 5
+		right_panel.patch_margin_bottom = 5
+		right_panel.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	right_panel.position = Vector2(1064, 62)
+	right_panel.size = Vector2(208, 46)
+	right_panel.modulate = Color(0.06, 0.04, 0.1, 0.75)
+	right_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	right_panel.visible = false  # Only show when combo is active
+	ui_layer.add_child(right_panel)
+	ui_layer.move_child(right_panel, 3)
+
 	# ピクセルフォント: project.godotの[gui] theme/custom で全Label/Buttonに適用済み
 
-	# HP Bar: cyan fill on dark background
+	# --- HP Bar: enlarged, with polished borders ---
+	hp_bar.position = Vector2(14, 10)
+	hp_bar.size = Vector2(310, 32)
+	hp_bar.custom_minimum_size = Vector2(310, 32)
+
 	var bar_bg := StyleBoxFlat.new()
-	bar_bg.bg_color = Color(0.06, 0.04, 0.12, 0.9)
-	bar_bg.border_color = Color(0.2, 0.18, 0.3, 0.8)
-	bar_bg.set_border_width_all(1)
-	bar_bg.set_corner_radius_all(3)
+	bar_bg.bg_color = Color(0.04, 0.02, 0.08, 0.95)
+	bar_bg.border_color = Color(0.3, 0.25, 0.45, 0.9)
+	bar_bg.set_border_width_all(2)
+	bar_bg.set_corner_radius_all(4)
 	hp_bar.add_theme_stylebox_override("background", bar_bg)
 
 	var bar_fill := StyleBoxFlat.new()
-	bar_fill.bg_color = player_cyan.darkened(0.2)
-	bar_fill.set_corner_radius_all(2)
+	bar_fill.bg_color = player_cyan.darkened(0.15)
+	bar_fill.set_corner_radius_all(3)
+	# Inner glow effect: lighter border on fill
+	bar_fill.border_color = player_cyan.lightened(0.2)
+	bar_fill.border_width_top = 1
 	hp_bar.add_theme_stylebox_override("fill", bar_fill)
 
-	# HP label on top of bar
-	hp_label.add_theme_font_size_override("font_size", 14)
+	# HP label: centered on the enlarged bar
+	hp_label.add_theme_font_size_override("font_size", 16)
 	hp_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.95))
-	hp_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	hp_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
 	hp_label.add_theme_constant_override("shadow_offset_x", 1)
 	hp_label.add_theme_constant_override("shadow_offset_y", 1)
 
-	# Wave/title label
-	wave_label.add_theme_font_size_override("font_size", 18)
-	wave_label.add_theme_color_override("font_color", player_cyan.lightened(0.15))
-	wave_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	# "HP" icon label (left of HP bar)
+	var hp_icon := Label.new()
+	hp_icon.name = "HPIcon"
+	hp_icon.text = "HP"
+	hp_icon.position = Vector2(14, 42)
+	hp_icon.add_theme_font_size_override("font_size", 11)
+	hp_icon.add_theme_color_override("font_color", player_cyan.darkened(0.1))
+	hp_icon.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+	hp_icon.add_theme_constant_override("shadow_offset_x", 1)
+	hp_icon.add_theme_constant_override("shadow_offset_y", 1)
+	ui_layer.add_child(hp_icon)
+
+	# Wave/level label: repositioned within top panel
+	wave_label.position = Vector2(460, 6)
+	wave_label.size = Vector2(360, 30)
+	wave_label.add_theme_font_size_override("font_size", 20)
+	wave_label.add_theme_color_override("font_color", player_cyan.lightened(0.2))
+	wave_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	wave_label.add_theme_constant_override("shadow_offset_x", 1)
 	wave_label.add_theme_constant_override("shadow_offset_y", 1)
 
-	# Timer label: prominent, right-aligned
-	timer_label.add_theme_font_size_override("font_size", 22)
+	# Timer label: right side of top panel
+	timer_label.position = Vector2(1100, 8)
+	timer_label.size = Vector2(168, 36)
+	timer_label.add_theme_font_size_override("font_size", 26)
 	timer_label.add_theme_color_override("font_color", text_color)
-	timer_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
-	timer_label.add_theme_constant_override("shadow_offset_x", 1)
-	timer_label.add_theme_constant_override("shadow_offset_y", 1)
+	timer_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	timer_label.add_theme_constant_override("shadow_offset_x", 2)
+	timer_label.add_theme_constant_override("shadow_offset_y", 2)
 
-	# Distance label (below title)
-	distance_label.add_theme_font_size_override("font_size", 16)
+	# Distance label: below wave label in center
+	distance_label.position = Vector2(560, 38)
+	distance_label.size = Vector2(160, 20)
+	distance_label.add_theme_font_size_override("font_size", 14)
 	distance_label.add_theme_color_override("font_color", dim_text)
-	distance_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
+	distance_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
 	distance_label.add_theme_constant_override("shadow_offset_x", 1)
 	distance_label.add_theme_constant_override("shadow_offset_y", 1)
 
-	# XP progress bar (WaveLabelの下、薄いバー)
+	# --- XP progress bar: below top panel, wider ---
 	xp_bar = ProgressBar.new()
 	xp_bar.name = "XPBar"
-	xp_bar.position = Vector2(530, 44)
-	xp_bar.custom_minimum_size = Vector2(220, 6)
-	xp_bar.size = Vector2(220, 6)
+	xp_bar.position = Vector2(480, 34)
+	xp_bar.custom_minimum_size = Vector2(320, 5)
+	xp_bar.size = Vector2(320, 5)
 	xp_bar.max_value = tower.get_xp_for_next_level()
 	xp_bar.value = 0
 	xp_bar.show_percentage = false
 
 	var xp_bar_bg := StyleBoxFlat.new()
-	xp_bar_bg.bg_color = Color(0.08, 0.06, 0.15, 0.6)
+	xp_bar_bg.bg_color = Color(0.06, 0.04, 0.12, 0.7)
 	xp_bar_bg.set_corner_radius_all(2)
 	xp_bar.add_theme_stylebox_override("background", xp_bar_bg)
 
 	var xp_bar_fill := StyleBoxFlat.new()
-	xp_bar_fill.bg_color = Color(0.35, 0.85, 0.45, 0.8)  # 緑: XPカラー
+	xp_bar_fill.bg_color = Color(0.35, 0.85, 0.45, 0.9)
 	xp_bar_fill.set_corner_radius_all(2)
+	# Bright top edge for XP bar glow
+	xp_bar_fill.border_color = Color(0.5, 1.0, 0.6, 0.6)
+	xp_bar_fill.border_width_top = 1
 	xp_bar.add_theme_stylebox_override("fill", xp_bar_fill)
 	ui_layer.add_child(xp_bar)
 
 	# Build info label — hidden: was exposing debug text ("Move: Kite | Aim: Nearest" etc.)
-	# which made the game look like a prototype. Hide for release builds.
 	build_label.visible = false
 
-	# Crush warning label
-	crush_label.add_theme_font_size_override("font_size", 22)
-	crush_label.add_theme_color_override("font_color", Color(1.0, 0.25, 0.2, 1.0))
-	crush_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	# Crush warning label: center screen, bold
+	crush_label.add_theme_font_size_override("font_size", 24)
+	crush_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.15, 1.0))
+	crush_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
 	crush_label.add_theme_constant_override("shadow_offset_x", 2)
 	crush_label.add_theme_constant_override("shadow_offset_y", 2)
 	crush_label.visible = false
 
-	# Kill combo label (画面右上、タイマーの下)
+	# Kill combo label: in the right info panel area
 	combo_label_node = Label.new()
 	combo_label_node.name = "ComboLabel"
 	combo_label_node.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	combo_label_node.position = Vector2(1080, 40)
-	combo_label_node.custom_minimum_size = Vector2(180, 0)
-	combo_label_node.add_theme_font_size_override("font_size", 20)
-	combo_label_node.add_theme_color_override("font_color", Color(1.0, 0.6, 0.2, 1.0))
-	combo_label_node.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	combo_label_node.position = Vector2(1072, 66)
+	combo_label_node.custom_minimum_size = Vector2(190, 0)
+	combo_label_node.add_theme_font_size_override("font_size", 22)
+	combo_label_node.add_theme_color_override("font_color", Color(1.0, 0.6, 0.15, 1.0))
+	combo_label_node.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
 	combo_label_node.add_theme_constant_override("shadow_offset_x", 2)
 	combo_label_node.add_theme_constant_override("shadow_offset_y", 2)
 	combo_label_node.z_index = 100
 	combo_label_node.visible = false
 	ui_layer.add_child(combo_label_node)
 
-	# 改善100: コンボタイマーバー（残りコンボウィンドウを細いバーで可視化）
+	# コンボタイマーバー: below combo label
 	_combo_timer_bar = ProgressBar.new()
 	_combo_timer_bar.name = "ComboTimerBar"
-	_combo_timer_bar.position = Vector2(1080, 70)
-	_combo_timer_bar.custom_minimum_size = Vector2(180, 5)
-	_combo_timer_bar.size = Vector2(180, 5)
+	_combo_timer_bar.position = Vector2(1072, 94)
+	_combo_timer_bar.custom_minimum_size = Vector2(190, 5)
+	_combo_timer_bar.size = Vector2(190, 5)
 	_combo_timer_bar.max_value = COMBO_WINDOW
 	_combo_timer_bar.value = 0.0
 	_combo_timer_bar.show_percentage = false
 	_combo_timer_bar.visible = false
 	var ctb_fill := StyleBoxFlat.new()
-	ctb_fill.bg_color = Color(1.0, 0.6, 0.2, 0.85)
-	ctb_fill.set_corner_radius_all(1)
+	ctb_fill.bg_color = Color(1.0, 0.6, 0.15, 0.9)
+	ctb_fill.set_corner_radius_all(2)
 	_combo_timer_bar.add_theme_stylebox_override("fill", ctb_fill)
 	var ctb_bg := StyleBoxFlat.new()
-	ctb_bg.bg_color = Color(0.15, 0.12, 0.2, 0.7)
+	ctb_bg.bg_color = Color(0.1, 0.08, 0.15, 0.7)
+	ctb_bg.set_corner_radius_all(2)
 	_combo_timer_bar.add_theme_stylebox_override("background", ctb_bg)
 	_combo_timer_bar.z_index = 100
 	ui_layer.add_child(_combo_timer_bar)
 
-	# Kill counter label (画面左下、distanceの下: 連続感と達成感）
+	# Kill counter: in the left info panel
 	var kill_label := Label.new()
 	kill_label.name = "KillCountLabel"
-	kill_label.position = Vector2(10, 85)
-	kill_label.add_theme_font_size_override("font_size", 13)
-	kill_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7, 0.85))
-	kill_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	kill_label.position = Vector2(14, 68)
+	kill_label.add_theme_font_size_override("font_size", 14)
+	kill_label.add_theme_color_override("font_color", Color(0.65, 0.6, 0.8, 0.9))
+	kill_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
 	kill_label.add_theme_constant_override("shadow_offset_x", 1)
 	kill_label.add_theme_constant_override("shadow_offset_y", 1)
 	kill_label.text = "Kills: 0"
 	kill_label.z_index = 90
 	ui_layer.add_child(kill_label)
 
-	# Restart label: large and clear
-	restart_label.add_theme_font_size_override("font_size", 28)
-	restart_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5, 1.0))
-	restart_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	# Restart label: large, centered, with panel background
+	restart_label.add_theme_font_size_override("font_size", 30)
+	restart_label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.5, 1.0))
+	restart_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
 	restart_label.add_theme_constant_override("shadow_offset_x", 2)
 	restart_label.add_theme_constant_override("shadow_offset_y", 2)
 
@@ -2296,9 +2390,17 @@ func _update_combo_display() -> void:
 		return
 	if combo_count < 3:
 		combo_label_node.visible = false
+		# Hide the right info panel when no combo
+		var rp := ui_layer.get_node_or_null("RightInfoPanel")
+		if rp:
+			rp.visible = false
 		return
 
 	combo_label_node.visible = true
+	# Show the right info panel backing for combo display
+	var rp := ui_layer.get_node_or_null("RightInfoPanel")
+	if rp:
+		rp.visible = true
 	var tier_text := ""
 	var tier_color := Color(1.0, 0.6, 0.2, 1.0)  # デフォルト: オレンジ
 

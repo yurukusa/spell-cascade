@@ -73,12 +73,13 @@ func _ready() -> void:
 	spacer.custom_minimum_size = Vector2(0, 30)
 	vbox.add_child(spacer)
 
-	# Start button
+	# Start button — styled with dungeon-themed panel
 	var start_btn := Button.new()
 	start_btn.text = "Start Game"
-	start_btn.custom_minimum_size = Vector2(200, 40)
+	start_btn.custom_minimum_size = Vector2(220, 48)
 	start_btn.pressed.connect(_on_start)
 	start_btn.modulate.a = 0.0
+	_style_menu_button(start_btn, Color(0.2, 0.55, 0.85, 1.0))  # Cyan accent
 	vbox.add_child(start_btn)
 	var s_tw := start_btn.create_tween()
 	s_tw.tween_interval(0.75)
@@ -87,9 +88,10 @@ func _ready() -> void:
 	# Settings button
 	var settings_btn := Button.new()
 	settings_btn.text = "Settings"
-	settings_btn.custom_minimum_size = Vector2(200, 40)
+	settings_btn.custom_minimum_size = Vector2(220, 48)
 	settings_btn.pressed.connect(_on_settings)
 	settings_btn.modulate.a = 0.0
+	_style_menu_button(settings_btn, Color(0.4, 0.4, 0.55, 1.0))  # Neutral grey
 	vbox.add_child(settings_btn)
 	var set_tw := settings_btn.create_tween()
 	set_tw.tween_interval(0.9)
@@ -98,9 +100,10 @@ func _ready() -> void:
 	# Quit button
 	var quit_btn := Button.new()
 	quit_btn.text = "Quit"
-	quit_btn.custom_minimum_size = Vector2(200, 40)
+	quit_btn.custom_minimum_size = Vector2(220, 48)
 	quit_btn.pressed.connect(_on_quit)
 	quit_btn.modulate.a = 0.0
+	_style_menu_button(quit_btn, Color(0.5, 0.3, 0.3, 1.0))  # Muted red
 	vbox.add_child(quit_btn)
 	var q_tw := quit_btn.create_tween()
 	q_tw.tween_interval(1.05)
@@ -160,6 +163,52 @@ func _emit_cascade_particle(initial: bool = false) -> void:
 	# 微妙なX揺れ
 	fall_tween.tween_property(dot, "position:x", start_x + randf_range(-40.0, 40.0), fall_dur).set_trans(Tween.TRANS_SINE)
 	fall_tween.chain().tween_callback(dot.queue_free)
+
+func _style_menu_button(btn: Button, accent: Color) -> void:
+	## Dungeon-themed button style using StyleBoxFlat panels.
+	## Why not NinePatchRect: Button has built-in stylebox support, simpler this way.
+	btn.add_theme_font_size_override("font_size", 20)
+	btn.add_theme_color_override("font_color", Color(0.95, 0.92, 1.0, 1.0))
+	btn.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 1.0, 1.0))
+	btn.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+	btn.add_theme_constant_override("shadow_offset_x", 1)
+	btn.add_theme_constant_override("shadow_offset_y", 1)
+
+	# Normal state
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Color(0.08, 0.06, 0.14, 0.9)
+	normal.border_color = accent.darkened(0.2)
+	normal.set_border_width_all(2)
+	normal.set_corner_radius_all(4)
+	normal.set_content_margin_all(8)
+	btn.add_theme_stylebox_override("normal", normal)
+
+	# Hover state: lighter border + slight bg shift
+	var hover := StyleBoxFlat.new()
+	hover.bg_color = Color(0.12, 0.1, 0.2, 0.95)
+	hover.border_color = accent.lightened(0.1)
+	hover.set_border_width_all(2)
+	hover.set_corner_radius_all(4)
+	hover.set_content_margin_all(8)
+	btn.add_theme_stylebox_override("hover", hover)
+
+	# Pressed state: invert brightness
+	var pressed := StyleBoxFlat.new()
+	pressed.bg_color = accent.darkened(0.5)
+	pressed.border_color = accent.lightened(0.3)
+	pressed.set_border_width_all(2)
+	pressed.set_corner_radius_all(4)
+	pressed.set_content_margin_all(8)
+	btn.add_theme_stylebox_override("pressed", pressed)
+
+	# Focus style (keyboard nav)
+	var focus := StyleBoxFlat.new()
+	focus.bg_color = Color(0.1, 0.08, 0.18, 0.95)
+	focus.border_color = accent.lightened(0.2)
+	focus.set_border_width_all(2)
+	focus.set_corner_radius_all(4)
+	focus.set_content_margin_all(8)
+	btn.add_theme_stylebox_override("focus", focus)
 
 func _on_start() -> void:
 	# change_scene_to_file はwebビルドでスレッドローダーが使われ失敗する場合がある。
