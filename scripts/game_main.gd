@@ -701,10 +701,15 @@ func _show_onboarding() -> void:
 	center.add_child(onboarding_panel)
 	ui_layer.add_child(center)
 
-	# フェードイン
+	# 改善224: オンボーディングパネル登場アニメーション（スケールイン + フェードイン）
+	# Why: 単純な0.5sフェードインは「UIが浮かんだ」だけ。ゲーム開始直後の最初の情報提示なので
+	# 0.92→1.0 TRANS_BACKで「ゲームが始まった」という開幕感を演出する。
+	onboarding_panel.scale = Vector2(0.92, 0.92)
 	onboarding_panel.modulate.a = 0.0
 	var tween := onboarding_panel.create_tween()
-	tween.tween_property(onboarding_panel, "modulate:a", 1.0, 0.5)
+	tween.set_parallel(true)
+	tween.tween_property(onboarding_panel, "modulate:a", 1.0, 0.4).set_trans(Tween.TRANS_QUAD)
+	tween.tween_property(onboarding_panel, "scale", Vector2(1.0, 1.0), 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 	onboarding_timer = ONBOARDING_DURATION
 
