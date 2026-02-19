@@ -804,6 +804,7 @@ func _setup_tower_attacks() -> void:
 # --- 敵スポーン ---
 
 func _show_boss_warning() -> void:
+	SFX.play_boss_warning()  # 改善184: 遠くで何かが来る低い予告音
 	var label := Label.new()
 	label.text = "BOSS IN 10s"
 	label.add_theme_font_size_override("font_size", 28)

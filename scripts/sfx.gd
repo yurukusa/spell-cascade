@@ -340,6 +340,16 @@ func play_wave_clear() -> void:
 func play_boss_entrance() -> void:
 	_boss_entrance_player.play()
 
+## 改善184: ボス警告SE（10秒前予告）。ボス登場音を低くして「遠くで何かが来る」感を演出。
+func play_boss_warning() -> void:
+	_boss_entrance_player.pitch_scale = 0.55  # 半音5つ下げて「遠い・重い」印象
+	_boss_entrance_player.volume_db = -10.0   # 控えめに（実際の登場より小さく）
+	_boss_entrance_player.play()
+	# 登場時に元に戻す（play_boss_entrance()は1.0で呼ぶ）
+	await get_tree().create_timer(2.0).timeout
+	_boss_entrance_player.pitch_scale = 1.0
+	_boss_entrance_player.volume_db = -3.0
+
 func play_ui_cancel() -> void:
 	_ui_cancel_player.play()
 
