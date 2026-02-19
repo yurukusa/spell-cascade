@@ -1689,16 +1689,19 @@ func _spawn_enemy() -> void:
 	var dmg_val := 14.0 + distance_m * 0.03  # v0.3: 10→14（HP500に対して体感できるダメージ）
 
 	# 敵タイプ選択: 時間ゲーティング（#247バグ修正: current_stageは最大3まで）
-	# 0s+: normal / 20s+: +swarmer / 40s+: +tank / 120s+: +splitter / 240s+: +healer
+	# 0s+: normal / 20s+: +swarmer / 40s+: +tank / 60s+: +shooter / 120s+: +splitter / 240s+: +healer
 	var type_roll := randf()
 	var etype := "normal"
 	if run_time >= 240.0 and type_roll < 0.08:
 		etype = "healer"
 	elif run_time >= 120.0 and type_roll < 0.18:
 		etype = "splitter"
-	elif run_time >= 40.0 and type_roll < 0.33:
+	# 改善257: shooter有効化。実装済みだがspawn未接続だった。60s以降で10%出現。
+	elif run_time >= 60.0 and type_roll < 0.28:
+		etype = "shooter"
+	elif run_time >= 40.0 and type_roll < 0.40:
 		etype = "tank"
-	elif run_time >= 20.0 and type_roll < 0.55:
+	elif run_time >= 20.0 and type_roll < 0.60:
 		etype = "swarmer"
 
 	enemy.init(tower, speed_val, hp_val, dmg_val, etype)
