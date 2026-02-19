@@ -1465,8 +1465,24 @@ func _spawn_drops() -> void:
 
 	var drop_script := load("res://scripts/drop_orb.gd")
 
-	# XPオーブを1-3個ドロップ
+	# 改善167: drop_rate_mult mod — drop_rate_mult 分だけ XP オーブ数を増やす
+	var _drop_rate_mult := 1.0
+	var _bs := get_node_or_null("/root/BuildSystem")
+	if _bs and player and player.has_method("get_module") and "max_slots" in player:
+		for _si in range(player.max_slots):
+			var _mod = player.get_module(_si)
+			if _mod != null:
+				var _ms: Dictionary = _bs.calculate_module_stats(_mod)
+				var _drm: float = _ms.get("drop_rate_mult", 1.0)
+				if _drm > _drop_rate_mult:
+					_drop_rate_mult = _drm
+
+	# XPオーブを1-3個ドロップ（drop_rate_mult が高ければ追加ドロップ確率UP）
 	var orb_count := randi_range(1, 3)
+	if _drop_rate_mult > 1.0:
+		# 超過分の割合で追加ドロップ（1.5x → 50%確率で+1個）
+		if randf() < (_drop_rate_mult - 1.0):
+			orb_count += 1
 	for i in range(orb_count):
 		var orb := Area2D.new()
 		orb.set_script(drop_script)
