@@ -111,6 +111,7 @@ var spawn_interval := 1.0  # v0.3.3: Dead Time<10s目標（旧1.2）
 
 # ステージランプ（v0.3.2: 3-Act構造）
 var current_stage := 1  # 1=vulnerability, 2=growth, 3=crisis
+var _active_synergy_ids: Array[String] = []  # 改善250: キャッシュ済みアクティブシナジーID
 const STAGE_2_TIME := 20.0  # Stage 2 開始時間
 const STAGE_3_TIME := 40.0  # Stage 3 開始時間
 const STAGE_SPAWN_MULT = [1.0, 1.2, 1.6]  # v0.3: Stage1を0.8→1.0（序盤の空白削減）
@@ -813,6 +814,13 @@ func _setup_tower_attacks() -> void:
 		if child.is_in_group("tower_attacks"):
 			child.queue_free()
 
+	# 改善250: シナジーをキャッシュし、stats生成前に確認
+	var filled_for_syn: Array = tower.get_filled_modules()
+	var active_syns: Array = build_system.check_active_synergies(filled_for_syn)
+	_active_synergy_ids.clear()
+	for syn in active_syns:
+		_active_synergy_ids.append(syn.get("id", ""))
+
 	# 各スロットの攻撃ノードを生成
 	for i in range(tower.max_slots):
 		var module: Variant = tower.get_module(i)
@@ -820,6 +828,11 @@ func _setup_tower_attacks() -> void:
 			continue
 
 		var stats: Dictionary = build_system.calculate_module_stats(module)
+
+		# 改善250: elemental_convergence — 3元素以上でダメージ2倍
+		if "elemental_convergence" in _active_synergy_ids:
+			stats["damage"] = int(stats["damage"] * 2.0)
+
 		var attack_node := Node2D.new()
 		var attack_script := load("res://scripts/tower_attack.gd")
 		attack_node.set_script(attack_script)
@@ -1858,6 +1871,36 @@ func _on_enemy_died(enemy: Node2D) -> void:
 			okt.tween_property(okr_ring, "scale", Vector2(2.8, 2.8), 0.35).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 			okt.tween_property(okr_ring, "modulate:a", 0.0, 0.35)
 			okt.chain().tween_callback(okr_ring.queue_free)
+
+	# 改善250: soul_harvest シナジー — holy_beam+trigger: kill時に10%HP回復+AoEパルス
+	if "soul_harvest" in _active_synergy_ids and is_instance_valid(enemy):
+		tower.heal(tower.max_hp * 0.1)
+		var sh_center := enemy.global_position
+		var sh_radius := 60.0
+		var sh_dmg_pct := 0.5
+		var sh_base_dmg := 15  # holy_beamのbase_damage
+		for e in get_tree().get_nodes_in_group("enemies"):
+			if is_instance_valid(e) and e != enemy:
+				if sh_center.distance_to(e.global_position) < sh_radius:
+					if e.has_method("take_damage"):
+						e.take_damage(int(sh_base_dmg * sh_dmg_pct))
+		# 金色パルスリング（魂の収穫）
+		var sh_root := get_tree().current_scene
+		if sh_root:
+			var sh_ring := Polygon2D.new()
+			var sh_pts := PackedVector2Array()
+			for _shi in range(20):
+				sh_pts.append(Vector2(cos(_shi * TAU / 20.0), sin(_shi * TAU / 20.0)) * sh_radius * 0.4)
+			sh_ring.polygon = sh_pts
+			sh_ring.color = Color(1.0, 0.85, 0.2, 0.7)
+			sh_ring.global_position = sh_center
+			sh_ring.z_index = 90
+			sh_root.add_child(sh_ring)
+			var sht := sh_ring.create_tween()
+			sht.set_parallel(true)
+			sht.tween_property(sh_ring, "scale", Vector2(3.0, 3.0), 0.4).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+			sht.tween_property(sh_ring, "modulate:a", 0.0, 0.4)
+			sht.chain().tween_callback(sh_ring.queue_free)
 
 	# キルマイルストーン（10, 25, 50, 100, 200キル: 達成感の積み上げ）
 	if kill_count in [10, 25, 50, 100, 200]:
