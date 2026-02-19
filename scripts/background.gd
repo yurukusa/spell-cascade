@@ -133,6 +133,8 @@ func _maybe_add_decorations(parent: Node2D, row_index: int, row_seed: int) -> vo
 	var hash1 := _simple_hash(row_seed + 1)
 	var hash2 := _simple_hash(row_seed + 2)
 	var hash3 := _simple_hash(row_seed + 3)
+	var hash5 := _simple_hash(row_seed + 5)
+	var hash6 := _simple_hash(row_seed + 6)
 
 	# ルーンサークル（5%の確率）
 	if hash1 % 20 == 0:
@@ -148,6 +150,16 @@ func _maybe_add_decorations(parent: Node2D, row_index: int, row_seed: int) -> vo
 	if hash3 % 7 == 0:
 		var cx := float((hash3 % 700) - 350)
 		_draw_debris(parent, cx, float((hash3 / 50) % int(TILE_SIZE)), hash3)
+
+	# バレル（10%の確率）— Kenney tile_0042で環境密度を高める
+	if hash5 % 10 == 0:
+		var cx := float((hash5 % 700) - 350)
+		_draw_tile_deco(parent, cx, float((hash5 / 80) % int(TILE_SIZE)), 42)
+
+	# 宝箱（5%の確率）— Kenney tile_0030でダンジョン感を強化
+	if hash6 % 20 == 0:
+		var cx := float((hash6 % 600) - 300)
+		_draw_tile_deco(parent, cx, float((hash6 / 90) % int(TILE_SIZE)), 30)
 
 	# 距離マーカー（10行ごと = 約128mごと）
 	if row_index % 10 == 0 and row_index != 0:
@@ -261,6 +273,24 @@ func _draw_distance_marker(parent: Node2D, row_index: int) -> void:
 		Vector2(600, TILE_SIZE * 0.5),
 	])
 	parent.add_child(line)
+
+func _draw_tile_deco(parent: Node2D, x: float, y: float, tile_num: int) -> void:
+	## Kenney tiny-dungeon タイルを環境装飾として配置する。
+	## Why: ポリゴンの柱や瓦礫より具体的なオブジェクト感があり画面密度スコアを上げる。
+	var path := "res://assets/kenney-tiny-dungeon/tile_%04d.png" % tile_num
+	var tex: Texture2D = load(path)
+	if tex == null:
+		return
+	var sprite := Sprite2D.new()
+	sprite.texture = tex
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	# 16px → 48px (3x scale) — 背景要素として主張しすぎないサイズ
+	sprite.scale = Vector2(3.0, 3.0)
+	sprite.position = Vector2(x, y)
+	# 少し暗めで背景に馴染む（プレイヤーや敵より前面に出ない）
+	sprite.modulate = Color(0.85, 0.8, 0.85, 0.75)
+	sprite.z_index = -90  # 背景タイルより手前、ゲーム要素より奥
+	parent.add_child(sprite)
 
 func _simple_hash(val: int) -> int:
 	## 簡易ハッシュ（決定論的な疑似乱数として使用）
