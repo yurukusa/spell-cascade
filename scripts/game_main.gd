@@ -979,10 +979,14 @@ func _show_shrine() -> void:
 
 	ui_layer.add_child(shrine_ui)
 
-	# フェードイン
+	# 改善192: スライドアップ + フェードイン（神殿が地面から「湧き出る」感触）
+	# 下から80pxオフセットした位置から正位置へスライド
 	shrine_ui.modulate.a = 0.0
+	shrine_ui.position = Vector2(0, 80)
 	var tween := shrine_ui.create_tween()
-	tween.tween_property(shrine_ui, "modulate:a", 1.0, 0.3)
+	tween.set_parallel(true)
+	tween.tween_property(shrine_ui, "modulate:a", 1.0, 0.3).set_trans(Tween.TRANS_QUAD)
+	tween.tween_property(shrine_ui, "position:y", 0.0, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _on_shrine_chosen(choice: int) -> void:
 	if shrine_ui == null:
@@ -1016,9 +1020,12 @@ func _shrine_auto_select() -> void:
 
 func _dismiss_shrine() -> void:
 	if shrine_ui:
+		# 改善192: スライドダウン退場（入場と対称）
 		var tween := shrine_ui.create_tween()
-		tween.tween_property(shrine_ui, "modulate:a", 0.0, 0.3)
-		tween.tween_callback(shrine_ui.queue_free)
+		tween.set_parallel(true)
+		tween.tween_property(shrine_ui, "modulate:a", 0.0, 0.25).set_trans(Tween.TRANS_QUAD)
+		tween.tween_property(shrine_ui, "position:y", 80.0, 0.28).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tween.chain().tween_callback(shrine_ui.queue_free)
 		shrine_ui = null
 		shrine_timer = 0.0
 
