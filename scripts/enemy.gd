@@ -773,20 +773,31 @@ func _heal_nearby_allies() -> void:
 					heal_flash.tween_property(e, "modulate", Color.WHITE, 0.3)
 
 func _spawn_heal_vfx(pos: Vector2) -> void:
+	# 改善204: ヒールVFXスケールポップ（「回復した！」を一瞬の視覚的インパクトで伝える）
+	# Why: ダメージ数字は scale pop + 色でインパクトがあるが、回復の "+" は素の浮遊のみで存在感がゼロ。
+	# 0.4→1.3→1.0（TRANS_BACK）でばね感を出し、フォントサイズも16→18に拡大して視認性UP。
 	var scene_root := get_tree().current_scene
 	if scene_root == null:
 		return
 	var label := Label.new()
 	label.text = "+"
-	label.add_theme_font_size_override("font_size", 14)
-	label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.4, 1.0))
+	label.add_theme_font_size_override("font_size", 18)
+	label.add_theme_color_override("font_color", Color(0.35, 1.0, 0.45, 1.0))
+	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.4, 0.0, 0.8))
+	label.add_theme_constant_override("shadow_offset_x", 1)
+	label.add_theme_constant_override("shadow_offset_y", 1)
 	label.global_position = pos + Vector2(randf_range(-8, 8), -15)
 	label.z_index = 100
+	label.scale = Vector2(0.4, 0.4)
 	scene_root.add_child(label)
 	var tween := label.create_tween()
+	# まずスケールポップ（TRANS_BACK でばね感）: 0.4→1.3→1.0
+	tween.tween_property(label, "scale", Vector2(1.3, 1.3), 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.08).set_trans(Tween.TRANS_QUAD)
+	# ポップ完了後: 浮上 + フェードアウトを並行
 	tween.set_parallel(true)
-	tween.tween_property(label, "global_position:y", label.global_position.y - 25.0, 0.4)
-	tween.tween_property(label, "modulate:a", 0.0, 0.4)
+	tween.tween_property(label, "global_position:y", label.global_position.y - 30.0, 0.45)
+	tween.tween_property(label, "modulate:a", 0.0, 0.45)
 	tween.chain().tween_callback(label.queue_free)
 
 func _spawn_dying_ring() -> void:
