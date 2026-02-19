@@ -1164,6 +1164,17 @@ func _spawn_boss() -> void:
 	tween.chain().tween_property(label, "modulate:a", 0.0, 1.5).set_delay(1.0)
 	tween.chain().tween_callback(label.queue_free)
 
+	# 改善237: ボス出現ズームアウト（「デカいものが来た」脅威スケール表現）
+	# Why: フラッシュ+テキストは「衝撃」。ズームアウトは「広さ」。
+	# 0.85まで素早く引いて0.5s保持、その後1.5sかけて自然に戻す。
+	# これでボスが視野に入るまでの緊張感が持続する。
+	var boss_cam := tower.get_node_or_null("Camera") as Camera2D
+	if boss_cam:
+		var bzt := boss_cam.create_tween()
+		bzt.tween_property(boss_cam, "zoom", Vector2(0.85, 0.85), 0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		bzt.tween_interval(0.5)
+		bzt.tween_property(boss_cam, "zoom", Vector2.ONE, 1.5).set_trans(Tween.TRANS_SINE)
+
 func _on_boss_died(_enemy: Node2D) -> void:
 	enemies_alive -= 1
 	kill_count += 1
