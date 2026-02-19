@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.9.3 (2026-02-20)
+
+### Balance: XP Curve Rebalance — pacing_warn Fix
+
+**Problem**: quality-gate reported avg_levelup_interval = 5.2s (threshold: min 8.0s).
+Level-ups were happening too frequently, reducing upgrade weight/anticipation.
+
+**Fix**: All 20 XP thresholds multiplied by ×1.5:
+- Before: `[10, 22, 40, 65, 100 ...]`
+- After:  `[15, 33, 60, 98, 150 ...]`
+
+Expected result: avg_levelup_interval ~7.8–8.5s (passes min_avg_interval: 8.0)
+
+This also reduces the "upgrade feast in first 3 minutes" problem noted in playtest_log.
+
+---
+
 ## v0.9.2 (2026-02-20)
 
 ### CRITICAL Visual Overhaul — Game Jam Submission Quality

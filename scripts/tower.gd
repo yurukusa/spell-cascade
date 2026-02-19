@@ -27,7 +27,7 @@ var start_y := 0.0  # 開始Y位置
 var xp := 0
 var level := 1
 # レベルアップに必要な累計XP（Lv2=10, Lv3=25, ...）
-var level_thresholds: Array[int] = [10, 22, 40, 65, 100, 145, 210, 290, 400, 540, 720, 930, 1180, 1500, 1900, 2400, 3000, 3750, 4700, 5900]  # Lv2-21。v0.5.1: Lv14キャップを撤廃（10分ランで到達可能なLv20+まで拡張）
+var level_thresholds: Array[int] = [15, 33, 60, 98, 150, 220, 315, 435, 600, 810, 1080, 1395, 1770, 2250, 2850, 3600, 4500, 5625, 7050, 8850]  # Lv2-21。v0.9.3: quality-gate pacing_warn修正（avg_interval 5.2s→8.0s+を目標に全値×1.5）
 signal xp_gained(total_xp: int, level: int)
 signal level_up(new_level: int)
 
