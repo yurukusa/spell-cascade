@@ -814,6 +814,7 @@ func get_xp_for_next_level() -> int:
 
 var shake_intensity := 0.0
 var shake_decay := 8.0  # 減衰速度
+var _cam_lead_offset := Vector2.ZERO  # 改善235: 照準方向への先読みオフセット
 
 # 低HP持続グロー（25%以下で赤いパルスリング）
 var _low_hp_glow: Polygon2D = null
@@ -887,19 +888,23 @@ func _spawn_trail_ghost() -> void:
 	tw.tween_callback(ghost.queue_free)
 
 func _process(delta: float) -> void:
+	# 改善235: カメラリード（照準方向に先読みオフセット。シェイクと合成）
+	# Why: 移動方向の60px先を見せることで、プレイヤーが反応する時間が増える。
+	# lerp係数5.0 = 約0.2sで方向転換に追いつく（遅すぎず速すぎず）
+	_cam_lead_offset = _cam_lead_offset.lerp(facing_dir * 60.0, delta * 5.0)
+	var cam := get_node_or_null("Camera")
 	if shake_intensity > 0.01:
-		var cam := get_node_or_null("Camera")
+		var shake_off := Vector2(
+			randf_range(-shake_intensity, shake_intensity),
+			randf_range(-shake_intensity, shake_intensity)
+		)
 		if cam and cam is Camera2D:
-			cam.offset = Vector2(
-				randf_range(-shake_intensity, shake_intensity),
-				randf_range(-shake_intensity, shake_intensity)
-			)
+			cam.offset = _cam_lead_offset + shake_off
 		shake_intensity = lerpf(shake_intensity, 0.0, shake_decay * delta)
 	else:
 		shake_intensity = 0.0
-		var cam := get_node_or_null("Camera")
 		if cam and cam is Camera2D:
-			cam.offset = Vector2.ZERO
+			cam.offset = _cam_lead_offset
 	# 改善234: 移動トレイル（高速移動中にゴーストの残像を生成）
 	# Why: 速い移動に「俊敏さ」の視覚フィードバック。残像が消えることで軌跡を示す。
 	_trail_timer -= delta
