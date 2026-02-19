@@ -1041,10 +1041,17 @@ func _show_shrine_toast(choice_name: String, color: Color) -> void:
 	label.position = Vector2(640 - 200, 350)
 	label.custom_minimum_size = Vector2(400, 0)
 	label.z_index = 200
+	# 改善208: Shrine Toastスケールポップイン（Shrine選択確認を「登場の一撃」で伝える）
+	label.scale = Vector2(0.5, 0.5)
+	label.modulate.a = 0.0
 	ui_layer.add_child(label)
 	var tween := label.create_tween()
+	tween.tween_property(label, "scale", Vector2(1.1, 1.1), 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.set_parallel(true)
+	tween.tween_property(label, "modulate:a", 1.0, 0.12)
+	tween.chain().tween_property(label, "scale", Vector2(1.0, 1.0), 0.1).set_trans(Tween.TRANS_QUAD)
 	tween.tween_property(label, "modulate:a", 0.0, 1.5).set_delay(1.0)
-	tween.tween_callback(label.queue_free)
+	tween.chain().tween_callback(label.queue_free)
 	# 改善131: Shrine選択時の色カラーフラッシュ（「何かが変わった」瞬間を全画面で演出）
 	var shrine_flash := ColorRect.new()
 	shrine_flash.color = Color(color.r, color.g, color.b, 0.18)
@@ -2654,9 +2661,12 @@ func _announce_overtime() -> void:
 	lbl.custom_minimum_size = Vector2(760, 0)
 	lbl.position = Vector2(200, 270)
 	lbl.z_index = 180
+	# 改善208: OVERTIMEスケールパンチイン（「残り1分！」の緊張感を登場演出で最大化）
+	lbl.scale = Vector2(2.2, 2.2)
 	ui_layer.add_child(lbl)
 	tower.shake(5.0)
 	var t := lbl.create_tween()
+	t.tween_property(lbl, "scale", Vector2(1.0, 1.0), 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	t.set_parallel(true)
 	t.tween_property(lbl, "position:y", 230.0, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	t.tween_property(lbl, "modulate:a", 0.0, 2.0).set_delay(0.6)
