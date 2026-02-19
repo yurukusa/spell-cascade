@@ -1942,6 +1942,23 @@ func _on_tower_damaged(current: float, max_val: float) -> void:
 	elif hp_bar_last_value >= 0 and current < hp_bar_last_value:
 		SFX.play_damage_taken()
 		_flash_hp_bar_damage()
+		# 改善165: thorns mod — 被弾時に近くの敵へダメージ反射
+		var dmg_taken := hp_bar_last_value - current
+		var thorns_pct := 0.0
+		var thorns_radius := 0.0
+		for atk in get_tree().get_nodes_in_group("tower_attacks"):
+			var s: Dictionary = atk.get("stats") if atk.get("stats") != null else {}
+			var tp: float = s.get("thorns_pct", 0.0)
+			if tp > thorns_pct:
+				thorns_pct = tp
+				thorns_radius = s.get("thorns_radius", 80.0)
+		if thorns_pct > 0.0 and thorns_radius > 0.0:
+			var thorns_dmg := int(dmg_taken * thorns_pct)
+			if thorns_dmg > 0:
+				for e in get_tree().get_nodes_in_group("enemies"):
+					if is_instance_valid(e) and e.global_position.distance_to(tower.global_position) <= thorns_radius:
+						if e.has_method("take_damage"):
+							e.take_damage(float(thorns_dmg))
 		# 改善121: 被弾時の赤い画面フラッシュ（「痛い！」を全画面で体感）
 		var dmg_flash := ColorRect.new()
 		dmg_flash.color = Color(0.8, 0.05, 0.05, 0.18)
