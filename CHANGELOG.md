@@ -1,5 +1,47 @@
 # Changelog
 
+## v0.9.2 (2026-02-20)
+
+### CRITICAL Visual Overhaul — Game Jam Submission Quality
+
+**Goal**: 17/50 → 34/50 visual quality score (target 25/50 ✅)
+
+**Player**:
+- Sprite: tile_0100 (blue/gray armored knight) — clear humanoid identity
+
+**Enemies** (v0.9.1):
+- 7 distinct Kenney tiny-dungeon sprites replace uniform red polygon
+- normal=demon, swarmer=slime, tank=armored beast, shooter=skeleton,
+  splitter=brown creature, healer=purple mage, boss=fire creature
+- Type-specific animations: boss pulse, swarmer fast-pulse, tank aura
+
+**Background** (v0.9.0 + v0.9.2):
+- ProceduralBackground: Kenney stone floor tiles (16×16, 8× scaled)
+- Rune circles with breathing pulse, column stumps, debris
+- Barrel (tile_0042) 10% + chest (tile_0030) 5% per row — dungeon density
+
+**Projectiles** (v0.9.1):
+- 6 elemental types: fireball, ice shard, spark, poison, holy, default
+- 3× scale baseline for combat readability
+- Trail effects, muzzle flash per shot
+
+**VFX**:
+- Hit flash (Color.WHITE, 50ms) on all enemy types
+- Death VFX: 7 type-specific particle bursts (4–16 fragments)
+- XP orb: blue-purple glow + pulse + trail + collection sparkle
+
+**UI** (v0.9.1):
+- Silkscreen pixel font (project-wide theme)
+- HP bar, XP bar, combo bar, wave/timer/distance labels restyled
+- Build label permanently hidden (debug text removal)
+
+**Debug cleanup**:
+- AutoPlayer debug autoload removed
+- ScreenshotCapture moved to debug-only scripts
+
+**HTML5 Build**:
+- exports/web/ rebuilt with all v0.9.x changes
+
 ## v0.8.3 (2026-02-19)
 
 ### Quality Loops 1-4 Complete — 143 Improvements
