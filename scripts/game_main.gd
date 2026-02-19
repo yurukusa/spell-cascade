@@ -2722,6 +2722,7 @@ func _show_result_screen(is_victory: bool) -> void:
 		["Kills", "%d" % kill_count],
 		["Best Combo", "x%d" % best_combo],
 		["Damage Dealt", "%d" % int(total_damage_dealt)],  # 改善162: 総ダメージ量
+		["DPS", "%.1f" % (total_damage_dealt / maxf(float(time_sec), 1.0))],  # 改善163: DPS（連続性の指標）
 		["Time", "%d:%02d" % [t_min, t_sec]],
 	]
 
