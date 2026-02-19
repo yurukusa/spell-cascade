@@ -533,6 +533,34 @@ func take_damage(amount: float) -> void:
 	if hp > 0 and hp / max_hp <= 0.3:
 		SFX.play_low_hp_warning()
 
+	# 改善196: フローティングダメージ数値（「どれだけ痛かったか」を即時数値で伝える）
+	# なぜ: HP棒の変化だけでは量感が掴みにくい。数値で重さを可視化。
+	var scene_root_dmg := get_tree().current_scene
+	if scene_root_dmg:
+		var dmg_lbl := Label.new()
+		dmg_lbl.text = "-%d" % int(amount)
+		var font_size := 14
+		var lbl_color := Color(1.0, 0.9, 0.8, 1.0)  # デフォルト: 薄い白
+		if amount >= 50.0:
+			font_size = 22
+			lbl_color = Color(1.0, 0.2, 0.15, 1.0)  # 大ダメージ: 赤
+		elif amount >= 20.0:
+			font_size = 18
+			lbl_color = Color(1.0, 0.55, 0.2, 1.0)  # 中ダメージ: オレンジ
+		dmg_lbl.add_theme_font_size_override("font_size", font_size)
+		dmg_lbl.add_theme_color_override("font_color", lbl_color)
+		dmg_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
+		dmg_lbl.add_theme_constant_override("shadow_offset_x", 1)
+		dmg_lbl.add_theme_constant_override("shadow_offset_y", 1)
+		dmg_lbl.z_index = 200
+		dmg_lbl.global_position = global_position + Vector2(randf_range(-18, 18), -30)
+		scene_root_dmg.add_child(dmg_lbl)
+		var dlbl_t := dmg_lbl.create_tween()
+		dlbl_t.set_parallel(true)
+		dlbl_t.tween_property(dmg_lbl, "global_position:y", dmg_lbl.global_position.y - 42.0, 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		dlbl_t.tween_property(dmg_lbl, "modulate:a", 0.0, 0.6).set_delay(0.2)
+		dlbl_t.chain().tween_callback(dmg_lbl.queue_free)
+
 	# 改善138: 大ダメージ時のUI赤フラッシュ（50+ダメージ: 「重い一撃」を全画面で）
 	if amount >= 50.0:
 		var scene_root := get_tree().current_scene
