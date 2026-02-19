@@ -2044,8 +2044,11 @@ func _on_tower_damaged(current: float, max_val: float) -> void:
 	elif hp_bar_last_value >= 0 and current < hp_bar_last_value:
 		SFX.play_damage_taken()
 		_flash_hp_bar_damage()
-		# 改善165: thorns mod — 被弾時に近くの敵へダメージ反射
+		# 改善190: 被弾シェイク（ダメージ割合でスケール: 小=2.5 大=6.0）
+		# ダメージの重さを「揺れ」で体感させる。HP比例でスケール。
 		var dmg_taken := hp_bar_last_value - current
+		var shake_str := clampf(dmg_taken / max_val * 15.0, 2.5, 6.0)
+		tower.shake(shake_str)
 		var thorns_pct := 0.0
 		var thorns_radius := 0.0
 		for atk in get_tree().get_nodes_in_group("tower_attacks"):
