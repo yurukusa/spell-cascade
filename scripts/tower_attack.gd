@@ -638,6 +638,12 @@ func _create_projectile(direction: Vector2) -> void:
 	var t := get_parent()
 	if t and "damage_mult" in t:
 		base_damage *= t.damage_mult
+	# 改善164: berserker mod — HP < threshold 時にダメージ倍率適用
+	var bz_threshold: float = stats.get("berserker_threshold", 0.0)
+	if bz_threshold > 0.0 and t and "hp" in t and "max_hp" in t and t.max_hp > 0:
+		var hp_pct: float = t.hp / t.max_hp
+		if hp_pct < bz_threshold:
+			base_damage *= stats.get("berserker_dmg_mult", 1.8)
 	bullet.set("damage", int(base_damage))
 	bullet.set("lifetime", 3.0)
 	bullet.set("behaviors", stats.get("behaviors", []))
