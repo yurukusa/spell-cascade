@@ -2,10 +2,13 @@ extends Control
 
 ## Title Screen — entry point for the game.
 ## Start game, open settings, or quit.
+## 改善185: タイトルアニメーション（呼吸するタイトル + カスケードパーティクル）
 
 var settings_panel: PanelContainer = null
 var volume_slider: HSlider = null
 var fullscreen_check: CheckBox = null
+var _title_label: Label = null
+var _particle_timer := 0.0
 
 func _ready() -> void:
 	# Dark background
@@ -13,6 +16,9 @@ func _ready() -> void:
 	bg.color = Color(0.04, 0.04, 0.08, 1.0)
 	bg.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	add_child(bg)
+
+	# 改善185: カスケードパーティクル背景（魔法的な雰囲気を演出）
+	_spawn_background_particles()
 
 	var vbox := VBoxContainer.new()
 	vbox.set_anchors_and_offsets_preset(PRESET_CENTER)
@@ -24,7 +30,7 @@ func _ready() -> void:
 	vbox.add_theme_constant_override("separation", 20)
 	add_child(vbox)
 
-	# Title
+	# Title — 改善185: スケールイン + 継続的な「呼吸」アニメーション
 	var title := Label.new()
 	title.text = "Spell Cascade"
 	title.add_theme_font_size_override("font_size", 52)
@@ -33,7 +39,16 @@ func _ready() -> void:
 	title.add_theme_constant_override("shadow_offset_x", 3)
 	title.add_theme_constant_override("shadow_offset_y", 3)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.modulate.a = 0.0
+	title.scale = Vector2(0.7, 0.7)
 	vbox.add_child(title)
+	_title_label = title
+	# 登場アニメーション: スケールイン + フェードイン
+	var title_tween := title.create_tween()
+	title_tween.set_parallel(true)
+	title_tween.tween_property(title, "modulate:a", 1.0, 0.5).set_trans(Tween.TRANS_QUAD)
+	title_tween.tween_property(title, "scale", Vector2(1.0, 1.0), 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	title_tween.chain().tween_callback(_start_title_breathing)
 
 	# Subtitle
 	var sub := Label.new()
@@ -71,6 +86,58 @@ func _ready() -> void:
 
 	# Build settings panel (hidden)
 	_build_settings_panel()
+
+func _process(delta: float) -> void:
+	# 改善185: 継続的にカスケードパーティクルを生成
+	_particle_timer -= delta
+	if _particle_timer <= 0:
+		_particle_timer = 0.15 + randf() * 0.2  # 0.15〜0.35s間隔
+		_emit_cascade_particle()
+
+func _start_title_breathing() -> void:
+	## タイトルの呼吸アニメーション（ループ）
+	if _title_label == null or not is_instance_valid(_title_label):
+		return
+	var breath := _title_label.create_tween()
+	breath.set_loops()  # 永久ループ
+	breath.tween_property(_title_label, "scale", Vector2(1.03, 1.03), 1.8).set_trans(Tween.TRANS_SINE)
+	breath.tween_property(_title_label, "scale", Vector2(0.97, 0.97), 1.8).set_trans(Tween.TRANS_SINE)
+
+func _spawn_background_particles() -> void:
+	## 初期バースト: 20個のパーティクルをランダム配置でフェードイン
+	for i in 20:
+		_emit_cascade_particle(true)
+
+func _emit_cascade_particle(initial: bool = false) -> void:
+	## カスケード魔法パーティクル: 上から下に落ちる輝く点
+	var dot := Polygon2D.new()
+	var sides := 4 + randi() % 3  # 4〜6角形
+	var radius := 2.0 + randf() * 5.0
+	var pts := PackedVector2Array()
+	for j in sides:
+		var a := float(j) * TAU / sides
+		pts.append(Vector2(cos(a), sin(a)) * radius)
+	dot.polygon = pts
+	# カラー: 青系〜紫系〜シアン系をランダム
+	var hue := randf_range(0.55, 0.75)  # 青〜紫の範囲
+	dot.color = Color.from_hsv(hue, 0.6, 1.0, 0.0)
+	var start_x := randf() * 1280.0
+	var start_y := -20.0 if not initial else randf() * 720.0
+	dot.position = Vector2(start_x, start_y)
+	dot.z_index = -1  # 背景より後ろ、でも見える
+	add_child(dot)
+	# 落下アニメーション
+	var fall_dur := randf_range(3.0, 7.0)
+	var fall_tween := dot.create_tween()
+	fall_tween.set_parallel(true)
+	# フェードイン → フェードアウト
+	fall_tween.tween_property(dot, "color:a", 0.4 + randf() * 0.4, 0.3)
+	fall_tween.tween_property(dot, "color:a", 0.0, 0.8).set_delay(fall_dur - 0.8)
+	# Y軸落下
+	fall_tween.tween_property(dot, "position:y", start_y + 720.0 + 40.0, fall_dur).set_trans(Tween.TRANS_QUAD)
+	# 微妙なX揺れ
+	fall_tween.tween_property(dot, "position:x", start_x + randf_range(-40.0, 40.0), fall_dur).set_trans(Tween.TRANS_SINE)
+	fall_tween.chain().tween_callback(dot.queue_free)
 
 func _on_start() -> void:
 	# change_scene_to_file はwebビルドでスレッドローダーが使われ失敗する場合がある。
