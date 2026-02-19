@@ -5,6 +5,7 @@ extends Node
 ## Why: pyfxr生成WAVはランタイム生成より音質が良い。フォールバックで堅牢性を確保。
 
 const SOUNDS_DIR := "res://assets/sounds/"
+const MUSIC_DIR := "res://assets/music/"
 
 # プレイヤープール
 var _shot_players: Array[AudioStreamPlayer] = []
@@ -83,6 +84,19 @@ func _try_load_wav(filename: String) -> AudioStream:
 		return load(path)
 	return null
 
+## 音楽ファイルロード（MP3/OGG）: なければnullを返す
+## Why: CC0の実際の音楽ファイルを優先使用。存在しなければProceduralにフォールバック。
+func _try_load_music(filename: String) -> AudioStream:
+	var path := MUSIC_DIR + filename
+	if ResourceLoader.exists(path):
+		var stream = load(path)
+		if stream is AudioStreamMP3:
+			stream.loop = true
+		elif stream is AudioStreamOggVorbis:
+			stream.loop = true
+		return stream
+	return null
+
 func _ready() -> void:
 	# Shot: pyfxr WAV (laser_alt) があればそれ、なければ procedural
 	var shot_stream: AudioStream = _try_load_wav("laser_alt.wav")
@@ -156,20 +170,25 @@ func _ready() -> void:
 		add_child(p)
 		_xp_pickup_players.append(p)
 
-	# v0.7.0: BGMを+4dB引き上げ（SFXとのバランス改善: -12→-8, -10→-6, -8→-4）
+	# BGM: CC0音楽ファイルを優先。なければProceduralにフォールバック
+	# Why: _gen_bgm()はサイン波ドローンで「音楽」と認識されにくい。
+	#      DST Tower Defense Theme (CC0) を battle.mp3 として assets/music/ に配置すれば優先使用。
 	_bgm_player = AudioStreamPlayer.new()
-	_bgm_player.stream = _gen_bgm()
-	_bgm_player.volume_db = -8.0   # v0.7.0: -12→-8
+	var bgm_stream = _try_load_music("battle.mp3")
+	_bgm_player.stream = bgm_stream if bgm_stream != null else _gen_bgm()
+	_bgm_player.volume_db = -10.0   # MP3は生成WAVより音圧が高いため2dB下げ
 	add_child(_bgm_player)
 
 	_bgm_intense_player = AudioStreamPlayer.new()
-	_bgm_intense_player.stream = _gen_bgm_intense()
-	_bgm_intense_player.volume_db = -6.0  # v0.7.0: -10→-6
+	var bgm_intense_stream = _try_load_music("battle_intense.mp3")
+	_bgm_intense_player.stream = bgm_intense_stream if bgm_intense_stream != null else _gen_bgm_intense()
+	_bgm_intense_player.volume_db = -8.0
 	add_child(_bgm_intense_player)
 
 	_bgm_boss_player = AudioStreamPlayer.new()
-	_bgm_boss_player.stream = _gen_bgm_boss()
-	_bgm_boss_player.volume_db = -4.0   # v0.7.0: -8→-4（ボスBGMは最も前面に）
+	var bgm_boss_stream = _try_load_music("battle_boss.mp3")
+	_bgm_boss_player.stream = bgm_boss_stream if bgm_boss_stream != null else _gen_bgm_boss()
+	_bgm_boss_player.volume_db = -6.0
 	add_child(_bgm_boss_player)
 
 	# Wave Clear: pyfxr WAV (combo_tierup) があればそれ、なければ procedural
