@@ -2587,11 +2587,14 @@ func _on_level_up(new_level: int) -> void:
 	lv_label.position = Vector2(640 - 180, 310)
 	lv_label.custom_minimum_size = Vector2(360, 0)
 	lv_label.z_index = 195
+	# 改善230: LEVEL UPラベルのスケールパンチイン（旧: 1.0→1.25→1.0 → 新: 1.8→1.0 TRANS_BACK）
+	# Why: 旧パターンは「膨らんで戻る」で弱い。レベルアップは毎回の重要達成なので
+	# 他のアナウンス（CLEARED!, STAGE等）と同じ punch-in 方式に統一し、「決まった感」を強める。
+	lv_label.scale = Vector2(1.8, 1.8)
 	ui_layer.add_child(lv_label)
 	var lv_lt := lv_label.create_tween()
-	lv_lt.tween_property(lv_label, "scale", Vector2(1.25, 1.25), 0.1).set_trans(Tween.TRANS_BACK)
-	lv_lt.tween_property(lv_label, "scale", Vector2(1.0, 1.0), 0.1)
-	lv_lt.tween_interval(0.65)
+	lv_lt.tween_property(lv_label, "scale", Vector2(1.0, 1.0), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	lv_lt.tween_interval(0.55)
 	lv_lt.tween_property(lv_label, "modulate:a", 0.0, 0.4)
 	lv_lt.tween_callback(lv_label.queue_free)
 
