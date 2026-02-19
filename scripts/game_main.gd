@@ -3031,8 +3031,17 @@ func _show_result_screen(is_victory: bool) -> void:
 	anim.tween_property(title, "modulate:a", 1.0, 0.3).set_delay(0.5)
 	anim.tween_property(sep, "modulate:a", 0.4, 0.2)
 	anim.tween_property(star_lbl, "modulate:a", 1.0, 0.25)
+	# 改善198: ★NEW!付きラベルをフェードイン後にスケールポップ（「新記録！」の瞬間を強調）
+	# Why: 全ラベルが均等にフェードインするだけだと新記録ラベルが埋もれる。ポップで目立たせる。
 	for lbl in stat_labels:
 		anim.tween_property(lbl, "modulate:a", 1.0, 0.15)
+		if lbl is Label and "★NEW!" in (lbl as Label).text:
+			var captured_lbl := lbl as Label
+			anim.tween_callback(func():
+				var pt := captured_lbl.create_tween()
+				pt.tween_property(captured_lbl, "scale", Vector2(1.12, 1.12), 0.07).set_trans(Tween.TRANS_BACK)
+				pt.tween_property(captured_lbl, "scale", Vector2(1.0, 1.0), 0.09)
+			)
 	anim.tween_property(retry, "modulate:a", 1.0, 0.3).set_delay(0.3)
 	anim.tween_property(cta_lbl, "modulate:a", 0.75, 0.4).set_delay(0.5)
 
