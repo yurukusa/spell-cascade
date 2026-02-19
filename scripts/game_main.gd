@@ -1243,9 +1243,14 @@ func _show_boss_reward_shrine() -> void:
 
 	ui_layer.add_child(shrine_ui)
 
+	# 改善194: 通常シュライン（#192）と同じスライドアップ + フェードイン（演出の統一感）
+	# 特別報酬なので少し速め (0.28s) かつスライド幅を大きめ (100px) にして重みを出す
 	shrine_ui.modulate.a = 0.0
+	shrine_ui.position = Vector2(0, 100)
 	var tween := shrine_ui.create_tween()
-	tween.tween_property(shrine_ui, "modulate:a", 1.0, 0.4)
+	tween.set_parallel(true)
+	tween.tween_property(shrine_ui, "modulate:a", 1.0, 0.35).set_trans(Tween.TRANS_QUAD)
+	tween.tween_property(shrine_ui, "position:y", 0.0, 0.40).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _on_boss_reward_chosen(idx: int) -> void:
 	## ボス撃破報酬の適用
