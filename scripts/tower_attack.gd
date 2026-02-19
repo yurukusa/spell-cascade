@@ -176,10 +176,6 @@ func _fire() -> void:
 			_echo_firing = false
 	fire_count += 1
 	last_fire_time = Time.get_ticks_msec() / 1000.0
-	if fire_count <= 3 or fire_count % 10 == 0:
-		var skill_name: String = stats.get("name", "?")
-		var tags: Array = stats.get("tags", [])
-		print("[TELEMETRY] slot=%d skill=%s tags=%s fire_count=%d" % [slot_index, skill_name, str(tags), fire_count])
 
 	# Summon Wisp: 追従ウィスプ召喚（通常projectileではない）
 	var skill_id_str: String = stats.get("skill_id", "")
