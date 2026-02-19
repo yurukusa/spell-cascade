@@ -1395,13 +1395,23 @@ func _create_boss_hp_bar(boss: Node2D) -> void:
 	slide_t.tween_property(_boss_hp_root, "modulate:a", 1.0, 0.4).set_trans(Tween.TRANS_QUAD)
 
 func _remove_boss_hp_bar() -> void:
-	## 改善187: rootを消すだけで全要素（bar/labels/markers）を一括解放
-	if _boss_hp_root and is_instance_valid(_boss_hp_root):
-		_boss_hp_root.queue_free()
-		_boss_hp_root = null
+	## 改善221: スライドアップ退場（#220入場と対称）
+	## Why: ボス撃破直後に即time queue_free()は「HPバーが瞬間消滅する断絶感」。
+	## 0→-40pxのスライドアウト+フェードで「ボスが倒されてバーが引き上げられる」感を演出。
+	## 参照を先にnullして_on_boss_hp_changedの更新を止めてから退場アニメーション。
 	boss_hp_bar = null
 	boss_hp_label = null
 	boss_phase_label = null
+	if _boss_hp_root and is_instance_valid(_boss_hp_root):
+		var root := _boss_hp_root
+		_boss_hp_root = null
+		var exit_t := root.create_tween()
+		exit_t.set_parallel(true)
+		exit_t.tween_property(root, "position:y", -40.0, 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		exit_t.tween_property(root, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_QUAD)
+		exit_t.chain().tween_callback(root.queue_free)
+	else:
+		_boss_hp_root = null
 
 func _on_boss_hp_changed(current: float, max_val: float) -> void:
 	if boss_hp_bar:
