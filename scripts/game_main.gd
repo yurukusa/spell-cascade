@@ -1061,6 +1061,7 @@ func _spawn_boss() -> void:
 		return
 	boss_spawned = true
 	SFX.play_boss_entrance()
+	SFX.switch_bgm("boss")  # 改善193: ボス出現でボス専用BGMに切替
 
 	var boss := enemy_scene.instantiate() as CharacterBody2D
 	# ボスは上方から出現
@@ -1124,6 +1125,9 @@ func _on_boss_died(_enemy: Node2D) -> void:
 	kill_count += 1
 	tower.enemy_killed.emit()
 	SFX.play_boss_kill()  # 改善180: ボス専用SFX（爆発+上昇フレア）
+	# 改善193: ボス撃破後のBGM復帰（HP状況で battle / intense を選択）
+	var post_boss_bgm := "intense" if (tower.hp / tower.max_hp) < 0.4 else "battle"
+	SFX.switch_bgm(post_boss_bgm)
 	# ボス撃破: 大きなシェイク
 	tower.shake(8.0)
 	# コンボ: ボスは+3カウント
@@ -1933,6 +1937,9 @@ func _announce_stage(stage: int) -> void:
 		return
 	# 改善182: ステージ警告SE (stage2=0=SURGE, stage3=1=CRISIS)
 	SFX.play_stage_alert(stage - 2)  # stage2→0, stage3→1
+	# 改善193: STAGE3でインテンスBGMに切替（ボス前の緊張感を音で演出）
+	if stage >= 3 and not boss_spawned:
+		SFX.switch_bgm("intense")
 	var ann := Label.new()
 	ann.text = msgs[stage - 1] if stage > 1 else ""
 	if ann.text.is_empty():
@@ -2108,6 +2115,12 @@ func _on_tower_damaged(current: float, max_val: float) -> void:
 
 	# HP label色もバーに連動
 	hp_label.add_theme_color_override("font_color", hp_color.lightened(0.3))
+
+	# 改善193: HP25%以下でインテンスBGMに切替（ボス戦中は変えない）
+	if pct <= 0.25 and not boss_spawned:
+		SFX.switch_bgm("intense")
+	elif pct > 0.40 and not boss_spawned:
+		SFX.switch_bgm("battle")
 
 	# Low HP pulse（25%以下でバーの境界線が脈動 + ループアニメ起動）
 	var bar_bg := hp_bar.get_theme_stylebox("background") as StyleBoxFlat
