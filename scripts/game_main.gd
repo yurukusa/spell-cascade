@@ -2991,12 +2991,22 @@ func _on_crush_breakout() -> void:
 
 # --- レベルアップ選択肢プール ---
 var levelup_pool: Array[Dictionary] = [
+	# === 攻撃系 — v0.9.5: プール拡張 6→13（毎ランのビルド多様性向上）===
 	{"id": "damage", "name": "+25% Damage", "description": "All attacks deal 25% more damage"},
+	{"id": "damage_big", "name": "+50% Damage", "description": "Massive boost — all attacks deal 50% more damage"},
 	{"id": "fire_rate", "name": "+20% Fire Rate", "description": "Attack cooldown reduced by 20%"},
+	{"id": "fire_rate_big", "name": "+35% Fire Rate", "description": "Attack cooldown reduced by 35%"},
 	{"id": "projectile", "name": "+1 Projectile", "description": "Fire an extra projectile per attack"},
+	# === 移動・ユーティリティ ===
 	{"id": "move_speed", "name": "+15% Move Speed", "description": "Move 15% faster"},
-	{"id": "max_hp", "name": "+50 Max HP", "description": "Increase max HP by 50 and heal 50"},
 	{"id": "attract", "name": "+100 Attract Range", "description": "Pick up XP orbs from further away"},
+	{"id": "attract_big", "name": "+200 Attract Range", "description": "Greatly extended XP orb pickup radius"},
+	# === サバイバル系 ===
+	{"id": "max_hp", "name": "+50 Max HP", "description": "Increase max HP by 50 and heal 50"},
+	{"id": "max_hp_big", "name": "+150 Max HP", "description": "Increase max HP by 150 and restore 75 HP"},
+	{"id": "regen", "name": "HP Regen +3/s", "description": "Continuously recover 3 HP per second"},
+	{"id": "armor", "name": "Armor: -20% Damage", "description": "Take 20% less damage from all sources"},
+	{"id": "heal_now", "name": "Emergency Repair", "description": "Immediately restore 100 HP"},
 ]
 
 func _on_level_up(new_level: int) -> void:
@@ -3076,25 +3086,50 @@ func _on_level_up(new_level: int) -> void:
 
 func _apply_levelup_stat(stat_id: String) -> void:
 	# スタット名と確認テキストのマップ（改善43: 選んだ効果を即時フィードバック）
+	# v0.9.5: プール拡張分を追加
 	var stat_labels := {
-		"damage": "ATK +25%", "fire_rate": "SPD +20%", "projectile": "+1 SHOT",
-		"move_speed": "MOV +15%", "max_hp": "HP +50", "attract": "RANGE +"
+		"damage": "ATK +25%", "damage_big": "ATK +50%",
+		"fire_rate": "SPD +20%", "fire_rate_big": "SPD +35%",
+		"projectile": "+1 SHOT",
+		"move_speed": "MOV +15%",
+		"attract": "RANGE +100", "attract_big": "RANGE +200",
+		"max_hp": "HP +50", "max_hp_big": "HP +150",
+		"regen": "REGEN +3/s", "armor": "ARMOR -20%", "heal_now": "HEAL +100",
 	}
 	match stat_id:
 		"damage":
 			tower.damage_mult *= 1.25
+		"damage_big":
+			tower.damage_mult *= 1.5
 		"fire_rate":
 			tower.cooldown_mult *= 0.8
+		"fire_rate_big":
+			tower.cooldown_mult *= 0.65
 		"projectile":
 			tower.projectile_bonus += 1
 		"move_speed":
 			tower.move_speed_mult *= 1.15
+		"attract":
+			tower.attract_range_bonus += 100.0
+		"attract_big":
+			tower.attract_range_bonus += 200.0
 		"max_hp":
 			tower.max_hp += 50.0
 			tower.heal(50.0)
 			hp_bar.max_value = tower.max_hp
-		"attract":
-			tower.attract_range_bonus += 100.0
+		"max_hp_big":
+			tower.max_hp += 150.0
+			tower.heal(75.0)
+			hp_bar.max_value = tower.max_hp
+		"regen":
+			# 毎秒3HP再生。tower._processで蓄積→heal()呼び出し
+			tower.regen_rate += 3.0
+		"armor":
+			# 被ダメ20%減。take_damageで armor_mult を乗算
+			tower.armor_mult *= 0.8
+		"heal_now":
+			# 即時100HP回復。HPバー更新はheal()内で実施
+			tower.heal(100.0)
 
 	# フローティング確認テキスト（改善43）
 	if stat_id in stat_labels:

@@ -37,6 +37,10 @@ var cooldown_mult := 1.0
 var projectile_bonus := 0  # 追加弾数
 var move_speed_mult := 1.0
 var attract_range_bonus := 0.0  # オーブ吸引範囲追加
+# アップグレード拡張 v0.9.5
+var regen_rate := 0.0       # HP再生速度（毎秒）。"regen"アップグレードで加算
+var armor_mult := 1.0       # 被ダメ乗数（1.0=等倍, 0.8=-20%）。"armor"アップグレードで乗算
+var _regen_acc := 0.0       # リジェネ蓄積（1.0以上でheal呼び出し）
 
 # Crush state（包囲DPS）
 var crush_active := false
@@ -479,7 +483,8 @@ func get_filled_modules() -> Array:
 	return filled
 
 func take_damage(amount: float) -> void:
-	hp -= amount
+	# armor_mult: 1.0=等倍, 0.8=20%減。アーマーアップグレード適用
+	hp -= amount * armor_mult
 	tower_damaged.emit(hp, max_hp)
 
 	# ヒットフラッシュ + スクリーンシェイク（H-5原則: ダメージ量に比例した強度）
@@ -895,3 +900,12 @@ func _process(delta: float) -> void:
 	if _trail_timer <= 0.0 and velocity.length() >= 100.0:
 		_trail_timer = TRAIL_INTERVAL
 		_spawn_trail_ghost()
+
+	# リジェネアップグレード: 毎秒regen_rate HP回復
+	# なぜ蓄積式: 毎フレームheal()呼出は回復SE・VFXが鳴りすぎる。1HP単位でまとめて呼ぶ
+	if regen_rate > 0.0 and hp < max_hp:
+		_regen_acc += regen_rate * delta
+		if _regen_acc >= 1.0:
+			var regen_amount := floorf(_regen_acc)
+			_regen_acc -= regen_amount
+			heal(regen_amount)

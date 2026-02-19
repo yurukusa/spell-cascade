@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.9.5 (2026-02-20)
+
+### Feature: アップグレードプール拡張 6→13 — ビルド多様性向上
+
+**問題**: 6種類のアップグレードでは3回のレベルアップで全種類を見てしまい、
+以降は同じ選択肢が繰り返され選択が形式的になっていた。
+
+**追加した7アップグレード**:
+- `damage_big` — +50% Damage（攻撃強化の上位選択肢）
+- `fire_rate_big` — +35% Fire Rate（攻撃速度の上位選択肢）
+- `attract_big` — +200 Attract Range（XPオーブ吸引範囲大拡張）
+- `max_hp_big` — +150 Max HP + Heal 75（HP強化の上位選択肢）
+- `regen` — HP Regen +3/s（毎秒3HP自動回復。tower.gd に regen_rate 変数を追加）
+- `armor` — Armor: -20% Damage Taken（被ダメ軽減。tower.gd に armor_mult を追加）
+- `heal_now` — Emergency Repair: Heal 100 HP（即時回復。低HP時の選択肢）
+
+**技術変更** (tower.gd):
+- `regen_rate` 変数追加。`_process`で蓄積→`heal()`呼び出し（1秒単位でまとめてVFX節約）
+- `armor_mult` 変数追加。`take_damage`で `amount * armor_mult` を適用
+
+---
+
 ## v0.9.4 (2026-02-20)
 
 ### Fix: クラッシュ防止ガード多数 — Web環境安定化
