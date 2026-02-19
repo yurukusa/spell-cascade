@@ -2191,6 +2191,7 @@ func _flash_hp_bar_damage() -> void:
 
 func _flash_hp_bar_heal() -> void:
 	## HP回復時のバー緑フラッシュ
+	## 改善197: スケールバウンス追加（XPバーのレベルアップバウンスと対称、「回復した！」達成感）
 	var fill_style := hp_bar.get_theme_stylebox("fill") as StyleBoxFlat
 	if fill_style == null:
 		return
@@ -2198,6 +2199,10 @@ func _flash_hp_bar_heal() -> void:
 	fill_style.bg_color = Color(0.3, 0.9, 0.4, 1.0)
 	var tween := hp_bar.create_tween()
 	tween.tween_property(fill_style, "bg_color", original, 0.2)
+	# 改善197: HPバーが縦方向にバウンス（XPバーのTRANS_ELASTICと対称。回復の「ぷよっと感」）
+	var bounce := hp_bar.create_tween()
+	bounce.tween_property(hp_bar, "scale", Vector2(1.0, 1.35), 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	bounce.tween_property(hp_bar, "scale", Vector2(1.0, 1.0), 0.16).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
 func _setup_vignette() -> void:
 	## 画面周辺暗化レイヤーを生成（改善35: 低HP危機感の視覚化）
