@@ -43,6 +43,7 @@ var crush_warning_label: Label = null  # pre-crush "DANGER" 表示
 
 # Boss HP bar
 var boss_hp_bar: ProgressBar = null
+var _boss_hp_root: Control = null  # 改善187: 全ボスHP UI要素のコンテナ（フェードイン管理+クリーンアップ用）
 
 # Hitstop リエントラント管理（複数同時呼び出しで早期復帰を防止）
 var _hitstop_depth := 0
@@ -1187,6 +1188,15 @@ func _on_boss_reward_chosen(idx: int) -> void:
 
 func _create_boss_hp_bar(boss: Node2D) -> void:
 	## ボス専用HPバー（画面上部中央）
+	## 改善187: 全要素を_boss_hp_rootに集約→フェードイン + クリーンアップ一括化（フェーズマーカーのリーク修正）
+	_boss_hp_root = Control.new()
+	_boss_hp_root.name = "BossHPRoot"
+	_boss_hp_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_boss_hp_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boss_hp_root.z_index = 180
+	_boss_hp_root.modulate.a = 0.0  # フェードイン開始位置
+	ui_layer.add_child(_boss_hp_root)
+
 	boss_hp_bar = ProgressBar.new()
 	boss_hp_bar.name = "BossHPBar"
 	boss_hp_bar.position = Vector2(340, 80)
@@ -1207,8 +1217,7 @@ func _create_boss_hp_bar(boss: Node2D) -> void:
 	bar_fill.bg_color = Color(0.6, 0.2, 0.9, 1.0)
 	bar_fill.set_corner_radius_all(2)
 	boss_hp_bar.add_theme_stylebox_override("fill", bar_fill)
-	boss_hp_bar.z_index = 180
-	ui_layer.add_child(boss_hp_bar)
+	_boss_hp_root.add_child(boss_hp_bar)
 
 	# フェーズマーカー（33%/66%の境界線: フェーズ移行を視覚的に予告する）
 	# ボスHP66%でPhase2、33%でPhase3に移行するのでバーのその位置に白いラインを引く
@@ -1219,8 +1228,7 @@ func _create_boss_hp_bar(boss: Node2D) -> void:
 		])
 		marker.color = Color(1.0, 1.0, 1.0, 0.6)
 		marker.position = Vector2(340.0 + 600.0 * phase_pct - 1.0, 80.0)
-		marker.z_index = 185
-		ui_layer.add_child(marker)
+		_boss_hp_root.add_child(marker)  # 改善187: rootに集約（以前はui_layerリーク）
 
 	# Boss name label
 	boss_hp_label = Label.new()
@@ -1234,8 +1242,7 @@ func _create_boss_hp_bar(boss: Node2D) -> void:
 	boss_hp_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	boss_hp_label.add_theme_constant_override("shadow_offset_x", 1)
 	boss_hp_label.add_theme_constant_override("shadow_offset_y", 1)
-	boss_hp_label.z_index = 180
-	ui_layer.add_child(boss_hp_label)
+	_boss_hp_root.add_child(boss_hp_label)
 
 	# Phase indicator
 	boss_phase_label = Label.new()
@@ -1249,19 +1256,20 @@ func _create_boss_hp_bar(boss: Node2D) -> void:
 	boss_phase_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
 	boss_phase_label.add_theme_constant_override("shadow_offset_x", 1)
 	boss_phase_label.add_theme_constant_override("shadow_offset_y", 1)
-	boss_phase_label.z_index = 180
-	ui_layer.add_child(boss_phase_label)
+	_boss_hp_root.add_child(boss_phase_label)
+
+	# フェードイン: ボス登場を劇的に演出（0.5sかけて出現）
+	var fade_t := _boss_hp_root.create_tween()
+	fade_t.tween_property(_boss_hp_root, "modulate:a", 1.0, 0.5).set_trans(Tween.TRANS_QUAD)
 
 func _remove_boss_hp_bar() -> void:
-	if boss_hp_bar:
-		boss_hp_bar.queue_free()
-		boss_hp_bar = null
-	if boss_hp_label:
-		boss_hp_label.queue_free()
-		boss_hp_label = null
-	if boss_phase_label:
-		boss_phase_label.queue_free()
-		boss_phase_label = null
+	## 改善187: rootを消すだけで全要素（bar/labels/markers）を一括解放
+	if _boss_hp_root and is_instance_valid(_boss_hp_root):
+		_boss_hp_root.queue_free()
+		_boss_hp_root = null
+	boss_hp_bar = null
+	boss_hp_label = null
+	boss_phase_label = null
 
 func _on_boss_hp_changed(current: float, max_val: float) -> void:
 	if boss_hp_bar:
