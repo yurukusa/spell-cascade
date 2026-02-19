@@ -854,6 +854,17 @@ func shake(intensity: float = 3.0) -> void:
 	# 累積ではなく、より強い方を採用（連続ヒットで揺れすぎない）
 	shake_intensity = maxf(shake_intensity, intensity)
 
+## 改善233: カメラズームパルス（コンボティアアップ/レベルアップ時の達成感強化）
+## Why: シェイクは「衝撃」感。ズームパルスは「昇格した」感。異なる感覚軸で達成感を補完。
+## zoom_inはEASE_OUT(急加速→減速)で「ぐっと来た」感、zoom_outはEASE_IN(加速)で自然に戻る。
+func camera_zoom_pulse(amount: float = 0.05, duration: float = 0.3) -> void:
+	var cam := get_node_or_null("Camera") as Camera2D
+	if cam == null:
+		return
+	var zt := cam.create_tween()
+	zt.tween_property(cam, "zoom", Vector2.ONE * (1.0 + amount), duration * 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	zt.tween_property(cam, "zoom", Vector2.ONE, duration * 0.65).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+
 func _process(delta: float) -> void:
 	if shake_intensity > 0.01:
 		var cam := get_node_or_null("Camera")

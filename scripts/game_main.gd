@@ -2008,6 +2008,12 @@ func _update_combo_display() -> void:
 		var shake_lvl := 2.5 if combo_count == 8 else (3.5 if combo_count == 15 else 5.0)
 		if is_instance_valid(tower):
 			tower.shake(shake_lvl)
+			# 改善233: ティアアップ時カメラズームパルス（ティアが高いほど強く引き込まれる感覚）
+			# Why: シェイクは「衝撃」を伝えるが、ズームパルスは「格が上がった」昇格感を別軸で補完。
+			# COMBO(3)=3%, RAMPAGE(8)=5%, MASSACRE(15)=7%, GODLIKE(30)=10%
+			var zoom_amt := 0.03 if combo_count == 3 else (0.05 if combo_count == 8 else (0.07 if combo_count == 15 else 0.10))
+			var zoom_dur := 0.25 if combo_count == 3 else (0.3 if combo_count == 8 else (0.35 if combo_count == 15 else 0.4))
+			tower.camera_zoom_pulse(zoom_amt, zoom_dur)
 		# 改善124: ティアアップ時のタワー位置から放射リング（「強化」の視覚的アンカー）
 		var tier_ring := Polygon2D.new()
 		var trpts := PackedVector2Array()
