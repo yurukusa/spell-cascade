@@ -2898,6 +2898,8 @@ func _show_result_screen(is_victory: bool) -> void:
 	star_lbl.add_theme_constant_override("shadow_offset_y", 2)
 	star_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	star_lbl.modulate.a = 0.0
+	# 改善202: スケールポップイン準備（小さく始める）
+	star_lbl.scale = Vector2(0.4, 0.4)
 	vbox.add_child(star_lbl)
 
 	# スタッツ
@@ -3036,7 +3038,14 @@ func _show_result_screen(is_victory: bool) -> void:
 	var anim := create_tween()
 	anim.tween_property(title, "modulate:a", 1.0, 0.3).set_delay(0.5)
 	anim.tween_property(sep, "modulate:a", 0.4, 0.2)
-	anim.tween_property(star_lbl, "modulate:a", 1.0, 0.25)
+	anim.tween_property(star_lbl, "modulate:a", 1.0, 0.2)
+	# 改善202: スター評価スケールポップ（フェードと同時にばね感のあるポップイン）
+	# Why: ★★★評価は最重要フィードバック。フェードだけでは埋もれる。TRANS_BACKで瞬間的な達成感を演出。
+	anim.tween_callback(func():
+		var sp := star_lbl.create_tween()
+		sp.tween_property(star_lbl, "scale", Vector2(1.25, 1.25), 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		sp.tween_property(star_lbl, "scale", Vector2(1.0, 1.0), 0.1).set_trans(Tween.TRANS_QUAD)
+	)
 	# 改善198: ★NEW!付きラベルをフェードイン後にスケールポップ（「新記録！」の瞬間を強調）
 	# Why: 全ラベルが均等にフェードインするだけだと新記録ラベルが埋もれる。ポップで目立たせる。
 	for lbl in stat_labels:
