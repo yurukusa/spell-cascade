@@ -1378,6 +1378,40 @@ func _on_body_entered(body):
 		var lc_target := _find_chain_target(body)
 		if lc_target and is_instance_valid(lc_target):
 			lc_target.take_damage(int(float(final_damage) * lightning_chain_dmg_pct))
+			# 改善176: mod雷チェインの視覚弧（chain supportと同じジグザグ電弧）
+			# Why: mod経由の雷チェインは発動が視認できず「chainが機能してるか？」が不明だった
+			var lc_root := get_tree().current_scene
+			if lc_root:
+				var lc_start := global_position
+				var lc_end := lc_target.global_position
+				var lc_seg := lc_end - lc_start
+				var lc_perp := Vector2(-lc_seg.y, lc_seg.x).normalized()
+				var lc_pts := PackedVector2Array()
+				lc_pts.append(lc_start)
+				for _lzi in range(3):
+					var lc_t := float(_lzi + 1) / 4.0
+					lc_pts.append(lc_start + lc_seg * lc_t + lc_perp * randf_range(-7.0, 7.0))
+				lc_pts.append(lc_end)
+				# グロー下層
+				var lc_glow := Line2D.new()
+				lc_glow.default_color = Color(0.6, 0.9, 0.3, 0.45)  # 黄緑（mod由来は色を変えてchainと区別）
+				lc_glow.width = 5.0
+				lc_glow.points = lc_pts
+				lc_glow.z_index = 91
+				lc_root.add_child(lc_glow)
+				var lgt := lc_glow.create_tween()
+				lgt.tween_property(lc_glow, \"modulate:a\", 0.0, 0.20)
+				lgt.chain().tween_callback(lc_glow.queue_free)
+				# コアライン上層
+				var lc_arc := Line2D.new()
+				lc_arc.default_color = Color(0.9, 1.0, 0.6, 0.9)  # 黄白コア
+				lc_arc.width = 1.5
+				lc_arc.points = lc_pts
+				lc_arc.z_index = 93
+				lc_root.add_child(lc_arc)
+				var lat := lc_arc.create_tween()
+				lat.tween_property(lc_arc, \"modulate:a\", 0.0, 0.20)
+				lat.chain().tween_callback(lc_arc.queue_free)
 
 	# enemy_killed シグナル（on_killチップ用）
 	if \"hp\" in body and body.hp <= 0:
