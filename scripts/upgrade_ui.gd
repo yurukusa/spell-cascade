@@ -116,7 +116,27 @@ func show_choices(orb_types: Array) -> void:
 		bt.tween_property(btns[i], "modulate:a", 1.0, 0.1)
 
 func hide_ui() -> void:
-	visible = false
+	# 改善216: #207ポップインと対になる縮小フェードアウト退場演出
+	# Why: show_choices()は0.7→1.08→1.0のポップインを持つのにhide_ui()はvisible=falseの
+	# 即時消滅で「断絶感」があった。対称的な退場で「選択が完了した」感を演出。
+	# _on_orb_chosen()でget_tree().paused=falseした後に呼ばれるので通常tweenで問題ない。
+	var overlay_node := get_node_or_null("Overlay")
+	for btn in buttons_container.get_children():
+		if btn is Control:
+			btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var ht := create_tween()
+	ht.set_parallel(true)
+	ht.tween_property(panel, "scale", Vector2(0.82, 0.82), 0.14).set_trans(Tween.TRANS_QUAD)
+	ht.tween_property(panel, "modulate:a", 0.0, 0.14).set_trans(Tween.TRANS_QUAD)
+	if overlay_node:
+		ht.tween_property(overlay_node, "modulate:a", 0.0, 0.14).set_trans(Tween.TRANS_QUAD)
+	ht.chain().tween_callback(func() -> void:
+		visible = false
+		panel.scale = Vector2(1.0, 1.0)
+		panel.modulate.a = 1.0
+		if overlay_node and is_instance_valid(overlay_node):
+			overlay_node.modulate.a = 1.0
+	)
 
 func _on_orb_chosen(orb_type: int) -> void:
 	get_tree().paused = false
