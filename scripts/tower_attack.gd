@@ -674,6 +674,7 @@ func _create_projectile(direction: Vector2) -> void:
 	# 改善243: freeze mod（freezing/frostbound）を弾に伝播。on_hitバグと同様の欠落だった
 	bullet.set("freeze_chance", stats.get("freeze_chance", 0.0))
 	bullet.set("freeze_duration", stats.get("freeze_duration", 0.0))
+	bullet.set("synergy_chain_freeze", stats.get("synergy_chain_freeze", 0.0))
 	bullet.set("crit_chance", stats.get("crit_chance", 0.0))
 	bullet.set("crit_mult", stats.get("crit_mult", 1.0))
 	# 改善169: add_dot を弾に伝播（Burning/Toxic/of_Decay mod）
@@ -1102,6 +1103,7 @@ var life_steal_pct := 0.0
 var ghost_bullet := false
 var crit_freeze_duration := 0.0
 var freeze_chance := 0.0  # 改善243: modからの確率凍結（freezing/frostbound）
+var synergy_chain_freeze := 0.0  # 改善251: frozen_stormシナジー — 全ヒットで凍結
 var freeze_duration := 0.0
 var crit_chance := 0.0
 var crit_mult := 1.0
@@ -1446,6 +1448,20 @@ func _on_body_entered(body):
 		get_tree().create_timer(freeze_duration).timeout.connect(func():
 			if is_instance_valid(body):
 				body.speed = orig_fspd
+				if "modulate" in body:
+					body.modulate = Color.WHITE
+		)
+
+	# 改善251: frozen_storm シナジー — chain_remaining > 0 のヒット（チェイン中）で凍結
+	# Why: chain中の全ヒットがice_shardのslowではなく完全凍結(speed=0)になる。
+	if synergy_chain_freeze > 0.0 and chain_remaining > 0 and "speed" in body:
+		var orig_sfspd: float = body.speed
+		body.speed = 0.0
+		if "modulate" in body:
+			body.modulate = Color(0.4, 0.75, 1.3, 1.0)
+		get_tree().create_timer(synergy_chain_freeze, true, false, true).timeout.connect(func():
+			if is_instance_valid(body):
+				body.speed = orig_sfspd
 				if "modulate" in body:
 					body.modulate = Color.WHITE
 		)

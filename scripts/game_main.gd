@@ -832,6 +832,9 @@ func _setup_tower_attacks() -> void:
 		# 改善250: elemental_convergence — 3元素以上でダメージ2倍
 		if "elemental_convergence" in _active_synergy_ids:
 			stats["damage"] = int(stats["damage"] * 2.0)
+		# 改善251: frozen_storm — ice_shard+chain: チェイン全ヒットで凍結
+		if "frozen_storm" in _active_synergy_ids:
+			stats["synergy_chain_freeze"] = 1.0
 
 		var attack_node := Node2D.new()
 		var attack_script := load("res://scripts/tower_attack.gd")
