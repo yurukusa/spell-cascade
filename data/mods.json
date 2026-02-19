@@ -135,6 +135,51 @@
       "bonus": {"drop_rate_mult": 1.5},
       "penalty": {"damage_mult": 0.9},
       "weight": 70
+    },
+    {
+      "id": "charged",
+      "name": "Charged",
+      "description": "+100% attack speed but -40% range and -20% damage.",
+      "tags": ["speed"],
+      "bonus": {"cooldown_mult": 0.5},
+      "penalty": {"range_mult": 0.6, "damage_mult": 0.8},
+      "weight": 45
+    },
+    {
+      "id": "frostbound",
+      "name": "Frostbound",
+      "description": "35% chance to freeze 2s but -30% attack speed and -15% damage.",
+      "tags": ["cold"],
+      "bonus": {"freeze_chance": 0.35, "freeze_duration": 2.0},
+      "penalty": {"cooldown_mult": 1.3, "damage_mult": 0.85},
+      "weight": 55
+    },
+    {
+      "id": "blighted",
+      "name": "Blighted",
+      "description": "Intense poison DoT (8 dmg/s, 3s) but -30% damage.",
+      "tags": ["chaos"],
+      "bonus": {"add_dot": {"damage": 8, "duration": 3.0, "element": "poison"}},
+      "penalty": {"damage_mult": 0.7},
+      "weight": 50
+    },
+    {
+      "id": "sniper",
+      "name": "Sniper",
+      "description": "+60% range but -35% damage and -15% attack speed.",
+      "tags": ["range"],
+      "bonus": {"range_mult": 1.6},
+      "penalty": {"damage_mult": 0.65, "cooldown_mult": 1.15},
+      "weight": 50
+    },
+    {
+      "id": "echo",
+      "name": "Echo",
+      "description": "60% chance to fire an extra shot but -25% damage.",
+      "tags": ["spell"],
+      "bonus": {"echo_chance": 0.6},
+      "penalty": {"damage_mult": 0.75},
+      "weight": 50
     }
   ],
   "suffixes": [
@@ -272,6 +317,51 @@
       "bonus": {"ghost_chance": 0.1},
       "penalty": {},
       "weight": 55
+    },
+    {
+      "id": "of_precision",
+      "name": "of Precision",
+      "description": "30% chance to deal 2.5x damage but -15% range.",
+      "tags": ["damage"],
+      "bonus": {"crit_chance": 0.3, "crit_mult": 2.5},
+      "penalty": {"range_mult": 0.85},
+      "weight": 60
+    },
+    {
+      "id": "of_magnetism",
+      "name": "of Magnetism",
+      "description": "Strong gravity pull and slight homing, but -20% projectile speed.",
+      "tags": ["area"],
+      "bonus": {"gravity_pull": 70.0, "homing_strength": 2.0},
+      "penalty": {"speed_mult": 0.8},
+      "weight": 45
+    },
+    {
+      "id": "of_swiftness",
+      "name": "of Swiftness",
+      "description": "+35% attack speed but -30% damage.",
+      "tags": ["speed"],
+      "bonus": {"cooldown_mult": 0.65},
+      "penalty": {"damage_mult": 0.7},
+      "weight": 70
+    },
+    {
+      "id": "of_annihilation",
+      "name": "of Annihilation",
+      "description": "On kill: 90px explosion dealing 60% damage, but -15% attack speed.",
+      "tags": ["fire", "area"],
+      "bonus": {"on_kill_explode_radius": 90.0, "on_kill_explode_dmg_pct": 0.6},
+      "penalty": {"cooldown_mult": 1.15},
+      "weight": 45
+    },
+    {
+      "id": "of_overcharge",
+      "name": "of Overcharge",
+      "description": "+80% damage but attacks cost 2 tower HP and -15% attack speed.",
+      "tags": ["damage"],
+      "bonus": {"damage_mult": 1.8},
+      "penalty": {"self_damage_per_attack": 2, "cooldown_mult": 1.15},
+      "weight": 40
     }
   ]
 }
