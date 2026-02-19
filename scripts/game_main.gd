@@ -340,9 +340,18 @@ func _update_timer_display() -> void:
 	if not _timer_30s_warned and remaining <= 30.0:
 		_timer_30s_warned = true
 		tower.shake(4.0)
+		# 改善213: タイマーラベルのスケールパンチ（「30秒！」を視覚的に叩き込む）
+		# Why: シェイクは画面全体の揺れ。ラベル自体が跳ねることで「時計が叫んでいる」感。
+		var t30 := timer_label.create_tween()
+		t30.tween_property(timer_label, "scale", Vector2(1.35, 1.35), 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		t30.tween_property(timer_label, "scale", Vector2(1.0, 1.0), 0.12).set_trans(Tween.TRANS_QUAD)
 	if not _timer_10s_warned and remaining <= 10.0:
 		_timer_10s_warned = true
 		tower.shake(6.0)
+		# 改善213: 10秒最終警告スケールパンチ（30秒より強くて最後の一押し）
+		var t10 := timer_label.create_tween()
+		t10.tween_property(timer_label, "scale", Vector2(1.6, 1.6), 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		t10.tween_property(timer_label, "scale", Vector2(1.0, 1.0), 0.1).set_trans(Tween.TRANS_QUAD)
 
 func _style_hud() -> void:
 	## Design Lock v1: semantic colors, min 16px text, 4.5:1 contrast
