@@ -1355,8 +1355,10 @@ func _on_body_entered(body):
 
 	# 改善244: of_leeching — hit時のHP回復（2HP/hit）
 	# Why: life_steal_pct は最終ダメージ比例。life_on_hit は固定量。性質が異なる別効果。
-	if life_on_hit > 0.0 and tower != null and is_instance_valid(tower):
-		tower.heal(life_on_hit)
+	if life_on_hit > 0.0:
+		var _loh_tower := get_tree().current_scene.get_node_or_null(\"Tower\")
+		if _loh_tower and _loh_tower.has_method(\"heal\"):
+			_loh_tower.heal(life_on_hit)
 
 	# on_hitスロー + 氷ブルーティント（スロー中であることを視覚的に示す）
 	if on_hit_slow > 0.0 and \"speed\" in body:
