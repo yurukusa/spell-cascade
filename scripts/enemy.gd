@@ -618,6 +618,9 @@ func _physics_process(delta: float) -> void:
 				if _dots[i]["duration"] <= 0.0:
 					_dots.remove_at(i)
 				i -= 1
+			# 改善170: DoT終了後ティントリセット（スロー/凍結と干渉しないよう _dots 空のみ）
+			if _dots.is_empty():
+				modulate = Color.WHITE
 
 func _melee_process(delta: float) -> void:
 	## 通常/swarmer/tank/splitter共通: 接近→メレー
@@ -1204,16 +1207,20 @@ func _on_body_entered(body):
 
 func apply_dot(damage: float, duration: float, element: String) -> void:
 	# 改善169: DoT適用。poison はスタック、fire は上書き（同element最大1スタック）
+	# 改善170: DoT中ティント（fire=オレンジ、poison=緑）
 	if element == "poison":
 		_dots.append({"damage": damage, "duration": duration, "element": element})
+		modulate = Color(0.5, 1.1, 0.3, 1.0)  # 毒: 緑ティント
 	else:
 		# fire等: 既存の同elementを上書き（高い方を残す）
 		for i in range(_dots.size()):
 			if _dots[i]["element"] == element:
 				_dots[i]["damage"] = maxf(_dots[i]["damage"], damage)
 				_dots[i]["duration"] = maxf(_dots[i]["duration"], duration)
+				modulate = Color(1.3, 0.6, 0.1, 1.0)  # 炎: オレンジティント
 				return
 		_dots.append({"damage": damage, "duration": duration, "element": element})
+		modulate = Color(1.3, 0.6, 0.1, 1.0)  # 炎: オレンジティント
 
 func take_damage(amount: float, is_crit: bool = false) -> void:
 	# フェーズ移行中の無敵
