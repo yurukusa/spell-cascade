@@ -676,6 +676,7 @@ func _create_projectile(direction: Vector2) -> void:
 	bullet.set("freeze_duration", stats.get("freeze_duration", 0.0))
 	bullet.set("synergy_chain_freeze", stats.get("synergy_chain_freeze", 0.0))
 	bullet.set("synergy_chain_reaction", stats.get("synergy_chain_reaction", false))
+	bullet.set("synergy_thunder_aoe", stats.get("synergy_thunder_aoe", 0.0))
 	bullet.set("crit_chance", stats.get("crit_chance", 0.0))
 	bullet.set("crit_mult", stats.get("crit_mult", 1.0))
 	# 改善169: add_dot を弾に伝播（Burning/Toxic/of_Decay mod）
@@ -1106,6 +1107,7 @@ var crit_freeze_duration := 0.0
 var freeze_chance := 0.0  # 改善243: modからの確率凍結（freezing/frostbound）
 var synergy_chain_freeze := 0.0  # 改善251: frozen_stormシナジー — 全ヒットで凍結
 var synergy_chain_reaction := false  # 改善252: chain_reactionシナジー — chainバウンスごとにfork生成
+var synergy_thunder_aoe := 0.0  # 改善254: thunder_godシナジー — 全弾合一AoE雷撃（80px）
 var freeze_duration := 0.0
 var crit_chance := 0.0
 var crit_mult := 1.0
@@ -1467,6 +1469,27 @@ func _on_body_entered(body):
 				if "modulate" in body:
 					body.modulate = Color.WHITE
 		)
+
+	# 改善254: thunder_god シナジー — spark+concentrate: 全弾合一の雷AoE
+	# Why: 多弾散弾の弱い火力を1点集中+AoEに変換。「鷹と雷神」感。
+	if synergy_thunder_aoe > 0.0:
+		_do_aoe(global_position, synergy_thunder_aoe, damage)
+		var tg_root := get_tree().current_scene
+		if tg_root:
+			var tg_ring := Polygon2D.new()
+			var tg_pts := PackedVector2Array()
+			for _tgi in range(20):
+				tg_pts.append(Vector2(cos(_tgi * TAU / 20.0), sin(_tgi * TAU / 20.0)) * synergy_thunder_aoe * 0.45)
+			tg_ring.polygon = tg_pts
+			tg_ring.color = Color(0.9, 0.95, 0.2, 0.75)  # 雷黄色
+			tg_ring.global_position = global_position
+			tg_ring.z_index = 92
+			tg_root.add_child(tg_ring)
+			var tgt := tg_ring.create_tween()
+			tgt.set_parallel(true)
+			tgt.tween_property(tg_ring, "scale", Vector2(2.5, 2.5), 0.25).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+			tgt.tween_property(tg_ring, "modulate:a", 0.0, 0.25)
+			tgt.chain().tween_callback(tg_ring.queue_free)
 
 	# 雷チェイン（modから。supportのchainとは別系統）
 	if lightning_chain_chance > 0.0 and randf() < lightning_chain_chance:

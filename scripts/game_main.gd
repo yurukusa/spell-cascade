@@ -838,6 +838,11 @@ func _setup_tower_attacks() -> void:
 		# 改善252: chain_reaction — chain+fork: チェインバウンスごとにforkも発動
 		if "chain_reaction" in _active_synergy_ids:
 			stats["synergy_chain_reaction"] = true
+		# 改善254: thunder_god — spark+concentrate: 多弾→1弾×3倍ダメ+80px AoE
+		if "thunder_god" in _active_synergy_ids:
+			stats["projectile_count"] = 1
+			stats["damage"] = int(stats["damage"] * 3.0)
+			stats["synergy_thunder_aoe"] = 80.0
 
 		var attack_node := Node2D.new()
 		var attack_script := load("res://scripts/tower_attack.gd")
