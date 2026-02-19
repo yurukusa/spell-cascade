@@ -2532,8 +2532,15 @@ func _spawn_stat_text(text: String) -> void:
 	label.position = Vector2(640 - 120, 300)
 	label.custom_minimum_size = Vector2(240, 0)
 	label.z_index = 210
+	# 改善209: 強化確認テキストのスケールポップイン（「決まった！」を一撃で伝える）
+	# Why: 今まで instant表示で浮かびあがるだけ。0.3→1.5→1.0のポップで「選択が確定した」感を強化。
+	label.scale = Vector2(0.3, 0.3)
 	ui_layer.add_child(label)
 	var tween := label.create_tween()
+	# まずスケールポップ（sequential）
+	tween.tween_property(label, "scale", Vector2(1.5, 1.5), 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1).set_trans(Tween.TRANS_QUAD)
+	# ポップ後: 浮上 + フェードアウトを並行
 	tween.set_parallel(true)
 	tween.tween_property(label, "position:y", label.position.y - 50.0, 0.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.tween_property(label, "modulate:a", 0.0, 0.8).set_delay(0.35)
