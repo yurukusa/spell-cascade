@@ -19,6 +19,17 @@ const SCREENSHOT_INTERVAL = 1.0  # スクリーンショット間隔（秒）
 # 各シナリオは「名前」と「アクションリスト」で構成
 var test_scenarios := [
 	{
+		"name": "title_screen",
+		"description": "タイトル画面確認 → START GAMEクリック（1280x720想定）",
+		"duration": 6.0,
+		"actions": [
+			{"type": "wait", "duration": 1.0},
+			# START GAMEボタン（画面中央、Y≈383）をクリックしてゲームに入る
+			{"type": "mouse_click", "position": Vector2(640, 383)},
+			{"type": "wait", "duration": 3.0},
+		]
+	},
+	{
 		"name": "idle",
 		"description": "何もしない状態を観察",
 		"duration": 3.0,
