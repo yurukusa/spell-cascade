@@ -3682,6 +3682,33 @@ func _show_result_screen(is_victory: bool) -> void:
 
 	# ビルド名（改善205: ランのアイデンティティ化 — シナジーから自動命名でSNSシェアを促進）
 	var build_name := _generate_build_name()
+
+	# 改善216: プレイ履歴をlocalStorageに保存（直近5ランをタイトル画面に表示）
+	# Why: タイトル画面で「Last: Phantom Executioner 5:23 42 kills」が見えると
+	# 「今日はあれを超えたい」「別のビルドを試したい」という動機が生まれる
+	if OS.has_feature("web"):
+		var hist_date := Time.get_date_dict_from_system()
+		var hist_date_str := "%02d/%02d" % [int(hist_date.month), int(hist_date.day)]
+		var hist_mode := ""
+		if is_daily_challenge:
+			hist_mode = "Daily " + (daily_challenge_date_str if daily_challenge_date_str != "" else hist_date_str)
+		elif is_endless_mode:
+			hist_mode = "Endless"
+		var hist_t_min := int(run_time) / 60
+		var hist_t_sec := int(run_time) % 60
+		var hist_entry := JSON.stringify({
+			"build": build_name, "win": is_victory,
+			"time": "%d:%02d" % [hist_t_min, hist_t_sec],
+			"kills": kill_count, "mode": hist_mode, "date": hist_date_str
+		})
+		var hist_js: String = ("""(function() {
+  var h = JSON.parse(localStorage.getItem('sc_history') || '[]');
+  h.unshift(ENTRY_PLACEHOLDER);
+  if (h.length > 5) h = h.slice(0, 5);
+  localStorage.setItem('sc_history', JSON.stringify(h));
+})()""").replace("ENTRY_PLACEHOLDER", hist_entry)
+		JavaScriptBridge.eval(hist_js)
+
 	var build_lbl := Label.new()
 	build_lbl.text = "[ %s ]" % build_name
 	build_lbl.add_theme_font_size_override("font_size", 22)

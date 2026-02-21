@@ -150,6 +150,34 @@ func _ready() -> void:
 				st_tw.tween_interval(0.92)
 				st_tw.tween_property(streak_title_lbl, "modulate:a", 0.85, 0.3).set_trans(Tween.TRANS_QUAD)
 
+	# 改善216: 最後のランをタイトル画面に表示（localStorage sc_history）
+	# Why: 「Last: Phantom Executioner 5:23 42 kills」が見えると次のランへの動機になる
+	if OS.has_feature("web"):
+		var hist_raw = JavaScriptBridge.eval("""(function() {
+  var h = JSON.parse(localStorage.getItem('sc_history') || '[]');
+  return h.length ? JSON.stringify(h[0]) : '';
+})()""")
+		if hist_raw != null and str(hist_raw) != "":
+			var last_run = JSON.parse_string(str(hist_raw))
+			if last_run and typeof(last_run) == TYPE_DICTIONARY:
+				var emoji := "🗡️" if last_run.get("win", false) else "💀"
+				var mode_s := str(last_run.get("mode", ""))
+				var label_text: String
+				if mode_s != "":
+					label_text = "Last [%s]: %s %s  %s  %d kills" % [mode_s, emoji, str(last_run.get("build", "?")), str(last_run.get("time", "?")), int(last_run.get("kills", 0))]
+				else:
+					label_text = "Last run: %s %s  %s  %d kills" % [emoji, str(last_run.get("build", "?")), str(last_run.get("time", "?")), int(last_run.get("kills", 0))]
+				var hist_lbl := Label.new()
+				hist_lbl.text = label_text
+				hist_lbl.add_theme_font_size_override("font_size", 12)
+				hist_lbl.add_theme_color_override("font_color", Color(0.5, 0.5, 0.65, 0.8))
+				hist_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				hist_lbl.modulate.a = 0.0
+				vbox.add_child(hist_lbl)
+				var hist_tw := hist_lbl.create_tween()
+				hist_tw.tween_interval(0.95)
+				hist_tw.tween_property(hist_lbl, "modulate:a", 0.75, 0.3).set_trans(Tween.TRANS_QUAD)
+
 	# Settings button
 	var settings_btn := Button.new()
 	settings_btn.text = "Settings"

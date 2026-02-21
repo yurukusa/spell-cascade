@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.11.6 (2026-02-21)
+
+### Feature: Run history on title screen (改善216)
+
+タイトル画面に「Last run: 💀 Phantom Executioner  5:23  42 kills」を表示。
+localStorage `sc_history`（直近5件保存）。バックエンドゼロ。
+
+- リザルト画面離脱時: ビルド名・時間・キル数・勝敗・モード・日付をlocalStorageに記録
+- タイトル画面: 最後のランを1行で表示（Daily/Endlessモードは [Daily 02/21] ラベル付き）
+- ゲームオーバーしても勝利しても記録される
+
 ## v0.11.5 (2026-02-21)
 
 ### Feature: Title screen streak display (改善215)
