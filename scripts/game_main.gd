@@ -3835,6 +3835,45 @@ func _show_result_screen(is_victory: bool) -> void:
 		vbox.add_child(daily_lbl)
 		stat_labels.append(daily_lbl)
 
+	# 改善214: デイリー連続日数バッジ（localStorage — バックエンドゼロで習慣形成）
+	# Why: 毎日戻ってくる理由を作る。streak=5で「5-day streak!」→ 継続の可視化 → 離脱防止
+	# 昨日チャレンジ(daily_challenge_date_str != "")はstreakに加算しない（今日のデイリーのみ）
+	if is_daily_challenge and daily_challenge_date_str == "" and OS.has_feature("web"):
+		var today_date_d := Time.get_date_dict_from_system()
+		var today_str := "%04d-%02d-%02d" % [int(today_date_d.year), int(today_date_d.month), int(today_date_d.day)]
+		# localStorage読み書き: 前日から継続ならstreak++、それ以外はリセット。同日再プレイは変更なし
+		var streak_js: String = ("""(function() {
+  var last = localStorage.getItem('sc_daily_last') || '';
+  var streak = parseInt(localStorage.getItem('sc_daily_streak') || '0');
+  var today = 'TODAY_PLACEHOLDER';
+  if (last === today) { return streak; }
+  var yDate = new Date(today + 'T00:00:00');
+  yDate.setDate(yDate.getDate() - 1);
+  var yStr = yDate.toISOString().slice(0, 10);
+  streak = (last === yStr) ? streak + 1 : 1;
+  localStorage.setItem('sc_daily_last', today);
+  localStorage.setItem('sc_daily_streak', String(streak));
+  return streak;
+})()""").replace("TODAY_PLACEHOLDER", today_str)
+		var streak_val: int = int(JavaScriptBridge.eval(streak_js))
+		if streak_val >= 1:
+			var streak_lbl := Label.new()
+			if streak_val == 1:
+				streak_lbl.text = "🔥 First daily! Come back tomorrow to start a streak"
+			elif streak_val < 7:
+				streak_lbl.text = "🔥 %d-day streak!" % streak_val
+			else:
+				streak_lbl.text = "🔥 %d-day streak!  🏆" % streak_val  # 1週間超えで特別感
+			streak_lbl.add_theme_font_size_override("font_size", 16)
+			streak_lbl.add_theme_color_override("font_color", Color(1.0, 0.58, 0.1, 1.0))
+			streak_lbl.add_theme_color_override("font_shadow_color", Color(0.3, 0.0, 0.0, 0.8))
+			streak_lbl.add_theme_constant_override("shadow_offset_x", 1)
+			streak_lbl.add_theme_constant_override("shadow_offset_y", 1)
+			streak_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			streak_lbl.modulate.a = 0.0
+			vbox.add_child(streak_lbl)
+			stat_labels.append(streak_lbl)
+
 	# 改善208: Solo Wanderer（サポートなし）でEndless到達 = 特別実績バナー
 	# Why: ゼロサポートのハードモードを自然発生的に選んだ挑戦者への報酬。コスト: 10行
 	if is_endless_mode and build_name == "Solo Wanderer":

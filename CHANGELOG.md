@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.11.4 (2026-02-21)
+
+### Feature: Daily Challenge streak counter (改善214)
+
+Daily Challenge をクリアするたびに「🔥 5-day streak!」バッジをリザルト画面に表示。
+localStorage のみ使用。バックエンド・サーバーゼロ。
+
+**設計意図**: 「毎日戻ってくる理由」を作る。streak が可視化されると中断が惜しくなる。
+連続7日以上で「🏆」が追加される。前日チャレンジはカウントしない（今日のデイリーのみ）。
+
+- `sc_daily_last` (YYYY-MM-DD), `sc_daily_streak` (数値) を localStorage に保存
+- 同日2回目プレイ: streak 変化なし
+- 1日の空白: streak = 1 にリセット
+
 ## v0.11.3 (2026-02-21)
 
 ### Feature: Yesterday's Challenge ボタン (改善213)
