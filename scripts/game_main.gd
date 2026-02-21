@@ -3550,6 +3550,59 @@ func _win_game() -> void:
 	SFX.play_victory()  # 改善179: 上昇ファンファーレで勝利の喜びを音で完結
 	_show_result_screen(true)
 
+func _generate_build_name() -> String:
+	## シナジーとサポートの組み合わせからビルド名を自動生成
+	## Why: ランに名前がつくと「俺のビルド」という意識が生まれ、SNSでシェアしやすくなる
+	var syn_names: Dictionary = {
+		"phantom_punisher": "Phantom Executioner",
+		"chain_reaction": "Chain Annihilator",
+		"death_spiral": "Spiral Reaper",
+		"frozen_storm": "Frostbolt Cyclone",
+		"plague_bearer": "Plague Spreader",
+		"thunder_god": "Storm Channeler",
+		"soul_harvest": "Soul Reaper",
+		"chaos_engine": "Chaos Master",
+		"summoners_pact": "Wisp Summoner",
+		"elemental_convergence": "Elemental Avatar",
+	}
+	var combo_names: Dictionary = {
+		"phantom_punisher+soul_harvest": "Undying Phantom",
+		"chain_reaction+frozen_storm": "Chain Blizzard",
+		"death_spiral+chaos_engine": "Entropy Spiral",
+		"thunder_god+elemental_convergence": "Storm Avatar",
+		"plague_bearer+summoners_pact": "Plague Wisp",
+	}
+	if _active_synergy_ids.size() >= 3:
+		return "Perfect Cascade"
+	if _active_synergy_ids.size() == 2:
+		var sorted_ids: Array = _active_synergy_ids.duplicate()
+		sorted_ids.sort()
+		var combo_key: String = sorted_ids[0] + "+" + sorted_ids[1]
+		if combo_names.has(combo_key):
+			return combo_names[combo_key]
+		return syn_names.get(_active_synergy_ids[0], "Multi-Synergy")
+	if _active_synergy_ids.size() == 1:
+		return syn_names.get(_active_synergy_ids[0], _active_synergy_ids[0].replace("_", " ").capitalize())
+	# シナジーなし → サポートの組み合わせで命名
+	var support_name_map: Dictionary = {
+		"chain": "Chain", "fork": "Fork", "pierce": "Pierce",
+		"orbit": "Orbit", "return": "Echo", "trigger": "Trigger",
+		"concentrate": "Focus", "spread": "Spread",
+	}
+	var filled: Array = tower.get_filled_modules()
+	var sup_set: Array = []
+	for module in filled:
+		for sid in module.support_ids:
+			if not sup_set.has(sid):
+				sup_set.append(sid)
+	if sup_set.is_empty():
+		return "Solo Wanderer"
+	var parts: Array[String] = []
+	for sid in sup_set.slice(0, 2):
+		parts.append(support_name_map.get(sid, (sid as String).capitalize()))
+	return " & ".join(parts) + " Caster"
+
+
 func _show_result_screen(is_victory: bool) -> void:
 	## リザルト画面: 暗転 → タイトル → スタッツ → リトライ
 	_save_unlocked_chips()
@@ -3609,6 +3662,19 @@ func _show_result_screen(is_victory: bool) -> void:
 	sep.custom_minimum_size = Vector2(300, 2)
 	sep.modulate.a = 0.0
 	vbox.add_child(sep)
+
+	# ビルド名（改善205: ランのアイデンティティ化 — シナジーから自動命名でSNSシェアを促進）
+	var build_name := _generate_build_name()
+	var build_lbl := Label.new()
+	build_lbl.text = "[ %s ]" % build_name
+	build_lbl.add_theme_font_size_override("font_size", 22)
+	build_lbl.add_theme_color_override("font_color", Color(0.45, 0.85, 1.0, 1.0))
+	build_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	build_lbl.add_theme_constant_override("shadow_offset_x", 2)
+	build_lbl.add_theme_constant_override("shadow_offset_y", 2)
+	build_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	build_lbl.modulate.a = 0.0
+	vbox.add_child(build_lbl)
 
 	# 改善88: スター評価（キル数で1〜3段階。「また挑戦したい」動機付け）
 	var star_count := 1
@@ -3765,6 +3831,7 @@ func _show_result_screen(is_victory: bool) -> void:
 	var anim := create_tween()
 	anim.tween_property(title, "modulate:a", 1.0, 0.3).set_delay(0.5)
 	anim.tween_property(sep, "modulate:a", 0.4, 0.2)
+	anim.tween_property(build_lbl, "modulate:a", 1.0, 0.25)
 	anim.tween_property(star_lbl, "modulate:a", 1.0, 0.2)
 	# 改善202: スター評価スケールポップ（フェードと同時にばね感のあるポップイン）
 	# Why: ★★★評価は最重要フィードバック。フェードだけでは埋もれる。TRANS_BACKで瞬間的な達成感を演出。

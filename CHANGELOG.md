@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.10.0 (2026-02-21)
+
+### Feature: Build Name Auto-generation — ランのアイデンティティ化
+
+**背景**: ランが終わっても「どんなビルドだったか」が残らない。SNSで共有するフックがない。
+
+**解決**: リザルト画面にビルド名を自動表示。シナジー組み合わせからユニークな名前を生成。
+
+- `game_main.gd`: `_generate_build_name()` 関数追加
+  - シナジー1種 → 専用名（例: `phantom_punisher` → "Phantom Executioner"）
+  - シナジー2種 → コンボ名またはメインシナジー名（例: "Undying Phantom"）
+  - シナジー3種以上 → "Perfect Cascade"
+  - シナジーなし → サポートから命名（例: "Chain & Pierce Caster"）
+  - 何もなし → "Solo Wanderer"
+- リザルト画面に `[ ビルド名 ]` をシアン色で表示（区切り線とスター評価の間）
+
 ## v0.9.9 (2026-02-21)
 
 ### Feature: Endless Mode — Wave 20後も続行、スコアアタック化
