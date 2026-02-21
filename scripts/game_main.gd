@@ -3725,8 +3725,16 @@ func _show_result_screen(is_victory: bool) -> void:
 	if "kills" in broken_records: _kills_str += "  ★NEW!"
 	var _combo_str := "x%d" % best_combo
 	if "combo" in broken_records: _combo_str += "  ★NEW!"
-	var _time_str := "%d:%02d" % [t_min, t_sec]
-	if "time" in broken_records: _time_str += "  ★NEW!"
+	# 改善206: Endless時はカウントアップ時間を強調表示（達成感の可視化）
+	var _time_str: String
+	if is_endless_mode:
+		@warning_ignore("integer_division")
+		var e_min := int(run_time - endless_start_time) / 60
+		var e_sec := int(run_time - endless_start_time) % 60
+		_time_str = "Endless  +%d:%02d" % [e_min, e_sec]
+	else:
+		_time_str = "%d:%02d" % [t_min, t_sec]
+		if "time" in broken_records: _time_str += "  ★NEW!"
 	var _stage_str := "Stage %d" % current_stage
 	if "stage" in broken_records: _stage_str += "  ★NEW!"
 	var stats_data: Array[Array] = [
@@ -3789,6 +3797,21 @@ func _show_result_screen(is_victory: bool) -> void:
 			vault_lbl.modulate.a = 0.0
 			vbox.add_child(vault_lbl)
 			stat_labels.append(vault_lbl)
+
+	# 改善207: Endless達成時にitch.ioコメント投稿を促す（自然なリーダーボード形成）
+	# Why: コメント欄が賑わうと開発者・プレイヤー双方にメリット。実装コスト: 1ラベル追加のみ
+	if is_endless_mode:
+		var share_lbl := Label.new()
+		share_lbl.text = "Post your Endless score in itch.io comments!"
+		share_lbl.add_theme_font_size_override("font_size", 17)
+		share_lbl.add_theme_color_override("font_color", Color(0.55, 0.95, 0.65, 1.0))
+		share_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+		share_lbl.add_theme_constant_override("shadow_offset_x", 1)
+		share_lbl.add_theme_constant_override("shadow_offset_y", 1)
+		share_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		share_lbl.modulate.a = 0.0
+		vbox.add_child(share_lbl)
+		stat_labels.append(share_lbl)
 
 	# スペーサー
 	var spacer := Control.new()
