@@ -1,5 +1,40 @@
 # Changelog
 
+## v0.9.9 (2026-02-21)
+
+### Feature: Endless Mode — Wave 20後も続行、スコアアタック化
+
+**問題**: Wave 20クリアで即「YOU WIN」となり、ゲームが10分で完全終了していた。
+ゲームジャム投票者が10分プレイして終わるため、より長く遊べる動線がなかった。
+
+**解決**: Wave 20クリア後に自動でEndless Modeへ移行。
+
+- `wave_manager.gd`: `endless_mode`フラグ追加。Wave 21以降も波を継続生成。
+  敵数上限60体（爆発防止）、phantomウェイトを上限60でキャップ。
+- `main.gd`: `all_waves_cleared`シグナルをEndless移行に転換。
+  "★ ENDLESS MODE ★" 1.5秒アナウンス後にWave +1, +2... と継続。
+  タイマー表示をカウントダウン→カウントアップ(+mm:ss)に切替。
+  Endlessスコア（waveクリア数）をwave_labelに表示。
+  10分タイマー勝利条件はEndless中は無効化。
+
+**Endlessの終了条件**: プレイヤー死亡のみ（Rキーでリスタート）
+
+---
+
+## v0.9.8 (2026-02-21)
+
+### Feature: Phantom Punisher シナジー
+
+pierce + trigger サポート組み合わせ時、phantomの脆弱フェーズ(1.5s)に+60%ダメージ。
+タイミング読みを「スキル」として報酬化する。
+
+- `synergies.json`: `phantom_punisher`エントリ追加
+- `enemy.gd`: `get_is_phantom_vulnerable()`メソッド + 赤フラッシュVFX
+- `tower_attack.gd`: 弾ヒット時のダメージ乗算ロジック
+- `game_main.gd`: シナジー有効時のstats注入
+
+---
+
 ## v0.9.5 (2026-02-20)
 
 ### Feature: アップグレードプール拡張 6→13 — ビルド多様性向上
