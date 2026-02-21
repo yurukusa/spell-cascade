@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.11.1 (2026-02-21)
+
+### Feature: Copy Score ボタン — クリップボードシェア (改善210)
+
+リザルト画面に「📋 Copy Score」ボタン追加。クリックするとスコアをクリップボードにコピー。
+Daily Challengeと組み合わせると「今日のスコアをitch.ioコメントに貼る」フローが1クリックになる。
+
+**シェアテキスト形式**:
+- Daily: `[Spell Cascade Daily] 🗡️ Phantom Executioner ★★★ | Endless +8:30 | 412 kills`
+- Normal: `[Spell Cascade Run] 💀 Chain Annihilator ★★ | 7:42 | 187 kills`
+
+Web: `JavaScriptBridge.eval("navigator.clipboard.writeText(...)")` / Native: `DisplayServer.clipboard_set()`
+コピー後「✓ Copied!」→1.5秒後に元テキストに戻る。
+
 ## v0.11.0 (2026-02-21)
 
 ### Feature: Daily Challenge Mode — コミュニティチャレンジ
