@@ -3923,6 +3923,29 @@ func _show_result_screen(is_victory: bool) -> void:
 	)
 	vbox.add_child(copy_btn)
 
+	# 改善212: Daily Challengeのitch.io直接リンクボタン
+	# Why: "Copy Score"の後、itch.ioコメント欄に飛ぶ摩擦をゼロにする。
+	# Daily特有: 同じシードで比較可能なスコアをコメント欄に集める社会設計。
+	var comment_btn: Button = null
+	if is_daily_challenge and OS.has_feature("web"):
+		comment_btn = Button.new()
+		comment_btn.text = "💬  Post to itch.io comments"
+		comment_btn.custom_minimum_size = Vector2(220, 36)
+		comment_btn.modulate.a = 0.0
+		var comment_style := StyleBoxFlat.new()
+		comment_style.bg_color = Color(0.1, 0.18, 0.12, 0.9)
+		comment_style.border_color = Color(0.35, 0.8, 0.45, 0.8)
+		comment_style.set_border_width_all(1)
+		comment_style.set_corner_radius_all(4)
+		comment_style.set_content_margin_all(6)
+		comment_btn.add_theme_stylebox_override("normal", comment_style)
+		comment_btn.add_theme_font_size_override("font_size", 16)
+		comment_btn.add_theme_color_override("font_color", Color(0.55, 1.0, 0.65, 1.0))
+		comment_btn.pressed.connect(func():
+			JavaScriptBridge.eval("window.open('https://yurukusa.itch.io/spell-cascade#comments', '_blank')")
+		)
+		vbox.add_child(comment_btn)
+
 	# Ko-fi CTA — 応援リンクを目立たせすぎず添える
 	var cta_spacer := Control.new()
 	cta_spacer.custom_minimum_size = Vector2(0, 14)
@@ -3968,6 +3991,8 @@ func _show_result_screen(is_victory: bool) -> void:
 				pt.tween_property(captured_lbl, "scale", Vector2(1.0, 1.0), 0.09)
 			)
 	anim.tween_property(copy_btn, "modulate:a", 1.0, 0.25).set_delay(0.2)
+	if comment_btn != null:
+		anim.tween_property(comment_btn, "modulate:a", 1.0, 0.2)
 	anim.tween_property(retry, "modulate:a", 1.0, 0.3).set_delay(0.1)
 	anim.tween_property(cta_lbl, "modulate:a", 0.75, 0.4).set_delay(0.5)
 

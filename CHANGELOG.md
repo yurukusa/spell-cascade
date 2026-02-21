@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.11.2 (2026-02-21)
+
+### Feature: Daily Challenge → itch.io コメント欄直接リンク (改善212)
+
+Daily Challenge リザルト画面に「💬 Post to itch.io comments」ボタン追加。
+Copy Score でスコアをクリップボードにコピーした後、itch.io のコメント欄に直接ジャンプできる。
+
+**設計意図**: Daily Challenge は全プレイヤーが同じシードで遊ぶため、コメント欄がリーダーボード代わりになる。
+スコアコピー → コメント欄へのフローを 2 クリックに短縮してソーシャル摩擦をゼロにする。
+
+- Web 環境のみ表示 (`OS.has_feature("web")` 判定)
+- Daily Challenge 時のみ表示 (`is_daily_challenge` フラグ)
+- クリックで `window.open('yurukusa.itch.io/spell-cascade#comments', '_blank')`
+
 ## v0.11.1 (2026-02-21)
 
 ### Feature: Copy Score ボタン — クリップボードシェア (改善210)
