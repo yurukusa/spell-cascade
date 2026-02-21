@@ -99,6 +99,22 @@ func _ready() -> void:
 	d_tw.tween_interval(0.82)
 	d_tw.tween_property(daily_btn, "modulate:a", 1.0, 0.2).set_trans(Tween.TRANS_QUAD)
 
+	# 改善213: 前日チャレンジボタン — 日付をまたいでも昨日のシードで対戦できる
+	# Why: 日本では22時にプレイ開始 → 翌日0時をまたぎ「昨日のやつ見たのに今日になってた」が起きる
+	# → 24時間の猶予を設けることでコメント欄の議論が翌日まで続く。実装コスト: 20行
+	var unix_yesterday := int(Time.get_unix_time_from_system()) - 86400
+	var ydate: Dictionary = Time.get_date_dict_from_unix_time(unix_yesterday)
+	var yesterday_btn := Button.new()
+	yesterday_btn.text = "← Yesterday  %02d/%02d" % [int(ydate.month), int(ydate.day)]
+	yesterday_btn.custom_minimum_size = Vector2(220, 38)
+	yesterday_btn.pressed.connect(_on_yesterday)
+	yesterday_btn.modulate.a = 0.0
+	_style_menu_button(yesterday_btn, Color(0.62, 0.38, 0.08, 1.0))  # Darker muted orange（過去の特別感）
+	vbox.add_child(yesterday_btn)
+	var y_tw := yesterday_btn.create_tween()
+	y_tw.tween_interval(0.87)
+	y_tw.tween_property(yesterday_btn, "modulate:a", 0.85, 0.2).set_trans(Tween.TRANS_QUAD)  # 若干透明（今日より控えめ）
+
 	# Settings button
 	var settings_btn := Button.new()
 	settings_btn.text = "Settings"
@@ -253,6 +269,27 @@ func _on_daily() -> void:
 	else:
 		_transitioning = false
 		Engine.remove_meta("daily_challenge_seed")
+		push_error("Failed to load game.tscn")
+
+func _on_yesterday() -> void:
+	## 前日チャレンジ: 昨日の日付ベースシードで再プレイ（改善213）
+	## Why: 日付をまたいだプレイヤーも同じ種で体験できる → itch.ioコメント欄の議論が続く
+	if _transitioning:
+		return
+	_transitioning = true
+	var unix_yesterday := int(Time.get_unix_time_from_system()) - 86400
+	var ydate: Dictionary = Time.get_date_dict_from_unix_time(unix_yesterday)
+	var seed_base: int = (int(ydate.year) * 10000) + (int(ydate.month) * 100) + int(ydate.day)
+	var yesterday_seed: int = seed_base * 31337  # 今日のデイリーと同じ計算式
+	Engine.set_meta("daily_challenge_seed", yesterday_seed)
+	Engine.set_meta("daily_challenge_date_str", "%02d/%02d" % [int(ydate.month), int(ydate.day)])
+	var scene: PackedScene = load("res://scenes/game.tscn")
+	if scene != null:
+		get_tree().change_scene_to_packed(scene)
+	else:
+		_transitioning = false
+		Engine.remove_meta("daily_challenge_seed")
+		Engine.remove_meta("daily_challenge_date_str")
 		push_error("Failed to load game.tscn")
 
 func _on_settings() -> void:

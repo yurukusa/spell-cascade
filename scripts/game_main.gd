@@ -99,6 +99,7 @@ var endless_start_time := 0.0  # Endless開始時のrun_time（経過時間計�
 # Daily Challenge Mode: 日付ベースのシードで全プレイヤーが同じ展開を経験
 # Why: itch.ioのコメント欄が自然なリーダーボードになる。「今日は Phantom Executioner だった」という会話が生まれる。
 var is_daily_challenge := false
+var daily_challenge_date_str: String = ""  # 改善213: 前日チャレンジ用の日付文字列（"MM/DD"形式）。空なら今日のデイリー
 
 # Shrine（中盤イベント: 120-225sのquiet zone対策）
 const SHRINE_TIME := 150.0  # 2:30で出現
@@ -141,6 +142,10 @@ func _ready() -> void:
 		seed(daily_seed)
 		is_daily_challenge = true
 		Engine.remove_meta("daily_challenge_seed")  # 使用後即削除（次回ゲームに持ち越さない）
+		# 改善213: 前日チャレンジの場合は日付文字列が渡される
+		if Engine.has_meta("daily_challenge_date_str"):
+			daily_challenge_date_str = Engine.get_meta("daily_challenge_date_str")
+			Engine.remove_meta("daily_challenge_date_str")
 
 	# 敵シーンロード
 	enemy_scene = load("res://scenes/enemy.tscn")
@@ -3812,10 +3817,14 @@ func _show_result_screen(is_victory: bool) -> void:
 
 	# 改善209: Daily Challengeバッジ（デイリーモードでプレイした証明）
 	# Why: 「今日のチャレンジをやった」可視化 → SNSで「今日のデイリーやった？」会話が生まれる
+	# 改善213: 前日チャレンジの場合は "★ PAST CHALLENGE MM/DD ★" を表示
 	if is_daily_challenge:
-		var date_dict := Time.get_date_dict_from_system()
 		var daily_lbl := Label.new()
-		daily_lbl.text = "★ DAILY CHALLENGE  %02d/%02d ★" % [date_dict.month, date_dict.day]
+		if daily_challenge_date_str != "":
+			daily_lbl.text = "★ PAST CHALLENGE  %s ★" % daily_challenge_date_str
+		else:
+			var date_dict := Time.get_date_dict_from_system()
+			daily_lbl.text = "★ DAILY CHALLENGE  %02d/%02d ★" % [date_dict.month, date_dict.day]
 		daily_lbl.add_theme_font_size_override("font_size", 20)
 		daily_lbl.add_theme_color_override("font_color", Color(1.0, 0.75, 0.2, 1.0))
 		daily_lbl.add_theme_color_override("font_shadow_color", Color(0.4, 0.1, 0.0, 0.9))
@@ -3882,7 +3891,16 @@ func _show_result_screen(is_victory: bool) -> void:
 
 	var t_min_c: int = int(run_time) / 60
 	var t_sec_c: int = int(run_time) % 60
-	var share_prefix := "Daily" if is_daily_challenge else "Run"
+	# 改善213: Daily/Past Challengeではシェアテキストに日付を含める（コメント欄での識別に必要）
+	var share_prefix: String
+	if is_daily_challenge:
+		if daily_challenge_date_str != "":
+			share_prefix = "Past %s" % daily_challenge_date_str
+		else:
+			var today_dict := Time.get_date_dict_from_system()
+			share_prefix = "Daily %02d/%02d" % [int(today_dict.month), int(today_dict.day)]
+	else:
+		share_prefix = "Run"
 	var share_emoji := "🗡️" if is_victory else "💀"
 	var star_str := "★".repeat(star_count) + "☆".repeat(3 - star_count)
 	var share_text: String
