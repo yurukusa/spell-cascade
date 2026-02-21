@@ -3007,6 +3007,13 @@ var levelup_pool: Array[Dictionary] = [
 	{"id": "regen", "name": "HP Regen +3/s", "description": "Continuously recover 3 HP per second"},
 	{"id": "armor", "name": "Armor: -20% Damage", "description": "Take 20% less damage from all sources"},
 	{"id": "heal_now", "name": "Emergency Repair", "description": "Immediately restore 100 HP"},
+	# === v0.9.6: プール拡張 13→19（ビルド多様性向上）===
+	{"id": "regen_big", "name": "HP Regen +8/s", "description": "Recover 8 HP every second — stack with other regen"},
+	{"id": "armor_big", "name": "Heavy Armor: -35%", "description": "Take 35% less damage — significant damage reduction"},
+	{"id": "attract_huge", "name": "Magnetic Field +500", "description": "Massively expanded XP orb pickup radius"},
+	{"id": "projectile_2", "name": "+2 Projectiles", "description": "Fire 2 extra projectiles per attack"},
+	{"id": "move_speed_big", "name": "+30% Move Speed", "description": "Move 30% faster — excellent for kiting"},
+	{"id": "heal_half", "name": "Repair Protocol", "description": "Immediately heal to at least 50% max HP"},
 ]
 
 func _on_level_up(new_level: int) -> void:
@@ -3095,6 +3102,9 @@ func _apply_levelup_stat(stat_id: String) -> void:
 		"attract": "RANGE +100", "attract_big": "RANGE +200",
 		"max_hp": "HP +50", "max_hp_big": "HP +150",
 		"regen": "REGEN +3/s", "armor": "ARMOR -20%", "heal_now": "HEAL +100",
+		"regen_big": "REGEN +8/s", "armor_big": "ARMOR -35%",
+		"attract_huge": "RANGE +500", "projectile_2": "+2 SHOTS",
+		"move_speed_big": "MOV +30%", "heal_half": "HEAL 50%",
 	}
 	match stat_id:
 		"damage":
@@ -3130,6 +3140,24 @@ func _apply_levelup_stat(stat_id: String) -> void:
 		"heal_now":
 			# 即時100HP回復。HPバー更新はheal()内で実施
 			tower.heal(100.0)
+		# v0.9.6: 拡張プール
+		"regen_big":
+			tower.regen_rate += 8.0
+		"armor_big":
+			tower.armor_mult *= 0.65
+		"attract_huge":
+			tower.attract_range_bonus += 500.0
+		"projectile_2":
+			tower.projectile_bonus += 2
+		"move_speed_big":
+			tower.move_speed_mult *= 1.3
+		"heal_half":
+			# 50%未満の場合は50%まで回復、50%以上は追加で+25%回復
+			var half_hp := tower.max_hp * 0.5
+			if tower.hp < half_hp:
+				tower.heal(half_hp - tower.hp)
+			else:
+				tower.heal(tower.max_hp * 0.25)
 
 	# フローティング確認テキスト（改善43）
 	if stat_id in stat_labels:
