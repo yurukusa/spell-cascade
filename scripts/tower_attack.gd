@@ -673,6 +673,7 @@ func _create_projectile(direction: Vector2) -> void:
 	bullet.set("synergy_chain_freeze", stats.get("synergy_chain_freeze", 0.0))
 	bullet.set("synergy_chain_reaction", stats.get("synergy_chain_reaction", false))
 	bullet.set("synergy_thunder_aoe", stats.get("synergy_thunder_aoe", 0.0))
+	bullet.set("synergy_phantom_punisher", stats.get("synergy_phantom_punisher", false))
 	bullet.set("crit_chance", stats.get("crit_chance", 0.0))
 	bullet.set("crit_mult", stats.get("crit_mult", 1.0))
 	# 改善169: add_dot を弾に伝播（Burning/Toxic/of_Decay mod）
@@ -1107,6 +1108,7 @@ var freeze_chance := 0.0  # 改善243: modからの確率凍結（freezing/frost
 var synergy_chain_freeze := 0.0  # 改善251: frozen_stormシナジー — 全ヒットで凍結
 var synergy_chain_reaction := false  # 改善252: chain_reactionシナジー — chainバウンスごとにfork生成
 var synergy_thunder_aoe := 0.0  # 改善254: thunder_godシナジー — 全弾合一AoE雷撃（80px）
+var synergy_phantom_punisher := false  # v0.9.8: phantom_punisherシナジー — phantom脆弱フェーズに+60%ダメージ
 var freeze_duration := 0.0
 var crit_chance := 0.0
 var crit_mult := 1.0
@@ -1185,6 +1187,14 @@ func _on_body_entered(body):
 	if crit_chance > 0.0 and randf() < crit_chance:
 		final_damage = int(float(damage) * crit_mult)
 		is_crit = true
+
+	# v0.9.8: Phantom Punisher シナジー — phantom脆弱フェーズに+60%ダメージ
+	# Why: pierce+triggerビルドで「タイミング読み」が報酬を持つ瞬間を作る。
+	# 赤フラッシュ（enemy.gd側）でプレイヤーが脆弱ウィンドウを把握できる。
+	if synergy_phantom_punisher and body.has_method("get_is_phantom_vulnerable"):
+		if body.get_is_phantom_vulnerable():
+			final_damage = int(float(final_damage) * 1.6)
+			is_crit = true  # クリット扱いにして視覚的に区別
 
 	body.take_damage(final_damage, is_crit)
 	hit_enemies.append(body)

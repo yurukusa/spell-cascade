@@ -748,12 +748,23 @@ func _phantom_process(delta: float) -> void:
 	_phantom_is_invincible = phase < 1.5
 
 	# 無敵フェーズはStylizedVisualをフェードアウト（プレイヤーへの視覚フィードバック）
+	# v0.9.8: 脆弱フェーズ移行直後に赤フラッシュ — Phantom Punisherシナジーの「叩き時」をUI無しで示す
 	var sv := get_node_or_null("StylizedVisual")
 	if sv:
 		var target_a := 0.2 if _phantom_is_invincible else 0.8
 		sv.modulate.a = lerp(sv.modulate.a, target_a, delta * 8.0)
+		# 脆弱フェーズ移行の瞬間（phase 1.5 付近）に赤色パルス（0.1s）
+		if not _phantom_is_invincible and phase >= 1.5 and phase < 1.6:
+			sv.modulate = Color(1.0, 0.25, 0.25, sv.modulate.a)
 
 	_melee_process(delta)
+
+func get_is_phantom_vulnerable() -> bool:
+	## v0.9.8: Phantom Punisherシナジー用 — 脆弱フェーズをtower_attack.gdに公開
+	## Why: take_damageは無敵チェックで弾くが、外部から「今が脆弱か」を安全に問い合わせできる口が必要
+	if enemy_type != "phantom":
+		return false
+	return not _phantom_is_invincible
 
 func _shooter_process(delta: float) -> void:
 	## シューター: preferred_distanceを維持しつつ遠距離弾を撃つ

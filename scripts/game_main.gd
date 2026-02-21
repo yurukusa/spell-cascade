@@ -960,6 +960,11 @@ func _setup_tower_attacks() -> void:
 		# statsにフラグを渡す。現役wisp数チェックはtree group "wisps" で行う。
 		if "summoners_pact" in _active_synergy_ids:
 			stats["synergy_summoners_pact"] = true
+		# phantom_punisher — pierce+trigger: phantom脆弱フェーズに+60%ダメージ＋赤フラッシュ（v0.9.8）
+		# Why: Wave18+で出現するphantomへの「タイミング読み」戦略を弾ヒット側から実現する。
+		# 無敵/脆弱サイクルを能動的に活かすビルドが初めて生まれる。
+		if "phantom_punisher" in _active_synergy_ids:
+			stats["synergy_phantom_punisher"] = true
 
 		var attack_node := Node2D.new()
 		var attack_script := load("res://scripts/tower_attack.gd")

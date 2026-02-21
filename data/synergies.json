@@ -143,6 +143,20 @@
         "_game_change": "Wisps multiply. One becomes many. The army sustains itself forever."
       },
       "discovery_hint": "What if a wisp's death was just a beginning?"
+    },
+    {
+      "id": "phantom_punisher",
+      "name": "Phantom Punisher",
+      "description": "Pierce + Trigger supports: Projectiles deal +60% damage to phantom enemies during their vulnerable phase. Vulnerable window flashes red as a visual cue.",
+      "condition": {
+        "type": "supports_combo",
+        "required_supports": ["pierce", "trigger"]
+      },
+      "effect": {
+        "phantom_vulnerable_damage_mult": 1.6,
+        "_game_change": "Phantoms alternate invincible/vulnerable. This synergy rewards timing — hit the red flash for massive burst. Wave 18+ changes completely."
+      },
+      "discovery_hint": "Piercing through the veil of the phantom..."
     }
   ]
 }
