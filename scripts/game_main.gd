@@ -96,6 +96,10 @@ var _overtime_announced := false
 var is_endless_mode := false
 var endless_start_time := 0.0  # Endless開始時のrun_time（経過時間計算用）
 
+# Daily Challenge Mode: 日付ベースのシードで全プレイヤーが同じ展開を経験
+# Why: itch.ioのコメント欄が自然なリーダーボードになる。「今日は Phantom Executioner だった」という会話が生まれる。
+var is_daily_challenge := false
+
 # Shrine（中盤イベント: 120-225sのquiet zone対策）
 const SHRINE_TIME := 150.0  # 2:30で出現
 const SHRINE_AUTO_SELECT_TIME := 10.0  # 10秒で自動選択
@@ -129,6 +133,14 @@ var _desperate_push_announced := false  # デスパレートプッシュ告知�
 
 func _ready() -> void:
 	build_system = get_node("/root/BuildSystem")
+
+	# Daily Challenge: title.gdから渡されたシードがあれば設定（改善209）
+	# Why: 同じシード → 同じ敵スポーン/タイプ/アップグレード選択。全プレイヤーが同じ展開を経験。
+	if Engine.has_meta("daily_challenge_seed"):
+		var daily_seed: int = Engine.get_meta("daily_challenge_seed")
+		seed(daily_seed)
+		is_daily_challenge = true
+		Engine.remove_meta("daily_challenge_seed")  # 使用後即削除（次回ゲームに持ち越さない）
 
 	# 敵シーンロード
 	enemy_scene = load("res://scenes/enemy.tscn")
@@ -3797,6 +3809,22 @@ func _show_result_screen(is_victory: bool) -> void:
 			vault_lbl.modulate.a = 0.0
 			vbox.add_child(vault_lbl)
 			stat_labels.append(vault_lbl)
+
+	# 改善209: Daily Challengeバッジ（デイリーモードでプレイした証明）
+	# Why: 「今日のチャレンジをやった」可視化 → SNSで「今日のデイリーやった？」会話が生まれる
+	if is_daily_challenge:
+		var date_dict := Time.get_date_dict_from_system()
+		var daily_lbl := Label.new()
+		daily_lbl.text = "★ DAILY CHALLENGE  %02d/%02d ★" % [date_dict.month, date_dict.day]
+		daily_lbl.add_theme_font_size_override("font_size", 20)
+		daily_lbl.add_theme_color_override("font_color", Color(1.0, 0.75, 0.2, 1.0))
+		daily_lbl.add_theme_color_override("font_shadow_color", Color(0.4, 0.1, 0.0, 0.9))
+		daily_lbl.add_theme_constant_override("shadow_offset_x", 2)
+		daily_lbl.add_theme_constant_override("shadow_offset_y", 2)
+		daily_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		daily_lbl.modulate.a = 0.0
+		vbox.add_child(daily_lbl)
+		stat_labels.append(daily_lbl)
 
 	# 改善208: Solo Wanderer（サポートなし）でEndless到達 = 特別実績バナー
 	# Why: ゼロサポートのハードモードを自然発生的に選んだ挑戦者への報酬。コスト: 10行

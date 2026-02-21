@@ -86,6 +86,19 @@ func _ready() -> void:
 	s_tw.tween_interval(0.75)
 	s_tw.tween_property(start_btn, "modulate:a", 1.0, 0.2).set_trans(Tween.TRANS_QUAD)
 
+	# Daily Challenge button — 今日のシードで全員が同じ展開を経験
+	var daily_btn := Button.new()
+	var date: Dictionary = Time.get_date_dict_from_system()
+	daily_btn.text = "Daily Challenge  %02d/%02d" % [int(date.month), int(date.day)]
+	daily_btn.custom_minimum_size = Vector2(220, 48)
+	daily_btn.pressed.connect(_on_daily)
+	daily_btn.modulate.a = 0.0
+	_style_menu_button(daily_btn, Color(0.85, 0.55, 0.15, 1.0))  # Orange accent（デイリー特別感）
+	vbox.add_child(daily_btn)
+	var d_tw := daily_btn.create_tween()
+	d_tw.tween_interval(0.82)
+	d_tw.tween_property(daily_btn, "modulate:a", 1.0, 0.2).set_trans(Tween.TRANS_QUAD)
+
 	# Settings button
 	var settings_btn := Button.new()
 	settings_btn.text = "Settings"
@@ -222,6 +235,24 @@ func _on_start() -> void:
 		get_tree().change_scene_to_packed(scene)
 	else:
 		_transitioning = false
+		push_error("Failed to load game.tscn")
+
+func _on_daily() -> void:
+	## デイリーチャレンジ: 日付ベースのシードをEngineメタデータで game_main.gd に渡す
+	## Why: 同じ日に遊んだ全プレイヤーが同じ展開を経験 → itch.ioコメントがリーダーボードになる
+	if _transitioning:
+		return
+	_transitioning = true
+	var date: Dictionary = Time.get_date_dict_from_system()
+	var seed_base: int = (int(date.year) * 10000) + (int(date.month) * 100) + int(date.day)
+	var daily_seed: int = seed_base * 31337  # 素数で拡散してシード品質を向上
+	Engine.set_meta("daily_challenge_seed", daily_seed)
+	var scene: PackedScene = load("res://scenes/game.tscn")
+	if scene != null:
+		get_tree().change_scene_to_packed(scene)
+	else:
+		_transitioning = false
+		Engine.remove_meta("daily_challenge_seed")
 		push_error("Failed to load game.tscn")
 
 func _on_settings() -> void:
