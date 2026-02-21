@@ -3873,6 +3873,56 @@ func _show_result_screen(is_victory: bool) -> void:
 	retry.modulate.a = 0.0
 	vbox.add_child(retry)
 
+	# 改善210: クリップボードシェアボタン（Daily Challengeのスコア投稿を1クリックで）
+	# Why: 「Post your score in comments!」はハードル高い。コピボタンで摩擦をゼロにする。
+	# Web限定（JavaScriptBridge）。ネイティブはDisplayServer.clipboard_set()でフォールバック。
+	var copy_spacer := Control.new()
+	copy_spacer.custom_minimum_size = Vector2(0, 8)
+	vbox.add_child(copy_spacer)
+
+	var t_min_c: int = int(run_time) / 60
+	var t_sec_c: int = int(run_time) % 60
+	var share_prefix := "Daily" if is_daily_challenge else "Run"
+	var share_emoji := "🗡️" if is_victory else "💀"
+	var star_str := "★".repeat(star_count) + "☆".repeat(3 - star_count)
+	var share_text: String
+	if is_endless_mode:
+		var e_min_c: int = int(run_time - endless_start_time) / 60
+		var e_sec_c: int = int(run_time - endless_start_time) % 60
+		share_text = "[Spell Cascade %s] %s %s %s | Endless +%d:%02d | %d kills\nyurukusa.itch.io/spell-cascade" % [share_prefix, share_emoji, build_name, star_str, e_min_c, e_sec_c, kill_count]
+	else:
+		share_text = "[Spell Cascade %s] %s %s %s | %d:%02d | %d kills\nyurukusa.itch.io/spell-cascade" % [share_prefix, share_emoji, build_name, star_str, t_min_c, t_sec_c, kill_count]
+
+	var copy_btn := Button.new()
+	copy_btn.text = "📋  Copy Score"
+	copy_btn.custom_minimum_size = Vector2(180, 36)
+	copy_btn.modulate.a = 0.0
+	# ボタンスタイル
+	var copy_style := StyleBoxFlat.new()
+	copy_style.bg_color = Color(0.15, 0.15, 0.25, 0.9)
+	copy_style.border_color = Color(0.4, 0.6, 0.9, 0.8)
+	copy_style.set_border_width_all(1)
+	copy_style.set_corner_radius_all(4)
+	copy_style.set_content_margin_all(6)
+	copy_btn.add_theme_stylebox_override("normal", copy_style)
+	copy_btn.add_theme_font_size_override("font_size", 16)
+	copy_btn.add_theme_color_override("font_color", Color(0.8, 0.9, 1.0, 1.0))
+	var captured_share_text := share_text
+	var captured_copy_btn := copy_btn
+	copy_btn.pressed.connect(func():
+		# Web: JavaScriptBridgeでClipboard API / Native: DisplayServer.clipboard_set
+		if OS.has_feature("web"):
+			var escaped := captured_share_text.replace("'", "\\'").replace("\n", "\\n")
+			JavaScriptBridge.eval("navigator.clipboard.writeText('" + escaped + "').catch(()=>{})")
+		else:
+			DisplayServer.clipboard_set(captured_share_text)
+		captured_copy_btn.text = "✓  Copied!"
+		var reset_tween := captured_copy_btn.create_tween()
+		reset_tween.tween_interval(1.5)
+		reset_tween.tween_callback(func(): captured_copy_btn.text = "📋  Copy Score")
+	)
+	vbox.add_child(copy_btn)
+
 	# Ko-fi CTA — 応援リンクを目立たせすぎず添える
 	var cta_spacer := Control.new()
 	cta_spacer.custom_minimum_size = Vector2(0, 14)
@@ -3917,7 +3967,8 @@ func _show_result_screen(is_victory: bool) -> void:
 				pt.tween_property(captured_lbl, "scale", Vector2(1.12, 1.12), 0.07).set_trans(Tween.TRANS_BACK)
 				pt.tween_property(captured_lbl, "scale", Vector2(1.0, 1.0), 0.09)
 			)
-	anim.tween_property(retry, "modulate:a", 1.0, 0.3).set_delay(0.3)
+	anim.tween_property(copy_btn, "modulate:a", 1.0, 0.25).set_delay(0.2)
+	anim.tween_property(retry, "modulate:a", 1.0, 0.3).set_delay(0.1)
 	anim.tween_property(cta_lbl, "modulate:a", 0.75, 0.4).set_delay(0.5)
 
 	# リトライラベルの点滅
