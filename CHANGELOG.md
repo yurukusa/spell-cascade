@@ -16,6 +16,12 @@
   - 何もなし → "Solo Wanderer"
 - リザルト画面に `[ ビルド名 ]` をシアン色で表示（区切り線とスター評価の間）
 
+### Feature: ランサマリー強化 — 達成の可視化 + シェアフック (案3+案4)
+
+- Endless達成時のTimeスタッツ表示を `Endless  +8:30` 形式に変更（継続時間を強調）
+- Endless達成時のリザルト画面に「Post your Endless score in itch.io comments!」を表示
+  → コメント欄が自然なリーダーボードとして機能する設計
+
 ## v0.9.9 (2026-02-21)
 
 ### Feature: Endless Mode — Wave 20後も続行、スコアアタック化
