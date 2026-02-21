@@ -14,9 +14,10 @@ extends Node2D
 
 var upgrade_ui: Node  # UpgradeUI (CanvasLayer)
 var run_time := 0.0
-var max_run_time := 600.0  # 10分
+var max_run_time := 600.0  # 10分（Endless移行後はINFに変更）
 var game_over := false
 var player_orbs: Array[int] = []  # OrbData.OrbType のリスト
+var endless_score := 0  # Endless中のWaveクリア数
 
 func _ready() -> void:
 	# プレイヤーのシグナル接続
@@ -52,18 +53,25 @@ func _process(delta: float) -> void:
 	run_time += delta
 	_update_timer_display()
 
-	# 10分経過 → 勝利
-	if run_time >= max_run_time:
+	# 10分経過 → 通常モードのみ勝利（Endlessは続行）
+	if run_time >= max_run_time and not wave_manager.endless_mode:
 		_win_game()
 
 func _update_timer_display() -> void:
-	var remaining := max_run_time - run_time
-	if remaining < 0:
-		remaining = 0
-	var total_sec := floori(remaining)
-	var minutes := total_sec / 60
-	var seconds := total_sec % 60
-	timer_label.text = "%d:%02d" % [minutes, seconds]
+	if wave_manager.endless_mode:
+		# Endless: 経過時間を表示（カウントアップ）
+		var elapsed := roundi(run_time)
+		var minutes := elapsed / 60
+		var seconds := elapsed % 60
+		timer_label.text = "+%d:%02d" % [minutes, seconds]
+	else:
+		var remaining := max_run_time - run_time
+		if remaining < 0:
+			remaining = 0
+		var total_sec := floori(remaining)
+		var minutes := total_sec / 60
+		var seconds := total_sec % 60
+		timer_label.text = "%d:%02d" % [minutes, seconds]
 
 func _update_orb_display() -> void:
 	if player_orbs.is_empty():
@@ -118,10 +126,17 @@ func _on_player_died() -> void:
 	restart_label.text = "Press R to Restart"
 
 func _on_wave_started(wave_num: int) -> void:
-	wave_label.text = "Wave %d / 20" % wave_num
+	if wave_manager.endless_mode:
+		wave_label.text = "ENDLESS  Wave +%d" % (wave_num - wave_manager.max_waves)
+	else:
+		wave_label.text = "Wave %d / 20" % wave_num
 
 func _on_wave_cleared(wave_num: int) -> void:
-	wave_label.text = "Wave %d Cleared!" % wave_num
+	if wave_manager.endless_mode:
+		endless_score += 1
+		wave_label.text = "Wave +%d Cleared!  Score: %d" % [wave_num - wave_manager.max_waves, endless_score]
+	else:
+		wave_label.text = "Wave %d Cleared!" % wave_num
 
 	# 3択のオーブ選択を表示
 	var choices = OrbData.get_random_orbs(3)
@@ -129,7 +144,22 @@ func _on_wave_cleared(wave_num: int) -> void:
 		upgrade_ui.show_choices(choices)
 
 func _on_all_waves_cleared() -> void:
-	_win_game()
+	# Wave 20クリア → Endless Modeへ移行（勝利画面を出さない）
+	wave_manager.endless_mode = true
+	# _next_wave()でcurrent_waveを21にした後にシグナルを出すので、+1を元に戻す
+	# こうすることで_announce_endless()内の_next_wave()でcurrent_wave=21(+1)になる
+	wave_manager.current_wave = wave_manager.max_waves
+	_announce_endless()
+
+func _announce_endless() -> void:
+	# "ENDLESS MODE!" をwave_labelで一瞬強調表示してからwave_startedへ引き渡す
+	wave_label.text = "★ ENDLESS MODE ★"
+	timer_label.text = "+0:00"
+	# wave_managerに次wave開始を委ねる（wave_startedシグナルで上書きされる）
+	await get_tree().create_timer(1.5).timeout
+	if not is_inside_tree() or game_over:
+		return
+	wave_manager._next_wave()
 
 func _win_game() -> void:
 	game_over = true
@@ -149,4 +179,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if get_tree().paused:
 				wave_label.text = "PAUSED"
 			else:
-				wave_label.text = "Wave %d / 20" % wave_manager.current_wave
+				if wave_manager.endless_mode:
+					wave_label.text = "ENDLESS  Wave +%d" % (wave_manager.current_wave - wave_manager.max_waves)
+				else:
+					wave_label.text = "Wave %d / 20" % wave_manager.current_wave

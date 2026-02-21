@@ -11,6 +11,7 @@ signal all_waves_cleared
 
 var current_wave := 0
 var max_waves := 20
+var endless_mode := false  # Wave 20クリア後に自動で有効化。プレイヤー死亡のみ終了
 var enemies_alive := 0
 var wave_active := false
 var player: Node2D
@@ -39,8 +40,10 @@ func start(target_player: Node2D) -> void:
 func _next_wave() -> void:
 	current_wave += 1
 	if current_wave > max_waves:
-		all_waves_cleared.emit()
-		return
+		if not endless_mode:
+			all_waves_cleared.emit()
+			return
+		# Endless: max_wavesを超えてもシグナルを出さず継続
 
 	wave_active = true
 	wave_started.emit(current_wave)
@@ -49,6 +52,9 @@ func _next_wave() -> void:
 	var enemy_count := current_wave * 3 + 2
 	if current_wave > 10:
 		enemy_count += (current_wave - 10) * 2
+	# Endless時は敵数爆発防止（上限60体）。Wave 20時点で82体→60で固定
+	if endless_mode and current_wave > max_waves:
+		enemy_count = mini(enemy_count, 60)
 	enemies_alive = enemy_count
 
 	# タイプ混合テーブル: waveに応じて出現タイプと割合を決定
@@ -88,8 +94,9 @@ func _get_wave_type_pool() -> Array[Dictionary]:
 	# Wave 18+: phantom（周期的無敵フェーズ。v0.9.7: Stage3体験の差別化）
 	# Why: Wave15-20は全体の20%を占めるがプレイ感が単調。phantomは「数値スケール」
 	# ではなく「行動パターン変化」で難度を上げる。エリート50%と相乗効果。
+	# Endless: 上限60でキャップ（phantomが100%になるのを防ぐ）
 	if current_wave >= 18:
-		pool.append({"type": "phantom", "weight": 20 + (current_wave - 18) * 8})
+		pool.append({"type": "phantom", "weight": mini(20 + (current_wave - 18) * 8, 60)})
 
 	return pool
 
