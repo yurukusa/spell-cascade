@@ -56,6 +56,11 @@ var _boss_aura_poly: Polygon2D = null  # 改善113: フェーズ別オーラ色�
 var _boss_charge_trail_timer := 0.0  # 改善135: チャージ中の軌跡ドットタイマー
 var _drift_phase := 0.0  # 改善241: 個体ごとのドリフト位相オフセット（スポーン時にランダム化）
 
+# phantom用: 周期的無敵フェーズ（v0.9.7 enemy variety pass）
+var _phantom_inv_timer: float = 0.0
+var _phantom_is_invincible: bool = false
+var _wave_num: int = 0  # エリート率をウェーブ依存にするため記録
+
 func _ready() -> void:
 	hp = max_hp
 	_drift_phase = randf() * TAU  # 改善241: 個体ごとにランダムな位相でドリフトがバラける
@@ -116,6 +121,7 @@ func _install_stylized_visual() -> void:
 		"shooter":  [121, 2.5],   # skeleton
 		"splitter": [111, 2.5],   # brown creature
 		"healer":   [99,  2.5],   # purple mage
+		"phantom":  [121, 2.0],   # skeleton sprite, ghostly blue-white tint
 		"boss":     [120, 5.0],   # fire creature (huge)
 	}
 
@@ -172,6 +178,9 @@ func _install_stylized_visual() -> void:
 		"healer":
 			# Green tint for healer identity
 			sprite.modulate = Color(0.7, 1.0, 0.7, 1.0)
+		"phantom":
+			# 青白い半透明: 幽霊感。_phantom_processがalphaを動的に変化させる
+			sprite.modulate = Color(0.5, 0.85, 1.0, 0.8)
 
 	# エリートなら金色のオーラリングを追加（F-19: キャラを立てるデザイン）
 	if is_elite and not is_boss:
@@ -537,9 +546,10 @@ func _make_ngon(sides: int, radius: float) -> PackedVector2Array:
 		pts.append(Vector2(cos(a), sin(a)) * radius)
 	return pts
 
-func init(target: Node2D, spd: float = 80.0, health: float = 30.0, dmg: float = 10.0, type: String = "normal") -> void:
+func init(target: Node2D, spd: float = 80.0, health: float = 30.0, dmg: float = 10.0, type: String = "normal", wave_num: int = 0) -> void:
 	player = target
 	enemy_type = type
+	_wave_num = wave_num
 
 	# タイプ別ステータス乗数
 	match enemy_type:
@@ -585,6 +595,13 @@ func init(target: Node2D, spd: float = 80.0, health: float = 30.0, dmg: float = 
 			heal_cooldown = 1.0
 			heal_range = 100.0
 			heal_amount = 2.0
+		"phantom":
+			# v0.9.7: 周期的無敵を持つ幽霊型。素早いが紙装甲。
+			# 無敵フェーズ中はダメージ無効→「タイミングを読む」戦略要素
+			speed = spd * 1.1
+			max_hp = health * 0.8
+			damage = dmg * 0.8
+			xp_value = 2
 		_:  # normal
 			speed = spd
 			max_hp = health
@@ -593,8 +610,11 @@ func init(target: Node2D, spd: float = 80.0, health: float = 30.0, dmg: float = 
 
 	hp = max_hp
 
-	# エリート判定: ボス以外で12%の確率で強化版（F-19: キャラを立てる）
-	if not is_boss and randf() < 0.12:
+	# エリート判定: Wave15+は50%、それ以前は12%（v0.9.7: Stage3に緊張感を追加）
+	# Why: Wave15-20は「Stage3」の想定だが数値スケールだけでは単調。
+	# エリートを多発させることで「これまでとは違う」感をプレイヤーに伝える。
+	var elite_chance := 0.50 if _wave_num >= 15 else 0.12
+	if not is_boss and randf() < elite_chance:
 		is_elite = true
 		max_hp *= 1.5
 		speed *= 1.2
@@ -628,6 +648,8 @@ func _physics_process(delta: float) -> void:
 			_shooter_process(delta)
 		"healer":
 			_healer_process(delta)
+		"phantom":
+			_phantom_process(delta)
 		_:
 			_melee_process(delta)
 
@@ -716,6 +738,22 @@ func _melee_process(delta: float) -> void:
 	# スプリッター瀕死ウォブル（改善53: HP30%以下で分裂直前の視覚的緊張感）
 	if enemy_type == "splitter" and max_hp > 0 and hp / max_hp < 0.3:
 		rotation = sin(Time.get_ticks_msec() * 0.008) * 0.15
+
+func _phantom_process(delta: float) -> void:
+	## ファントム: 1.5s無敵 / 1.5s脆弱の3sサイクルで接近攻撃
+	## Why: 無敵フェーズを読んでタイミングを合わせるのがファントム戦略。
+	## 単純なHP増加より「行動変化」の方が体験的に新鮮に感じられる（v0.9.7目的）
+	_phantom_inv_timer += delta
+	var phase := fmod(_phantom_inv_timer, 3.0)
+	_phantom_is_invincible = phase < 1.5
+
+	# 無敵フェーズはStylizedVisualをフェードアウト（プレイヤーへの視覚フィードバック）
+	var sv := get_node_or_null("StylizedVisual")
+	if sv:
+		var target_a := 0.2 if _phantom_is_invincible else 0.8
+		sv.modulate.a = lerp(sv.modulate.a, target_a, delta * 8.0)
+
+	_melee_process(delta)
 
 func _shooter_process(delta: float) -> void:
 	## シューター: preferred_distanceを維持しつつ遠距離弾を撃つ
@@ -1337,6 +1375,11 @@ func apply_dot(damage: float, duration: float, element: String) -> void:
 func take_damage(amount: float, is_crit: bool = false) -> void:
 	# フェーズ移行中の無敵
 	if boss_phase_invuln > 0:
+		return
+
+	# ファントム無敵フェーズ中はダメージ無効（v0.9.7）
+	# Why: take_damageで弾く方がシンプル。phantom_processのalphaと状態が一致する。
+	if enemy_type == "phantom" and _phantom_is_invincible:
 		return
 
 	# ボス連続ヒット減衰: chain/fork等の高速連打を抑制し、単発は100%通す

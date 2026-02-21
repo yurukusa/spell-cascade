@@ -85,6 +85,12 @@ func _get_wave_type_pool() -> Array[Dictionary]:
 	if current_wave >= 12:
 		pool.append({"type": "healer", "weight": 10 + (current_wave - 12) * 2})
 
+	# Wave 18+: phantom（周期的無敵フェーズ。v0.9.7: Stage3体験の差別化）
+	# Why: Wave15-20は全体の20%を占めるがプレイ感が単調。phantomは「数値スケール」
+	# ではなく「行動パターン変化」で難度を上げる。エリート50%と相乗効果。
+	if current_wave >= 18:
+		pool.append({"type": "phantom", "weight": 20 + (current_wave - 18) * 8})
+
 	return pool
 
 func _pick_type(pool: Array[Dictionary]) -> String:
@@ -128,7 +134,7 @@ func _spawn_enemy(type: String = "normal") -> void:
 		hp_scale += pow((current_wave - 5) * 0.15, 2)
 	var speed_scale := 1.0 + (current_wave - 1) * 0.05
 
-	enemy.init(player, 80.0 * speed_scale, 30.0 * hp_scale, 10.0, type)
+	enemy.init(player, 80.0 * speed_scale, 30.0 * hp_scale, 10.0, type, current_wave)
 
 	# Wave段階に応じたテクスチャ割り当て
 	var tex_index := 0
