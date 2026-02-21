@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.11.5 (2026-02-21)
+
+### Feature: Title screen streak display (改善215)
+
+タイトル画面に現在のデイリーストリーク状況を表示。
+Daily Challenge ボタンを押す前に「🔥 4-day streak — play to continue」が見える。
+
+- streak >= 2 + 今日済み: "🔥 N-day streak — already played today ✓"
+- streak >= 1 + 昨日済み: "🔥 N-day streak — play to continue"（7日超で🏆）
+- その他: 非表示
+- Web 限定（localStorage アクセス）
+
 ## v0.11.4 (2026-02-21)
 
 ### Feature: Daily Challenge streak counter (改善214)

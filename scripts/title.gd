@@ -115,6 +115,41 @@ func _ready() -> void:
 	y_tw.tween_interval(0.87)
 	y_tw.tween_property(yesterday_btn, "modulate:a", 0.85, 0.2).set_trans(Tween.TRANS_QUAD)  # 若干透明（今日より控えめ）
 
+	# 改善215: タイトル画面でのstreak表示（Web限定・localStorage読み取り）
+	# Why: Daily Challengeを開く前に「🔥4-day streak — play to continue」が見えれば
+	# その日のデイリーを選ぶモチベーションになる。「今日すでにプレイ済み✓」も安心感を与える。
+	if OS.has_feature("web"):
+		var today_dict_ts := Time.get_date_dict_from_system()
+		var today_ts := "%04d-%02d-%02d" % [int(today_dict_ts.year), int(today_dict_ts.month), int(today_dict_ts.day)]
+		var ydate_ts: Dictionary = Time.get_date_dict_from_unix_time(int(Time.get_unix_time_from_system()) - 86400)
+		var yesterday_ts := "%04d-%02d-%02d" % [int(ydate_ts.year), int(ydate_ts.month), int(ydate_ts.day)]
+		var streak_raw = JavaScriptBridge.eval("""(function() {
+  var last = localStorage.getItem('sc_daily_last') || '';
+  var streak = parseInt(localStorage.getItem('sc_daily_streak') || '0');
+  return JSON.stringify({last: last, streak: streak});
+})()""")
+		var streak_info = JSON.parse_string(str(streak_raw))
+		if streak_info and typeof(streak_info) == TYPE_DICTIONARY:
+			var s: int = int(streak_info.get("streak", 0))
+			var last_str: String = str(streak_info.get("last", ""))
+			var streak_msg := ""
+			if s >= 2 and last_str == today_ts:
+				streak_msg = "🔥 %d-day streak — already played today ✓" % s
+			elif s >= 1 and last_str == yesterday_ts:
+				var fire := "🔥" if s < 7 else "🔥🏆"
+				streak_msg = "%s %d-day streak — play to continue" % [fire, s]
+			if streak_msg != "":
+				var streak_title_lbl := Label.new()
+				streak_title_lbl.text = streak_msg
+				streak_title_lbl.add_theme_font_size_override("font_size", 13)
+				streak_title_lbl.add_theme_color_override("font_color", Color(1.0, 0.6, 0.15, 0.9))
+				streak_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				streak_title_lbl.modulate.a = 0.0
+				vbox.add_child(streak_title_lbl)
+				var st_tw := streak_title_lbl.create_tween()
+				st_tw.tween_interval(0.92)
+				st_tw.tween_property(streak_title_lbl, "modulate:a", 0.85, 0.3).set_trans(Tween.TRANS_QUAD)
+
 	# Settings button
 	var settings_btn := Button.new()
 	settings_btn.text = "Settings"
