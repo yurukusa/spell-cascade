@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.11.0 (2026-02-21)
+
+### Feature: Daily Challenge Mode — コミュニティチャレンジ
+
+**背景**: ビルド名(v0.10.0)でSNSシェアフックができた。次の問題: 「俺のPhantom Executioner」はユニークだが比較できない。
+
+**解決**: タイトル画面に「Daily Challenge MM/DD」ボタン（オレンジ）を追加。
+押すと日付ベースのシードで全プレイヤーが同じ敵スポーン・タイプ・アップグレード選択を経験。
+
+**実装詳細**:
+- `title.gd`: `_on_daily()` 関数 — `date.year×10000 + date.month×100 + date.day × 31337` でシード生成。`Engine.set_meta("daily_challenge_seed", seed)` でゲームシーンに渡す
+- `game_main.gd`: `_ready()` で `Engine.has_meta("daily_challenge_seed")` チェック。見つかれば `seed()` 設定 + `is_daily_challenge = true` + メタ削除（次回持ち越しなし）
+- `game_main.gd`: リザルト画面に「★ DAILY CHALLENGE MM/DD ★」バッジ（改善209）
+
+**技術ポイント**: `seed()` でGodotグローバル乱数を設定すると、wave_manager/enemy/tower_attackの全 `randi()`/`randf()` に自動反映。Autoload追加不要。5行の変更で完結。
+
 ## v0.10.1 (2026-02-21)
 
 ### Feature: SOLO WARRIOR 実績バナー
