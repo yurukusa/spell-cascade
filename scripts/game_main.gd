@@ -3798,6 +3798,21 @@ func _show_result_screen(is_victory: bool) -> void:
 			vbox.add_child(vault_lbl)
 			stat_labels.append(vault_lbl)
 
+	# 改善208: Solo Wanderer（サポートなし）でEndless到達 = 特別実績バナー
+	# Why: ゼロサポートのハードモードを自然発生的に選んだ挑戦者への報酬。コスト: 10行
+	if is_endless_mode and build_name == "Solo Wanderer":
+		var solo_lbl := Label.new()
+		solo_lbl.text = "★ SOLO WARRIOR ★"
+		solo_lbl.add_theme_font_size_override("font_size", 26)
+		solo_lbl.add_theme_color_override("font_color", Color(1.0, 0.6, 0.15, 1.0))
+		solo_lbl.add_theme_color_override("font_shadow_color", Color(0.5, 0.1, 0.0, 0.9))
+		solo_lbl.add_theme_constant_override("shadow_offset_x", 2)
+		solo_lbl.add_theme_constant_override("shadow_offset_y", 2)
+		solo_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		solo_lbl.modulate.a = 0.0
+		vbox.add_child(solo_lbl)
+		stat_labels.append(solo_lbl)
+
 	# 改善207: Endless達成時にitch.ioコメント投稿を促す（自然なリーダーボード形成）
 	# Why: コメント欄が賑わうと開発者・プレイヤー双方にメリット。実装コスト: 1ラベル追加のみ
 	if is_endless_mode:

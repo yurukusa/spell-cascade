@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.10.1 (2026-02-21)
+
+### Feature: SOLO WARRIOR 実績バナー
+
+サポートを一切装備せずにEndless Modeに到達すると「★ SOLO WARRIOR ★」バナーを表示。
+ハードモード自然発生プレイへの報酬。コスト: 15行。
+
 ## v0.10.0 (2026-02-21)
 
 ### Feature: Build Name Auto-generation — ランのアイデンティティ化
