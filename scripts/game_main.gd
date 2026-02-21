@@ -90,6 +90,12 @@ var _pressure_active := false
 # 改善128: OVERTIMEラベル（9分到達で表示）
 var _overtime_announced := false
 
+# Endless Mode: 10分後も続行する（プレイヤー死亡のみ終了）
+# Why: ゲームジャム投票者が10分でゲームを終了するのを防ぐ。
+# 10分クリアはスタート地点。スコアアタックとして無限に続く。
+var is_endless_mode := false
+var endless_start_time := 0.0  # Endless開始時のrun_time（経過時間計算用）
+
 # Shrine（中盤イベント: 120-225sのquiet zone対策）
 const SHRINE_TIME := 150.0  # 2:30で出現
 const SHRINE_AUTO_SELECT_TIME := 10.0  # 10秒で自動選択
@@ -197,9 +203,9 @@ func _process(delta: float) -> void:
 	# Crush ring visual更新
 	_update_crush_ring()
 
-	# 10分経過 → 勝利
-	if run_time >= max_run_time:
-		_win_game()
+	# 10分経過 → 通常: 勝利。Endless: 継続
+	if run_time >= max_run_time and not is_endless_mode:
+		_enter_endless_mode()
 		return
 
 	# ステージ遷移（v0.3.2: 3-Act構造）
@@ -328,6 +334,18 @@ func record_damage(amount: float) -> void:
 	total_damage_dealt += amount
 
 func _update_timer_display() -> void:
+	if is_endless_mode:
+		# Endless: 10分後の経過時間をカウントアップ（+mm:ss）
+		var elapsed := roundi(run_time - endless_start_time)
+		@warning_ignore("integer_division")
+		var minutes: int = elapsed / 60
+		var seconds: int = elapsed % 60
+		timer_label.text = "+%d:%02d" % [minutes, seconds]
+		# Endless中はゴールド色で点滅（「生き延びている」感）
+		var pulse: float = abs(sin(run_time * 1.5))
+		timer_label.add_theme_color_override("font_color", Color(1.0, 0.85 + pulse * 0.1, 0.2, 1.0))
+		return
+
 	var remaining := maxf(max_run_time - run_time, 0.0)
 	var total_sec: int = floori(remaining)
 	@warning_ignore("integer_division")
@@ -3306,6 +3324,34 @@ func _show_pressure_label() -> void:
 	pt.set_loops()
 	pt.tween_property(_pressure_label, "modulate:a", 0.4, 0.5).set_trans(Tween.TRANS_SINE)
 	pt.tween_property(_pressure_label, "modulate:a", 1.0, 0.5).set_trans(Tween.TRANS_SINE)
+
+func _enter_endless_mode() -> void:
+	## 10分クリア → Endless Modeへ移行（プレイヤー死亡のみ終了）
+	## Why: Wave 20で終わるゲームはジャム投票者に10分で見切られる。
+	## 10分生き残ったビルドが次にどこまで行けるかのスコアアタックとして続ける。
+	is_endless_mode = true
+	endless_start_time = run_time
+	# "ENDLESS MODE" アナウンス（OVERTIMEと同じアーキテクチャで一貫した演出）
+	var lbl := Label.new()
+	lbl.text = "★ ENDLESS MODE ★"
+	lbl.add_theme_font_size_override("font_size", 40)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.1, 1.0))
+	lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	lbl.add_theme_constant_override("shadow_offset_x", 3)
+	lbl.add_theme_constant_override("shadow_offset_y", 3)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.custom_minimum_size = Vector2(760, 0)
+	lbl.position = Vector2(200, 260)
+	lbl.z_index = 180
+	lbl.scale = Vector2(2.2, 2.2)
+	ui_layer.add_child(lbl)
+	tower.shake(6.0)
+	var t := lbl.create_tween()
+	t.tween_property(lbl, "scale", Vector2(1.0, 1.0), 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.set_parallel(true)
+	t.tween_property(lbl, "position:y", 240.0, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.tween_property(lbl, "modulate:a", 0.0, 2.5).set_delay(0.8)
+	t.chain().tween_callback(lbl.queue_free)
 
 func _announce_overtime() -> void:
 	## 改善128: 9分到達でOVERTIME告知（「あと1分！ゴールは近い」）
